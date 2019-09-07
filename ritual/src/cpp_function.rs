@@ -1,6 +1,7 @@
 //! Types for handling information about C++ methods.
 
-use crate::cpp_data::{CppPath, CppVisibility};
+use crate::cpp_data::{CppPath, CppPathItem, CppVisibility};
+use crate::cpp_ffi_data::CppCast;
 pub use crate::cpp_operator::{CppOperator, CppOperatorInfo};
 use crate::cpp_type::{CppPointerLikeTypeKind, CppType};
 use crate::rust_info::RustQtReceiverType;
@@ -80,30 +81,6 @@ impl CppFunctionMemberData {
     }
 }
 
-/// C++ documentation for a method
-#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
-pub struct CppFunctionExternalDoc {
-    /// HTML anchor of this documentation entry
-    /// (used to detect duplicates)
-    pub anchor: String,
-    /// HTML content
-    pub html: String,
-    /// If the documentation parser couldn't find documentation for the exact same
-    /// method, it can still provide documentation entry for the closest match.
-    /// In this case, this field should contain C++ declaration of the found method.
-    pub mismatched_declaration: Option<String>,
-    /// Absolute URL to online documentation page for this method
-    pub url: String,
-    /// Absolute documentation URLs encountered in the content
-    pub cross_references: Vec<String>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize, Default)]
-pub struct CppFunctionDoc {
-    pub arguments_before_omitting: Option<Vec<CppFunctionArgument>>,
-    pub external_doc: Option<CppFunctionExternalDoc>,
-}
-
 /// Information about a C++ method
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
 pub struct CppFunction {
@@ -140,11 +117,10 @@ pub struct CppFunction {
     pub arguments: Vec<CppFunctionArgument>,
     /// Whether the argument list is terminated with "..."
     pub allows_variadic_arguments: bool,
+    pub cast: Option<CppCast>,
     /// C++ code of the method's declaration.
     /// None if the method was not explicitly declared.
     pub declaration_code: Option<String>,
-    /// C++ documentation data for this method
-    pub doc: CppFunctionDoc,
 }
 
 /// Chosen type allocation place for the method
@@ -217,9 +193,19 @@ impl CppFunction {
             && self.argument_types_equal(other)
     }
 
-    pub fn class_type(&self) -> Result<CppPath> {
+    pub fn class_path(&self) -> Result<CppPath> {
         if self.member.is_some() {
             Ok(self.path.parent().with_context(|_| {
+                err_msg("CppFunction is a class member but its path is not nested.")
+            })?)
+        } else {
+            bail!("not a member function")
+        }
+    }
+
+    pub fn class_path_parts(&self) -> Result<&[CppPathItem]> {
+        if self.member.is_some() {
+            Ok(self.path.parent_parts().with_context(|_| {
                 err_msg("CppFunction is a class member but its path is not nested.")
             })?)
         } else {
@@ -321,7 +307,7 @@ impl CppFunction {
                     arg.argument_type.to_cpp_pseudo_code(),
                     arg.name,
                     if arg.has_default_value {
-                        " = ?".to_string()
+                        " = …".to_string()
                     } else {
                         String::new()
                     }
@@ -351,7 +337,7 @@ impl CppFunction {
         if self.arguments.len() != 1 {
             return false;
         }
-        let arg = CppType::new_reference(true, CppType::Class(self.class_type().unwrap()));
+        let arg = CppType::new_reference(true, CppType::Class(self.class_path().unwrap()));
         arg == self.arguments[0].argument_type
     }
 
@@ -440,7 +426,7 @@ impl CppFunction {
             result.push(CppType::PointerLike {
                 is_const: class_membership.is_const,
                 kind: CppPointerLikeTypeKind::Pointer,
-                target: Box::new(CppType::Class(self.class_type().unwrap())),
+                target: Box::new(CppType::Class(self.class_path().unwrap())),
             });
         }
         for t in self.arguments.iter().map(|x| x.argument_type.clone()) {
@@ -452,5 +438,22 @@ impl CppFunction {
             result.extend(template_arguments.clone());
         }
         result
+    }
+
+    pub fn can_infer_template_arguments(&self) -> bool {
+        if let Some(args) = &self.path.last().template_arguments {
+            for t in args {
+                if let CppType::TemplateParameter(param) = t {
+                    if !self
+                        .arguments
+                        .iter()
+                        .any(|arg| arg.argument_type.contains_template_parameter(param))
+                    {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
     }
 }

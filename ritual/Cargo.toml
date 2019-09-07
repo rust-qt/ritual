@@ -13,7 +13,7 @@ exclude = ["test_assets/**/*"]
 ritual_common = { version = "0.0.0", path = "../ritual_common" }
 
 regex = "1.1.0"
-serde = "1.0.84"       # serialization
+serde = { version = "1.0.84", features = ["rc"] }
 serde_derive = "1.0.84"
 clang = "0.20.0"    # C++ parsing
 select = "0.4.2"    # html parsing

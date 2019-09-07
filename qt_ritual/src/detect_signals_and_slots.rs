@@ -2,7 +2,7 @@ use itertools::Itertools;
 use log::trace;
 use regex::Regex;
 use ritual::cpp_data::{CppItem, CppPath};
-use ritual::database::DatabaseItemSource;
+use ritual::cpp_parser::CppParserOutput;
 use ritual::processor::ProcessorData;
 use ritual_common::errors::{Result, ResultExt};
 use ritual_common::file_utils::open_file;
@@ -14,7 +14,7 @@ pub fn inherits(
     derived_class_name: &CppPath,
     base_class_name: &CppPath,
 ) -> bool {
-    for item in data.all_cpp_items() {
+    for item in data.db.all_cpp_items() {
         if let CppItem::ClassBase(base_data) = &item.item {
             if &base_data.derived_class_type == derived_class_name {
                 if &base_data.base_class_type == base_class_name {
@@ -43,22 +43,22 @@ struct Section {
 
 /// Parses include files to detect which methods are signals or slots.
 #[allow(clippy::cognitive_complexity, clippy::collapsible_if)]
-pub fn detect_signals_and_slots(data: &mut ProcessorData<'_>) -> Result<()> {
+pub fn detect_signals_and_slots(
+    data: &mut ProcessorData<'_>,
+    output: &CppParserOutput,
+) -> Result<()> {
     // TODO: only run if it's a new class or it has some new methods; don't change existing old methods
     let mut files = HashSet::new();
 
     let qobject_path = CppPath::from_good_str("QObject");
-    for item in data.current_database.cpp_items() {
-        if let DatabaseItemSource::CppParser {
-            origin_location, ..
-        } = &item.source
-        {
-            if let CppItem::Type(type1) = &item.item {
-                if type1.kind.is_class() {
-                    if type1.path == qobject_path || inherits(&data, &type1.path, &qobject_path) {
-                        if !files.contains(&origin_location.include_file_path) {
-                            files.insert(origin_location.include_file_path.clone());
-                        }
+    for item in &output.0 {
+        let cpp_item = data.db.cpp_item(&item.id)?;
+
+        if let CppItem::Type(type1) = &cpp_item.item {
+            if type1.kind.is_class() {
+                if type1.path == qobject_path || inherits(&data, &type1.path, &qobject_path) {
+                    if !files.contains(&item.origin_location.include_file_path) {
+                        files.insert(item.origin_location.include_file_path.clone());
                     }
                 }
             }
@@ -102,62 +102,55 @@ pub fn detect_signals_and_slots(data: &mut ProcessorData<'_>) -> Result<()> {
     }
 
     let mut sections_per_class = HashMap::new();
-    for item in data.current_database.cpp_items() {
-        if let DatabaseItemSource::CppParser {
-            origin_location, ..
-        } = &item.source
-        {
-            if let CppItem::Type(type1) = &item.item {
-                if let Some(sections) = sections.get(&origin_location.include_file_path) {
-                    let sections_for_class = sections
-                        .iter()
-                        .filter(|x| x.line + 1 >= origin_location.line as usize)
-                        .collect_vec();
-                    sections_per_class.insert(type1.path.clone(), sections_for_class);
-                }
+    for item in &output.0 {
+        let cpp_item = data.db.cpp_item(&item.id)?;
+
+        if let CppItem::Type(type1) = &cpp_item.item {
+            if let Some(sections) = sections.get(&item.origin_location.include_file_path) {
+                let sections_for_class = sections
+                    .iter()
+                    .filter(|x| x.line + 1 >= item.origin_location.line as usize)
+                    .collect_vec();
+                sections_per_class.insert(type1.path.clone(), sections_for_class);
             }
         }
     }
 
-    for item in data.current_database.cpp_items_mut() {
-        if let DatabaseItemSource::CppParser {
-            origin_location, ..
-        } = &item.source
-        {
-            if let CppItem::Function(method) = &mut item.item {
-                let mut section_type = SectionType::Other;
-                if let Ok(class_name) = method.class_type() {
-                    if let Some(sections) = sections_per_class.get(&class_name) {
-                        let matching_sections = sections
-                            .clone()
-                            .into_iter()
-                            .filter(|x| x.line < origin_location.line as usize)
-                            .collect_vec();
-                        if !matching_sections.is_empty() {
-                            let section = matching_sections[matching_sections.len() - 1];
-                            section_type = section.section_type.clone();
-                            match section.section_type {
-                                SectionType::Signals => {
-                                    trace!("Found signal: {}", method.short_text());
-                                }
-                                SectionType::Slots => {
-                                    trace!("Found slot: {}", method.short_text());
-                                }
-                                SectionType::Other => {}
+    for item in &output.0 {
+        let mut cpp_item = data.db.cpp_item_mut(&item.id)?;
+        if let CppItem::Function(method) = &mut cpp_item.item {
+            let mut section_type = SectionType::Other;
+            if let Ok(class_name) = method.class_path() {
+                if let Some(sections) = sections_per_class.get(&class_name) {
+                    let matching_sections = sections
+                        .clone()
+                        .into_iter()
+                        .filter(|x| x.line < item.origin_location.line as usize)
+                        .collect_vec();
+                    if !matching_sections.is_empty() {
+                        let section = matching_sections[matching_sections.len() - 1];
+                        section_type = section.section_type.clone();
+                        match section.section_type {
+                            SectionType::Signals => {
+                                trace!("Found signal: {}", method.short_text());
                             }
+                            SectionType::Slots => {
+                                trace!("Found slot: {}", method.short_text());
+                            }
+                            SectionType::Other => {}
                         }
                     }
                 }
-                if let Some(info) = &mut method.member {
-                    match section_type {
-                        SectionType::Signals => {
-                            info.is_signal = true;
-                        }
-                        SectionType::Slots => {
-                            info.is_slot = true;
-                        }
-                        SectionType::Other => {}
+            }
+            if let Some(info) = &mut method.member {
+                match section_type {
+                    SectionType::Signals => {
+                        info.is_signal = true;
                     }
+                    SectionType::Slots => {
+                        info.is_slot = true;
+                    }
+                    SectionType::Other => {}
                 }
             }
         }

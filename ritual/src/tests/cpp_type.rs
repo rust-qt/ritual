@@ -3,7 +3,7 @@ use crate::cpp_ffi_data::CppToFfiTypeConversion;
 use crate::cpp_ffi_generator::ffi_type;
 use crate::cpp_type::{
     CppBuiltInNumericType, CppFunctionPointerType, CppSpecificNumericType,
-    CppSpecificNumericTypeKind, CppType, CppTypeRole,
+    CppSpecificNumericTypeKind, CppTemplateParameter, CppType, CppTypeRole,
 };
 
 fn assert_type_to_ffi_unchanged(t: &CppType) {
@@ -328,11 +328,11 @@ fn qflags() {
 fn template_parameter() {
     let type1 = CppType::new_pointer(
         false,
-        CppType::TemplateParameter {
+        CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 0,
             index: 0,
             name: "T".into(),
-        },
+        }),
     );
     assert_eq!(type1.is_void(), false);
     assert_eq!(type1.is_class(), false);
@@ -364,11 +364,11 @@ fn function1() {
 fn instantiate1() {
     let type1 = CppType::new_reference(
         true,
-        CppType::TemplateParameter {
+        CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 0,
             index: 0,
             name: "T".into(),
-        },
+        }),
     );
     let type2 = CppType::new_pointer(false, CppType::BuiltInNumeric(CppBuiltInNumericType::Bool));
     let r = type1.instantiate(0, &[type2]).unwrap();

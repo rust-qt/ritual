@@ -1,29 +1,12 @@
 #![allow(dead_code)]
 
 use crate::config::MovableTypesHookOutput;
-use crate::cpp_data::{CppItem, CppPath, CppTypeDeclarationKind};
+use crate::cpp_data::{CppItem, CppPath};
 use crate::cpp_type::{CppPointerLikeTypeKind, CppType};
 use crate::processor::ProcessorData;
 use log::{info, trace};
 use ritual_common::errors::Result;
 use std::collections::HashMap;
-
-pub fn set_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
-    if let Some(hook) = data.config.movable_types_hook() {
-        for type1 in data
-            .current_database
-            .cpp_items_mut()
-            .iter_mut()
-            .filter_map(|item| item.item.as_type_mut())
-        {
-            if let CppTypeDeclarationKind::Class { is_movable, .. } = &mut type1.kind {
-                *is_movable = hook(&type1.path)? == MovableTypesHookOutput::Movable;
-            }
-        }
-    }
-
-    Ok(())
-}
 
 #[derive(Default, Debug)]
 struct TypeStats {
@@ -122,8 +105,8 @@ const MAX_ITEMS: usize = 10;
 pub fn suggest_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
     let mut data_map = HashMap::new();
 
-    for item in data.current_database.cpp_items() {
-        if !item.source.is_parser() || item.source_ffi_item.is_some() {
+    for item in data.db.cpp_items() {
+        if item.source_id.is_some() {
             continue;
         }
         if let CppItem::Type(type1) = &item.item {
@@ -140,8 +123,8 @@ pub fn suggest_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
         }
     }
 
-    for item in data.current_database.cpp_items() {
-        if !item.source.is_parser() || item.source_ffi_item.is_some() {
+    for item in data.db.cpp_items() {
+        if item.source_id.is_some() {
             continue;
         }
         if let CppItem::Function(function) = &item.item {
@@ -154,7 +137,7 @@ pub fn suggest_allocation_places(data: &mut ProcessorData<'_>) -> Result<()> {
             }
             check_type(&function.return_type, false, &mut data_map, &item_text);
             if function.is_virtual() {
-                let type1 = function.class_type()?;
+                let type1 = function.class_path()?;
                 let good_path = type1.deinstantiate();
                 if let Some(stats) = data_map.get_mut(&good_path) {
                     if stats.virtual_functions.len() < MAX_ITEMS {

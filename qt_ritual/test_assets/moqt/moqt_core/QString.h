@@ -5,8 +5,20 @@
 
 class MOQT_CORE_EXPORT QByteArray {
 public:
+    QByteArray(int, char) {}
+    QByteArray(const char*, int) {}
+    QByteArray() {}
     const char *constData() const;
     int size() const;
+};
+
+class QString;
+
+class MOQT_CORE_EXPORT QDebug {
+public:
+    QDebug() {}
+    QDebug(QString*) {}
+    QDebug(int) {}
 };
 
 class MOQT_CORE_EXPORT QString {

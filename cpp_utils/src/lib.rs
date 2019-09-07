@@ -8,17 +8,19 @@
 //! - `Ptr`: possibly owned, possibly null
 //! - `Ref`: not owned, non-null
 
-pub use crate::casts::{
-    dynamic_cast, dynamic_cast_mut, static_downcast, static_downcast_mut, static_upcast,
-    static_upcast_mut, DynamicCast, StaticDowncast, StaticUpcast,
-};
+pub use crate::casts::{DynamicCast, StaticDowncast, StaticUpcast};
+pub use crate::convert::{CastFrom, CastInto};
 pub use crate::cpp_box::{CppBox, CppDeletable};
-pub use crate::ptr::{ConstPtr, Ptr};
-pub use crate::ref_::{ConstRef, Ref};
+pub use crate::iterator::{cpp_iter, CppIterator};
+pub use crate::ptr::{MutPtr, NullPtr, Ptr};
+pub use crate::ref_::{MutRef, Ref};
 
 mod casts;
 pub mod cmp;
+mod convert;
 mod cpp_box;
-mod ops;
+mod iterator;
+pub mod ops;
+mod ops_impls;
 mod ptr;
 mod ref_;

@@ -7,6 +7,7 @@
 pub mod cli;
 pub mod cluster_api;
 pub mod config;
+mod cpp_casts;
 pub mod cpp_checker;
 mod cpp_checks;
 mod cpp_code_generator;
@@ -18,8 +19,8 @@ mod cpp_implicit_methods;
 mod cpp_inheritance; // TODO: deal with inheritance for subclassing support
 mod cpp_omitting_arguments;
 mod cpp_operator;
-mod cpp_parser;
-mod cpp_template_instantiator;
+pub mod cpp_parser;
+pub mod cpp_template_instantiator;
 pub mod cpp_type;
 mod crate_writer;
 pub mod database;

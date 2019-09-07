@@ -1,6 +1,7 @@
-use crate::{ConstPtr, ConstRef, Ptr, Ref};
+use crate::ops::{Begin, BeginMut, End, EndMut};
+use crate::{DynamicCast, MutPtr, MutRef, Ptr, Ref, StaticDowncast, StaticUpcast};
 use std::ops::{Deref, DerefMut};
-use std::{fmt, mem, ptr};
+use std::{fmt, mem, ptr, slice};
 
 /// Indicates that the type can be put into a CppBox.
 ///
@@ -34,17 +35,21 @@ pub struct CppBox<T: CppDeletable>(ptr::NonNull<T>);
 
 impl<T: CppDeletable> CppBox<T> {
     /// Returns constant raw pointer to the value in the box.
-    pub unsafe fn as_ptr(&self) -> ConstPtr<T> {
-        ConstPtr::from_raw(self.0.as_ptr())
-    }
-
-    /// Returns mutable raw pointer to the value in the box.
-    pub unsafe fn as_mut_ptr(&mut self) -> Ptr<T> {
+    pub unsafe fn as_ptr(&self) -> Ptr<T> {
         Ptr::from_raw(self.0.as_ptr())
     }
 
-    pub unsafe fn as_raw_ptr(&mut self) -> *mut T {
+    /// Returns mutable raw pointer to the value in the box.
+    pub unsafe fn as_mut_ptr(&mut self) -> MutPtr<T> {
+        MutPtr::from_raw(self.0.as_ptr())
+    }
+
+    pub unsafe fn as_mut_raw_ptr(&mut self) -> *mut T {
         self.0.as_ptr()
+    }
+
+    pub unsafe fn as_raw_ptr(&self) -> *const T {
+        self.0.as_ptr() as *const T
     }
 
     /// Returns the pointer to the content and destroys the box.
@@ -59,20 +64,120 @@ impl<T: CppDeletable> CppBox<T> {
     /// Returns the pointer to the content and destroys the box.
     /// The caller of the function becomes the owner of the object and should
     /// ensure that the object will be deleted at some point.
-    pub unsafe fn into_ptr(self) -> Ptr<T> {
-        let ptr = Ptr::from_raw(self.0.as_ptr());
+    pub unsafe fn into_ptr(self) -> MutPtr<T> {
+        let ptr = MutPtr::from_raw(self.0.as_ptr());
         mem::forget(self);
         ptr
     }
 
     #[allow(clippy::should_implement_trait)]
-    pub unsafe fn as_ref(&self) -> ConstRef<T> {
-        ConstRef::from_raw_non_null(self.0)
+    pub unsafe fn as_ref(&self) -> Ref<T> {
+        Ref::from_raw_non_null(self.0)
     }
 
     #[allow(clippy::should_implement_trait)]
-    pub unsafe fn as_mut_ref(&mut self) -> Ref<T> {
-        Ref::from_raw_non_null(self.0)
+    pub unsafe fn as_mut_ref(&mut self) -> MutRef<T> {
+        MutRef::from_raw_non_null(self.0)
+    }
+
+    pub unsafe fn static_upcast<U>(&self) -> Ref<U>
+    where
+        T: StaticUpcast<U>,
+    {
+        StaticUpcast::static_upcast(self.as_ptr())
+            .as_ref()
+            .expect("StaticUpcast returned null on CppBox input")
+    }
+
+    pub unsafe fn static_downcast<U>(&self) -> Ref<U>
+    where
+        T: StaticDowncast<U>,
+    {
+        StaticDowncast::static_downcast(self.as_ptr())
+            .as_ref()
+            .expect("StaticDowncast returned null on CppBox input")
+    }
+
+    pub unsafe fn dynamic_cast<U>(&self) -> Option<Ref<U>>
+    where
+        T: DynamicCast<U>,
+    {
+        DynamicCast::dynamic_cast(self.as_ptr()).as_ref()
+    }
+
+    pub unsafe fn static_upcast_mut<U>(&mut self) -> MutRef<U>
+    where
+        T: StaticUpcast<U>,
+    {
+        StaticUpcast::static_upcast_mut(self.as_mut_ptr())
+            .as_mut_ref()
+            .expect("StaticUpcast returned null on CppBox input")
+    }
+
+    pub unsafe fn static_downcast_mut<U>(&mut self) -> MutRef<U>
+    where
+        T: StaticDowncast<U>,
+    {
+        StaticDowncast::static_downcast_mut(self.as_mut_ptr())
+            .as_mut_ref()
+            .expect("StaticDowncast returned null on CppBox input")
+    }
+
+    pub unsafe fn dynamic_cast_mut<U>(&mut self) -> Option<MutRef<U>>
+    where
+        T: DynamicCast<U>,
+    {
+        DynamicCast::dynamic_cast_mut(self.as_mut_ptr()).as_mut_ref()
+    }
+
+    pub unsafe fn begin(&self) -> <&'static T as Begin>::Output
+    where
+        &'static T: Begin,
+    {
+        (*self.as_raw_ptr()).begin()
+    }
+
+    pub unsafe fn begin_mut(&mut self) -> <&'static mut T as BeginMut>::Output
+    where
+        &'static mut T: BeginMut,
+    {
+        (*self.as_mut_raw_ptr()).begin_mut()
+    }
+
+    pub unsafe fn end(&self) -> <&'static T as End>::Output
+    where
+        &'static T: End,
+    {
+        (*self.as_raw_ptr()).end()
+    }
+
+    pub unsafe fn end_mut(&mut self) -> <&'static mut T as EndMut>::Output
+    where
+        &'static mut T: EndMut,
+    {
+        (*self.as_mut_raw_ptr()).end_mut()
+    }
+
+    pub unsafe fn as_slice<'a, T1>(&'a self) -> &'a [T1]
+    where
+        T: 'static,
+        &'static T: Begin<Output = Ptr<T1>> + End<Output = Ptr<T1>>,
+    {
+        let begin = self.begin().as_raw_ptr();
+        let end = self.end().as_raw_ptr();
+        let count = (end as usize).saturating_sub(begin as usize) / mem::size_of::<T1>();
+        slice::from_raw_parts(begin, count)
+    }
+
+    pub unsafe fn as_mut_slice<'a, T1>(&'a mut self) -> &'a mut [T1]
+    where
+        T: 'static,
+        &'static mut T: BeginMut<Output = MutPtr<T1>> + EndMut<Output = MutPtr<T1>>,
+    {
+        let begin = self.begin_mut().as_mut_raw_ptr();
+        let end = self.end_mut().as_mut_raw_ptr();
+        let count = (end as usize).saturating_sub(begin as usize) / mem::size_of::<T1>();
+        slice::from_raw_parts_mut(begin, count)
     }
 }
 
@@ -91,8 +196,8 @@ impl<T: CppDeletable> CppBox<T> {
     ///
     /// Use `CppBox::into_ptr` to unwrap the pointer before passing it to
     /// a function that takes ownership of the object.
-    pub unsafe fn new(ptr: Ptr<T>) -> Option<Self> {
-        Self::from_raw(ptr.as_raw_ptr())
+    pub unsafe fn new(ptr: MutPtr<T>) -> Option<Self> {
+        Self::from_raw(ptr.as_mut_raw_ptr())
     }
 
     pub unsafe fn from_raw(ptr: *mut T) -> Option<Self> {
@@ -129,7 +234,7 @@ impl<T: CppDeletable> fmt::Debug for CppBox<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{CppBox, CppDeletable, Ptr};
+    use crate::{CppBox, CppDeletable, MutPtr};
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -156,7 +261,7 @@ mod tests {
         assert!(*value1.borrow() == 10);
         unsafe {
             // TODO: remove all "as *mut _" because it's automatic
-            CppBox::new(Ptr::from_raw(&mut object1));
+            CppBox::new(MutPtr::from_raw(&mut object1));
         }
         assert!(*value1.borrow() == 42);
     }

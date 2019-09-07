@@ -26,25 +26,25 @@ impl<'a> {pub_type_name}<'a> {{
         unsafe {{
             self.raw_slot.set(
                 Some(callback),
-                ::cpp_utils::Ptr::from_raw(&mut*func_box as *mut Box<_> as *mut ::std::ffi::c_void)
+                ::cpp_utils::MutPtr::from_raw(&mut*func_box as *mut Box<_> as *mut ::std::ffi::c_void)
             );
         }}
         self.func = Some(func_box);
     }}
 
-    /// Drops the previously set closure, if any. After this, slot invokation will have no effect
+    /// Drops the previously set closure, if any. After this, slot invocation will have no effect
     /// until a new closure is set.
     pub fn clear(&mut self) {{
         if self.func.is_some() {{
             unsafe {{
-                self.raw_slot.set(None, ::cpp_utils::Ptr::null());
+                self.raw_slot.set(None, ::cpp_utils::NullPtr);
             }}
             self.func = None;
         }}
     }}
 
-    pub unsafe fn as_raw(&mut self) -> ::cpp_utils::Ptr<{type_name}> {{
-        self.raw_slot.as_mut_ptr()
+    pub unsafe fn as_raw(&mut self) -> ::cpp_utils::MutRef<{type_name}> {{
+        self.raw_slot.as_mut_ref()
     }}
 }}
 

@@ -72,6 +72,22 @@ pub struct CppSpecificNumericType {
     pub kind: CppSpecificNumericTypeKind,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
+pub struct CppTemplateParameter {
+    /// Template instantiation level. For example,
+    /// if there is a template class and a template method in it,
+    /// the class's template parameters will have level = 0 and
+    /// the method's template parameters will have level = 1.
+    /// If only the class or only the method is a template,
+    /// the level will be 0.
+    pub nested_level: usize,
+    /// Index of the parameter. In `QHash<K, V>` `"K"` has `index = 0`
+    /// and `"V"` has `index = 1`.
+    pub index: usize,
+    /// Declared name of this template parameter
+    pub name: String,
+}
+
 /// Base C++ type. `CppType` can add indirection
 /// and constness to `CppTypeBase`, but otherwise
 /// this enum lists all supported types.
@@ -96,21 +112,7 @@ pub enum CppType {
     Class(CppPath),
     /// Template parameter, like `"T"` anywhere inside
     /// `QVector<T>` declaration
-    TemplateParameter {
-        /// Template instantiation level. For example,
-        /// if there is a template class and a template method in it,
-        /// the class's template parameters will have level = 0 and
-        /// the method's template parameters will have level = 1.
-        /// If only the class or only the method is a template,
-        /// the level will be 0.
-        nested_level: usize,
-        /// Index of the parameter. In `QHash<K, V>` `"K"` has `index = 0`
-        /// and `"V"` has `index = 1`.
-        index: usize,
-
-        /// Declared name of this template parameter
-        name: String,
-    },
+    TemplateParameter(CppTemplateParameter),
     /// Function pointer type
     FunctionPointer(CppFunctionPointerType),
     PointerLike {
@@ -266,6 +268,32 @@ impl CppType {
         }
     }
 
+    pub fn contains_template_parameter(&self, param: &CppTemplateParameter) -> bool {
+        match self {
+            CppType::TemplateParameter(self_params) => {
+                self_params.nested_level == param.nested_level && self_params.index == param.index
+            }
+            CppType::PointerLike { target, .. } => target.contains_template_parameter(param),
+            CppType::FunctionPointer(type1) => {
+                type1.return_type.contains_template_parameter(param)
+                    || type1
+                        .arguments
+                        .iter()
+                        .any(|t| t.contains_template_parameter(param))
+            }
+            CppType::Class(path) => path.items().iter().any(|item| {
+                if let Some(template_arguments) = &item.template_arguments {
+                    template_arguments
+                        .iter()
+                        .any(|t| t.contains_template_parameter(param))
+                } else {
+                    false
+                }
+            }),
+            _ => false,
+        }
+    }
+
     /// Returns C++ code representing this type.
     pub fn to_cpp_code(&self, function_pointer_inner_text: Option<&str>) -> Result<String> {
         if !self.is_function_pointer() && function_pointer_inner_text.is_some() {
@@ -325,8 +353,8 @@ impl CppType {
     /// for debugging output.
     pub fn to_cpp_pseudo_code(&self) -> String {
         match self {
-            CppType::TemplateParameter { name, .. } => {
-                return name.to_string();
+            CppType::TemplateParameter(param) => {
+                return param.name.to_string();
             }
             CppType::Class(base) => return base.to_cpp_pseudo_code(),
             CppType::FunctionPointer(..) => {
@@ -364,7 +392,7 @@ impl CppType {
             CppType::PointerSizedInteger { path, .. }
             | CppType::Enum { path }
             | CppType::Class(path) => path.ascii_caption(),
-            CppType::TemplateParameter { name, .. } => name.to_string(),
+            CppType::TemplateParameter(param) => param.name.to_string(),
             CppType::FunctionPointer(_) => "fn".into(),
             CppType::PointerLike {
                 kind,
@@ -431,31 +459,27 @@ impl CppType {
         }
     }
 
-    /// Attempts to replace template types at `nested_level1`
+    /// Attempts to replace template types at `nested_level`
     /// within this type with `template_arguments1`.
     #[allow(clippy::if_not_else)]
     pub fn instantiate(
         &self,
-        nested_level1: usize,
+        nested_level: usize,
         template_arguments1: &[CppType],
     ) -> Result<CppType> {
         match self {
-            CppType::TemplateParameter {
-                nested_level,
-                index,
-                ..
-            } => {
-                if *nested_level == nested_level1 {
-                    if *index >= template_arguments1.len() {
+            CppType::TemplateParameter(param) => {
+                if param.nested_level == nested_level {
+                    if param.index >= template_arguments1.len() {
                         bail!("not enough template arguments");
                     }
-                    Ok(template_arguments1[*index].clone())
+                    Ok(template_arguments1[param.index].clone())
                 } else {
                     Ok(self.clone())
                 }
             }
             CppType::Class(type1) => Ok(CppType::Class(
-                type1.instantiate(nested_level1, template_arguments1)?,
+                type1.instantiate(nested_level, template_arguments1)?,
             )),
             CppType::PointerLike {
                 kind,
@@ -464,7 +488,7 @@ impl CppType {
             } => Ok(CppType::PointerLike {
                 kind: kind.clone(),
                 is_const: *is_const,
-                target: Box::new(target.instantiate(nested_level1, template_arguments1)?),
+                target: Box::new(target.instantiate(nested_level, template_arguments1)?),
             }),
             _ => Ok(self.clone()),
         }

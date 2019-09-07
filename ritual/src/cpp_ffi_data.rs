@@ -1,8 +1,10 @@
-use crate::cpp_data::{CppClassField, CppPath};
-use crate::cpp_function::{CppFunction, ReturnValueAllocationPlace};
+use crate::cpp_code_generator;
+use crate::cpp_data::CppPath;
+use crate::cpp_function::ReturnValueAllocationPlace;
 use crate::cpp_type::{CppBuiltInNumericType, CppFunctionPointerType, CppType};
+use crate::database::DatabaseClient;
 use itertools::Itertools;
-use ritual_common::errors::Result;
+use ritual_common::errors::{bail, Result};
 use serde_derive::{Deserialize, Serialize};
 
 /// Variation of a field accessor method
@@ -18,7 +20,7 @@ pub enum CppFieldAccessorType {
     Setter,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub enum CppCast {
     Static {
         /// If true, this is an unsafe (from base to derived) `static_cast` wrapper.
@@ -26,7 +28,7 @@ pub enum CppCast {
 
         /// Contains index of the base (e.g. 0 for the first base; always
         /// 0 if the class only has one base).
-        base_index: usize,
+        base_index: Option<usize>,
     },
     Dynamic,
     QObject,
@@ -49,7 +51,7 @@ impl CppCast {
     }
     pub fn is_first_static_cast(&self) -> bool {
         match self {
-            CppCast::Static { base_index, .. } => base_index == &0,
+            CppCast::Static { base_index, .. } => base_index.as_ref() == Some(&0),
             _ => false,
         }
     }
@@ -60,37 +62,13 @@ impl CppCast {
 #[allow(clippy::large_enum_variant)]
 pub enum CppFfiFunctionKind {
     /// This is a real C++ function.
-    Function {
-        cpp_function: CppFunction,
-        /// If Some, this is an instance of `static_cast`, `dynamic_cast` or
-        /// `qobject_cast` function call.
-        cast: Option<CppCast>,
-    },
+    Function,
     /// This is a field accessor, i.e. a non-existing getter or setter
     /// method for a public field.
     FieldAccessor {
         /// Type of the accessor
         accessor_type: CppFieldAccessorType,
-        // /// Name of the C++ field
-        field: CppClassField,
     },
-}
-
-impl CppFfiFunctionKind {
-    pub fn cpp_function(&self) -> Option<&CppFunction> {
-        if let CppFfiFunctionKind::Function { cpp_function, .. } = self {
-            Some(cpp_function)
-        } else {
-            None
-        }
-    }
-    pub fn cpp_field(&self) -> Option<&CppClassField> {
-        if let CppFfiFunctionKind::FieldAccessor { field, .. } = self {
-            Some(field)
-        } else {
-            None
-        }
-    }
 }
 
 /// Relation between original C++ method's argument value
@@ -198,28 +176,26 @@ impl CppFfiFunction {
         })
     }
 
-    pub fn short_text(&self) -> String {
+    pub fn has_same_kind(&self, other: &Self) -> bool {
         match &self.kind {
-            CppFfiFunctionKind::Function { cpp_function, .. } => {
-                let omitted_args_text =
-                    if let Some(args) = &cpp_function.doc.arguments_before_omitting {
-                        format!(
-                            " (omitted arguments: {})",
-                            args.len() - cpp_function.arguments.len()
-                        )
-                    } else {
-                        String::new()
-                    };
-                format!(
-                    "FFI function call{}: {}",
-                    omitted_args_text,
-                    cpp_function.short_text()
-                )
+            CppFfiFunctionKind::Function { .. } => {
+                if let CppFfiFunctionKind::Function { .. } = &other.kind {
+                    true
+                } else {
+                    false
+                }
             }
-            CppFfiFunctionKind::FieldAccessor {
-                field,
-                accessor_type,
-            } => format!("FFI field {:?}: {}", accessor_type, field.short_text()),
+            CppFfiFunctionKind::FieldAccessor { accessor_type, .. } => {
+                if let CppFfiFunctionKind::FieldAccessor {
+                    accessor_type: other_accessor_type,
+                    ..
+                } = &other.kind
+                {
+                    accessor_type == other_accessor_type
+                } else {
+                    false
+                }
+            }
         }
     }
 }
@@ -299,9 +275,6 @@ pub struct QtSlotWrapper {
     pub arguments: Vec<CppFfiType>,
     /// The function pointer type accepted by this wrapper
     pub function_type: CppFunctionPointerType,
-    // /// String identifier passed to `QObject::connect` function to
-    // /// specify the object's slot.
-    //pub receiver_id: String,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -328,6 +301,14 @@ impl CppFfiItem {
         }
     }
 
+    pub fn as_slot_wrapper_ref(&self) -> Option<&QtSlotWrapper> {
+        if let CppFfiItem::QtSlotWrapper(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+
     pub fn is_slot_wrapper(&self) -> bool {
         if let CppFfiItem::QtSlotWrapper(_) = self {
             true
@@ -338,7 +319,7 @@ impl CppFfiItem {
 
     pub fn short_text(&self) -> String {
         match self {
-            CppFfiItem::Function(function) => function.short_text(),
+            CppFfiItem::Function(function) => function.path.to_cpp_pseudo_code(),
             CppFfiItem::QtSlotWrapper(slot_wrapper) => format!(
                 "slot wrapper for ({})",
                 slot_wrapper
@@ -347,6 +328,48 @@ impl CppFfiItem {
                     .map(CppType::to_cpp_pseudo_code)
                     .join(", ")
             ),
+        }
+    }
+
+    pub fn has_same_kind(&self, other: &Self) -> bool {
+        match self {
+            CppFfiItem::Function(function) => {
+                if let CppFfiItem::Function(other_function) = other {
+                    function.has_same_kind(other_function)
+                } else {
+                    false
+                }
+            }
+            CppFfiItem::QtSlotWrapper(wrapper) => {
+                if let CppFfiItem::QtSlotWrapper(other_wrapper) = other {
+                    wrapper.signal_arguments == other_wrapper.signal_arguments
+                } else {
+                    false
+                }
+            }
+        }
+    }
+
+    pub fn path(&self) -> &CppPath {
+        match self {
+            CppFfiItem::Function(f) => &f.path,
+            CppFfiItem::QtSlotWrapper(s) => &s.class_path,
+        }
+    }
+
+    pub fn is_source_item(&self) -> bool {
+        match self {
+            CppFfiItem::Function(_) => false,
+            CppFfiItem::QtSlotWrapper(_) => true,
+        }
+    }
+
+    pub fn source_item_cpp_code(&self, db: &DatabaseClient) -> Result<String> {
+        match self {
+            CppFfiItem::Function(_) => bail!("not a source item"),
+            CppFfiItem::QtSlotWrapper(slot_wrapper) => {
+                cpp_code_generator::qt_slot_wrapper(db, slot_wrapper)
+            }
         }
     }
 }

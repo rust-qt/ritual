@@ -1,13 +1,14 @@
 //! Types holding information about generates Rust API.
 
-use crate::cpp_data::{CppPath, CppTypeDoc};
+use crate::cpp_data::CppPath;
 use crate::cpp_ffi_data::CppFfiFunction;
-use crate::cpp_function::CppFunctionExternalDoc;
 use crate::cpp_type::CppType;
-use crate::rust_code_generator::rust_type_to_code;
-use crate::rust_type::{RustFinalType, RustPath, RustPointerLikeTypeKind, RustType};
-use ritual_common::errors::{bail, format_err, Result};
-use ritual_common::string_utils::ends_with_digit;
+use crate::database::DbItem;
+use crate::rust_code_generator::{rust_common_type_to_code, rust_type_to_code};
+use crate::rust_type::{
+    RustCommonType, RustFinalType, RustPath, RustPointerLikeTypeKind, RustType,
+};
+use ritual_common::errors::{bail, Result};
 use serde_derive::{Deserialize, Serialize};
 
 /// One variant of a Rust enum
@@ -16,18 +17,6 @@ pub struct RustEnumValue {
     pub path: RustPath,
     /// Corresponding value
     pub value: i64,
-    /// Documentation of corresponding C++ variants
-    pub doc: RustEnumValueDoc,
-}
-
-/// C++ documentation data for a enum variant
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct RustEnumValueDoc {
-    pub extra_doc: Option<String>,
-    /// C++ path of the variant
-    pub cpp_path: CppPath,
-    /// HTML content
-    pub cpp_doc: Option<String>,
 }
 
 /// Information about a Qt slot wrapper on Rust side
@@ -35,7 +24,6 @@ pub struct RustEnumValueDoc {
 pub struct RustQtSlotWrapper {
     /// Argument types of the slot
     pub arguments: Vec<RustFinalType>,
-    pub signal_arguments: Vec<CppType>,
     pub raw_slot_wrapper: RustPath,
 }
 
@@ -47,40 +35,16 @@ pub enum RustWrapperTypeKind {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct RustRawQtSlotWrapperDocData {
-    pub public_wrapper_path: RustPath,
-    pub rust_arguments: Vec<RustFinalType>,
-    pub cpp_arguments: Vec<CppType>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct RustWrapperTypeDocData {
-    /// Corresponding C++ type (for generating docs).
+pub struct RustSizedType {
     pub cpp_path: CppPath,
-    /// C++ documentation for this type
-    pub cpp_doc: Option<CppTypeDoc>,
-
-    pub raw_qt_slot_wrapper: Option<RustRawQtSlotWrapperDocData>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct RustWrapperType {
-    pub doc_data: RustWrapperTypeDocData,
-    pub kind: RustWrapperTypeKind,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct RustFfiClassTypeDoc {
-    pub cpp_path: CppPath,
-    pub public_rust_path: RustPath,
 }
 
 /// Information about a Rust type wrapper
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum RustStructKind {
-    WrapperType(RustWrapperType),
+    WrapperType(RustWrapperTypeKind),
     QtSlotWrapper(RustQtSlotWrapper),
-    SizedType(CppPath),
+    SizedType(RustSizedType),
 }
 
 impl RustStructKind {
@@ -98,19 +62,50 @@ impl RustStructKind {
             _ => false,
         }
     }
+
+    pub fn has_same_kind(&self, other: &Self) -> bool {
+        match self {
+            RustStructKind::WrapperType(_) => {
+                if let RustStructKind::WrapperType(_) = other {
+                    true
+                } else {
+                    false
+                }
+            }
+            RustStructKind::QtSlotWrapper(_) => {
+                if let RustStructKind::QtSlotWrapper(_) = other {
+                    true
+                } else {
+                    false
+                }
+            }
+            RustStructKind::SizedType(_) => {
+                if let RustStructKind::SizedType(_) = other {
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RustRawQtSlotWrapperData {
+    pub arguments: Vec<RustType>,
+    pub closure_wrapper: RustPath,
 }
 
 /// Exported information about a Rust wrapper type
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustStruct {
-    /// Additional documentation content that will appear before C++ documentation or any other
-    /// automatically generated content.
-    pub extra_doc: Option<String>,
     pub path: RustPath,
     /// Kind of the type and additional information.
     pub kind: RustStructKind,
     /// Indicates whether this type is public
     pub is_public: bool,
+
+    pub raw_slot_wrapper_data: Option<RustRawQtSlotWrapperData>,
 }
 
 /// Location of a Rust method.
@@ -144,43 +139,49 @@ pub enum RustQtReceiverType {
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustFfiWrapperData {
-    /// C++ method corresponding to this variant.
-    pub cpp_ffi_function: CppFfiFunction,
-
     pub ffi_function_path: RustPath,
-    /// Index of the FFI function argument used for acquiring the return value,
-    /// if any. `None` if the return value is passed normally (as the return value
-    /// of the FFI function).
-    pub return_type_ffi_index: Option<usize>,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub struct RustSignalOrSlotGetter {
+    /// Type of the receiver.
+    pub receiver_type: RustQtReceiverType,
+    /// Identifier of the signal or slot for passing to `QObject::connect`.
+    pub receiver_id: String,
 }
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum RustFunctionKind {
     FfiWrapper(RustFfiWrapperData),
-    CppDeletableImpl {
-        deleter: RustPath,
-    },
-    SignalOrSlotGetter {
-        /// C++ name of the signal or slot
-        cpp_path: CppPath,
-        /// Type of the receiver.
-        receiver_type: RustQtReceiverType,
-        /// Identifier of the signal or slot for passing to `QObject::connect`.
-        receiver_id: String,
-
-        cpp_doc: Option<CppFunctionExternalDoc>,
-    },
+    SignalOrSlotGetter(RustSignalOrSlotGetter),
+    FfiFunction,
 }
 
 impl RustFunctionKind {
     pub fn short_text(&self) -> String {
         match self {
-            RustFunctionKind::FfiWrapper(data) => data.cpp_ffi_function.short_text(),
-            RustFunctionKind::CppDeletableImpl { .. } => format!("{:?}", self),
-            RustFunctionKind::SignalOrSlotGetter { cpp_path, .. } => {
-                format!("SignalOrSlotGetter({}", cpp_path.to_cpp_pseudo_code())
+            RustFunctionKind::FfiWrapper(data) => {
+                format!("FfiWrapper({})", data.ffi_function_path.last())
             }
+            RustFunctionKind::SignalOrSlotGetter(_) => "SignalOrSlotGetter".to_string(),
+            RustFunctionKind::FfiFunction => "FfiFunction".to_string(),
+        }
+    }
+
+    pub fn is_ffi_function(&self) -> bool {
+        if let RustFunctionKind::FfiFunction = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_signal_or_slot_getter(&self) -> bool {
+        if let RustFunctionKind::SignalOrSlotGetter(_) = self {
+            true
+        } else {
+            false
         }
     }
 }
@@ -192,7 +193,6 @@ pub struct UnnamedRustFunction {
     pub kind: RustFunctionKind,
     pub arguments: Vec<RustFunctionArgument>,
     pub return_type: RustFinalType,
-    pub extra_doc: Option<String>,
 }
 
 impl UnnamedRustFunction {
@@ -204,7 +204,6 @@ impl UnnamedRustFunction {
             kind: self.kind,
             arguments: self.arguments,
             return_type: self.return_type,
-            extra_doc: self.extra_doc,
         }
     }
 
@@ -333,9 +332,6 @@ pub struct RustFunction {
     pub arguments: Vec<RustFunctionArgument>,
     /// C++ and Rust return types at all levels.
     pub return_type: RustFinalType,
-
-    /// Documentation data.
-    pub extra_doc: Option<String>,
 }
 
 /// Information about type of `self` argument of the function.
@@ -361,6 +357,13 @@ pub struct RustTraitAssociatedType {
     pub value: RustType,
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+pub enum RustTraitImplExtraKind {
+    Normal,
+    Deref,
+    DerefMut,
+}
+
 /// Information about a trait implementation.
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustTraitImpl {
@@ -368,36 +371,48 @@ pub struct RustTraitImpl {
     /// Type the trait is implemented for.
     pub target_type: RustType,
     /// Type of the trait.
-    pub trait_type: RustType,
+    pub trait_type: RustCommonType,
     /// Values of associated types of the trait.
     pub associated_types: Vec<RustTraitAssociatedType>,
     /// Functions that implement the trait.
     pub functions: Vec<RustFunction>,
+    pub extra_kind: RustTraitImplExtraKind,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct RustModuleDoc {
-    pub extra_doc: Option<String>,
-    pub cpp_path: Option<CppPath>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
-pub enum RustModuleKind {
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize)]
+pub enum RustSpecialModuleKind {
     CrateRoot,
     Ffi,
     Ops,
     SizedTypes,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
+pub enum RustModuleKind {
+    Special(RustSpecialModuleKind),
     CppNamespace,
-    CppNestedType,
+    CppNestedTypes,
 }
 
 impl RustModuleKind {
     pub fn is_in_separate_file(self) -> bool {
         match self {
-            RustModuleKind::CrateRoot | RustModuleKind::CppNamespace | RustModuleKind::Ops => true,
-            RustModuleKind::Ffi | RustModuleKind::SizedTypes | RustModuleKind::CppNestedType => {
-                false
-            }
+            RustModuleKind::Special(kind) => match kind {
+                RustSpecialModuleKind::CrateRoot => true,
+                RustSpecialModuleKind::Ffi => false,
+                RustSpecialModuleKind::Ops => true,
+                RustSpecialModuleKind::SizedTypes => false,
+            },
+            RustModuleKind::CppNamespace { .. } => true,
+            RustModuleKind::CppNestedTypes { .. } => false,
+        }
+    }
+
+    pub fn is_cpp_nested_types(self) -> bool {
+        if let RustModuleKind::CppNestedTypes { .. } = self {
+            true
+        } else {
+            false
         }
     }
 }
@@ -406,13 +421,15 @@ impl RustModuleKind {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct RustModule {
     pub is_public: bool,
-
     /// Path to the module.
     pub path: RustPath,
-    /// Markdown content of Rust documentation for this module.
-    pub doc: RustModuleDoc,
-
     pub kind: RustModuleKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RustTypeCaptionStrategy {
+    LastName,
+    Full,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -420,7 +437,7 @@ pub struct RustFunctionCaptionStrategy {
     pub mut_: bool,
     pub args_count: bool,
     pub arg_names: bool,
-    pub arg_types: bool,
+    pub arg_types: Option<RustTypeCaptionStrategy>,
     pub static_: bool,
 }
 
@@ -443,14 +460,24 @@ impl RustFunctionCaptionStrategy {
                 ..S::default()
             },
             S {
-                arg_names: true,
+                static_: true,
                 ..S::default()
             },
             S {
-                arg_types: true,
+                arg_types: Some(RustTypeCaptionStrategy::LastName),
                 ..S::default()
             },
             S {
+                arg_types: Some(RustTypeCaptionStrategy::LastName),
+                static_: true,
+                ..S::default()
+            },
+            S {
+                arg_types: Some(RustTypeCaptionStrategy::Full),
+                ..S::default()
+            },
+            S {
+                arg_types: Some(RustTypeCaptionStrategy::Full),
                 static_: true,
                 ..S::default()
             },
@@ -463,11 +490,6 @@ impl RustFunctionCaptionStrategy {
                 ..item.clone()
             });
         }
-
-        //        all.push(S {
-        //            index: true,
-        //            ..S::default()
-        //        });
 
         all
     }
@@ -482,19 +504,6 @@ pub struct RustFFIArgument {
     pub argument_type: RustType,
 }
 
-/// Information about a Rust FFI function.
-/// Name and signature of this function must be the same
-/// as the corresponding C++ function on the other side of FFI.
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct RustFFIFunction {
-    /// Return type of the function.
-    pub return_type: RustType,
-    /// Name of the function.
-    pub path: RustPath,
-    /// Arguments of the function.
-    pub arguments: Vec<RustFFIArgument>,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustRawSlotReceiver {
     pub target_path: RustPath,
@@ -503,15 +512,53 @@ pub struct RustRawSlotReceiver {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RustFlagEnumImpl {
+    pub enum_path: RustPath,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RustExtraImplKind {
-    FlagEnum { enum_path: RustPath },
+    FlagEnum(RustFlagEnumImpl),
     RawSlotReceiver(RustRawSlotReceiver),
+}
+
+impl RustExtraImplKind {
+    pub fn has_same_kind(&self, other: &Self) -> bool {
+        match self {
+            RustExtraImplKind::FlagEnum(_) => {
+                if let RustExtraImplKind::FlagEnum(_) = other {
+                    true
+                } else {
+                    false
+                }
+            }
+            RustExtraImplKind::RawSlotReceiver(_) => {
+                if let RustExtraImplKind::RawSlotReceiver(_) = other {
+                    true
+                } else {
+                    false
+                }
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustExtraImpl {
     pub parent_path: RustPath,
     pub kind: RustExtraImplKind,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum RustReexportSource {
+    DependencyCrate { crate_name: String },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RustReexport {
+    pub path: RustPath,
+    pub target: RustPath,
+    pub source: RustReexportSource,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -522,25 +569,183 @@ pub enum RustItem {
     EnumValue(RustEnumValue),
     TraitImpl(RustTraitImpl),
     ExtraImpl(RustExtraImpl),
-    FfiFunction(RustFFIFunction), // TODO: merge FfiFunction and Function
     Function(RustFunction),
-    Reexport { path: RustPath, target: RustPath },
+    Reexport(RustReexport),
 }
 
 impl RustItem {
-    pub fn is_ffi_function(&self) -> bool {
-        if let RustItem::FfiFunction(_) = self {
-            true
-        } else {
-            false
+    pub fn path(&self) -> Option<&RustPath> {
+        match self {
+            RustItem::Module(data) => Some(&data.path),
+            RustItem::Struct(data) => Some(&data.path),
+            RustItem::EnumValue(data) => Some(&data.path),
+            RustItem::Function(data) => Some(&data.path),
+            RustItem::Reexport(data) => Some(&data.path),
+            RustItem::TraitImpl(_) | RustItem::ExtraImpl(_) => None,
         }
     }
 
-    pub fn is_wrapper_type(&self) -> bool {
-        if let RustItem::Struct(data) = self {
-            data.kind.is_wrapper_type()
+    pub fn parent_path(&self) -> Result<RustPath> {
+        match self {
+            RustItem::TraitImpl(trait_impl) => Ok(trait_impl.parent_path.clone()),
+            RustItem::ExtraImpl(data) => Ok(data.parent_path.clone()),
+            _ => self
+                .path()
+                .expect("item must have path because it's not a trait impl")
+                .parent(),
+        }
+    }
+
+    pub fn parent_path_parts(&self) -> Result<&[String]> {
+        match self {
+            RustItem::TraitImpl(trait_impl) => Ok(trait_impl.parent_path.parts()),
+            RustItem::ExtraImpl(data) => Ok(data.parent_path.parts()),
+            _ => self
+                .path()
+                .expect("item must have path because it's not a trait impl")
+                .parent_parts(),
+        }
+    }
+
+    pub fn is_child_of(&self, parent: &RustPath) -> bool {
+        self.parent_path_parts().ok() == Some(parent.parts())
+    }
+
+    pub fn as_module_ref(&self) -> Option<&RustModule> {
+        if let RustItem::Module(data) = self {
+            Some(data)
         } else {
-            false
+            None
+        }
+    }
+    pub fn as_struct_ref(&self) -> Option<&RustStruct> {
+        if let RustItem::Struct(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+    pub fn as_enum_value_ref(&self) -> Option<&RustEnumValue> {
+        if let RustItem::EnumValue(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+    pub fn as_reexport_ref(&self) -> Option<&RustReexport> {
+        if let RustItem::Reexport(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    pub fn as_function_ref(&self) -> Option<&RustFunction> {
+        if let RustItem::Function(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    pub fn as_trait_impl_ref(&self) -> Option<&RustTraitImpl> {
+        if let RustItem::TraitImpl(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+    pub fn as_extra_impl_ref(&self) -> Option<&RustExtraImpl> {
+        if let RustItem::ExtraImpl(value) = self {
+            Some(value)
+        } else {
+            None
+        }
+    }
+
+    pub fn has_same_kind(&self, other: &Self) -> bool {
+        match self {
+            RustItem::Module(data) => {
+                if let RustItem::Module(other) = other {
+                    data.kind == other.kind
+                } else {
+                    false
+                }
+            }
+            RustItem::Struct(data) => {
+                if let RustItem::Struct(other) = other {
+                    data.kind.has_same_kind(&other.kind)
+                } else {
+                    false
+                }
+            }
+            RustItem::EnumValue(_) => {
+                if let RustItem::EnumValue(_) = other {
+                    true
+                } else {
+                    false
+                }
+            }
+            RustItem::TraitImpl(data) => match other {
+                RustItem::TraitImpl(other) => data.extra_kind == other.extra_kind,
+                RustItem::Function(other) => {
+                    if let RustFunctionKind::FfiWrapper(_) = &other.kind {
+                        data.extra_kind == RustTraitImplExtraKind::Normal
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            },
+            RustItem::ExtraImpl(data) => {
+                if let RustItem::ExtraImpl(other) = other {
+                    data.kind.has_same_kind(&other.kind)
+                } else {
+                    false
+                }
+            }
+            RustItem::Function(data) => match &data.kind {
+                RustFunctionKind::FfiWrapper(_) => match other {
+                    RustItem::TraitImpl(other) => {
+                        other.extra_kind == RustTraitImplExtraKind::Normal
+                    }
+                    RustItem::Function(other) => {
+                        if let RustFunctionKind::FfiWrapper(_) = &other.kind {
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    _ => false,
+                },
+                RustFunctionKind::SignalOrSlotGetter(_) => {
+                    if let RustItem::Function(other) = other {
+                        if let RustFunctionKind::SignalOrSlotGetter(_) = &other.kind {
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                }
+                RustFunctionKind::FfiFunction => {
+                    if let RustItem::Function(other) = other {
+                        if let RustFunctionKind::FfiFunction = &other.kind {
+                            true
+                        } else {
+                            false
+                        }
+                    } else {
+                        false
+                    }
+                }
+            },
+            RustItem::Reexport(data) => {
+                if let RustItem::Reexport(other) = other {
+                    data.source == other.source
+                } else {
+                    false
+                }
+            }
         }
     }
 
@@ -551,10 +756,30 @@ impl RustItem {
             false
         }
     }
-
+    pub fn is_trait_impl(&self) -> bool {
+        if let RustItem::TraitImpl(_) = self {
+            true
+        } else {
+            false
+        }
+    }
+    pub fn is_ffi_function(&self) -> bool {
+        if let RustItem::Function(function) = self {
+            function.kind.is_ffi_function()
+        } else {
+            false
+        }
+    }
+    pub fn is_wrapper_type(&self) -> bool {
+        if let RustItem::Struct(data) = self {
+            data.kind.is_wrapper_type()
+        } else {
+            false
+        }
+    }
     pub fn is_module_for_nested(&self) -> bool {
         if let RustItem::Module(module) = self {
-            module.kind == RustModuleKind::CppNestedType
+            module.kind.is_cpp_nested_types()
         } else {
             false
         }
@@ -562,7 +787,7 @@ impl RustItem {
 
     pub fn is_crate_root(&self) -> bool {
         if let RustItem::Module(module) = self {
-            module.kind == RustModuleKind::CrateRoot
+            module.kind == RustModuleKind::Special(RustSpecialModuleKind::CrateRoot)
         } else {
             false
         }
@@ -575,150 +800,17 @@ impl RustItem {
             RustItem::EnumValue(data) => format!("enum value {}", data.path.full_name(None)),
             RustItem::TraitImpl(data) => format!(
                 "impl {} for {}",
-                rust_type_to_code(&data.trait_type, None),
+                rust_common_type_to_code(&data.trait_type, None),
                 rust_type_to_code(&data.target_type, None)
             ),
             RustItem::ExtraImpl(data) => format!("extra impl {:?}", data.kind),
-            RustItem::FfiFunction(data) => format!("ffi fn {}", data.path.full_name(None)),
             RustItem::Function(data) => format!("fn {}", data.path.full_name(None)),
-            RustItem::Reexport { path, target } => {
-                format!("use {} as {}", path.full_name(None), target.last())
-            }
+            RustItem::Reexport(data) => format!(
+                "use {} as {}",
+                data.path.full_name(None),
+                data.target.last()
+            ),
         }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RustDatabaseItem {
-    pub item: RustItem,
-    pub cpp_item_index: Option<usize>,
-    pub ffi_item_index: Option<usize>,
-}
-
-impl RustDatabaseItem {
-    pub fn path(&self) -> Option<&RustPath> {
-        match &self.item {
-            RustItem::Module(data) => Some(&data.path),
-            RustItem::Struct(data) => Some(&data.path),
-            RustItem::EnumValue(data) => Some(&data.path),
-            RustItem::Function(data) => Some(&data.path),
-            RustItem::FfiFunction(data) => Some(&data.path),
-            RustItem::Reexport { path, .. } => Some(path),
-            RustItem::TraitImpl(_) | RustItem::ExtraImpl(_) => None,
-        }
-    }
-
-    pub fn parent_path(&self) -> Result<RustPath> {
-        match &self.item {
-            RustItem::TraitImpl(trait_impl) => Ok(trait_impl.parent_path.clone()),
-            RustItem::ExtraImpl(data) => Ok(data.parent_path.clone()),
-            _ => self
-                .path()
-                .expect("item must have path because it's not a trait impl")
-                .parent(),
-        }
-    }
-
-    pub fn is_child_of(&self, parent: &RustPath) -> bool {
-        self.parent_path().ok().as_ref() == Some(parent)
-    }
-
-    pub fn as_module_ref(&self) -> Option<&RustModule> {
-        if let RustItem::Module(data) = &self.item {
-            Some(data)
-        } else {
-            None
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RustDatabase {
-    crate_name: String,
-    items: Vec<RustDatabaseItem>,
-}
-
-impl RustDatabase {
-    pub fn new(crate_name: String) -> Self {
-        Self {
-            crate_name,
-            items: Vec::new(),
-        }
-    }
-
-    pub fn find(&self, path: &RustPath) -> Option<&RustDatabaseItem> {
-        self.items.iter().find(|item| item.path() == Some(path))
-    }
-
-    pub fn children<'a>(
-        &'a self,
-        path: &'a RustPath,
-    ) -> impl Iterator<Item = &'a RustDatabaseItem> {
-        self.items.iter().filter(move |item| item.is_child_of(path))
-    }
-
-    pub fn items(&self) -> &[RustDatabaseItem] {
-        &self.items
-    }
-
-    pub fn add_item(&mut self, item: RustDatabaseItem) -> Result<()> {
-        if item.item.is_crate_root() {
-            let item_path = item.path().expect("crate root must have path");
-            let crate_name = item_path
-                .crate_name()
-                .expect("rust item path must have crate name");
-            if crate_name != self.crate_name {
-                bail!("can't add rust item with different crate name: {:?}", item);
-            }
-        } else {
-            let mut path = item
-                .parent_path()
-                .map_err(|_| format_err!("path has no parent for rust item: {:?}", item))?;
-            let crate_name = path
-                .crate_name()
-                .expect("rust item path must have crate name");
-            if crate_name != self.crate_name {
-                bail!("can't add rust item with different crate name: {:?}", item);
-            }
-            while path.parts.len() > 1 {
-                if self.find(&path).is_none() {
-                    bail!("unreachable path {:?} for rust item: {:?}", path, item);
-                }
-                path.parts.pop();
-            }
-        }
-
-        self.items.push(item);
-        Ok(())
-    }
-
-    pub fn clear(&mut self) {
-        self.items.clear();
-    }
-
-    pub fn make_unique_path(&self, path: &RustPath) -> RustPath {
-        let mut number = None;
-        let mut path_try = path.clone();
-        loop {
-            if let Some(number) = number {
-                *path_try.last_mut() = format!(
-                    "{}{}{}",
-                    path.last(),
-                    if ends_with_digit(path.last()) {
-                        "_"
-                    } else {
-                        ""
-                    },
-                    number
-                );
-            }
-            if self.find(&path_try).is_none() {
-                return path_try;
-            }
-
-            number = Some(number.unwrap_or(1) + 1);
-        }
-        // TODO: check for conflicts with types from crate template (how?)
     }
 }
 
@@ -739,13 +831,13 @@ impl RustPathScope {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NameType<'a> {
     Type,
     EnumValue,
     Module,
     FfiFunction,
-    ApiFunction(&'a CppFfiFunction),
+    ApiFunction(DbItem<&'a CppFfiFunction>),
     ReceiverFunction {
         receiver_type: RustQtReceiverType,
     },

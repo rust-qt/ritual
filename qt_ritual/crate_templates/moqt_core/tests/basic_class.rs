@@ -1,4 +1,4 @@
-use cpp_utils::Ref;
+use cpp_utils::{MutRef, Ref};
 use moqt_core::basic_class::{inner_struct::InnerEnum, UpdateType};
 use moqt_core::{BasicClass, BasicClassField};
 
@@ -16,7 +16,7 @@ fn basic_class() {
 
         assert!(v.int_pointer_field().is_null());
         let p = v.int_reference_field();
-        v.set_int_pointer_field(p.into());
+        v.set_int_pointer_field(p.as_mut_ptr());
         v.set_int_field(4);
         assert_eq!(*v.int_pointer_field(), 4);
 
@@ -27,7 +27,7 @@ fn basic_class() {
         assert_eq!(v.int_field(), 8);
 
         // TODO: set_int_reference_field should have int arg
-        v.set_int_reference_field(Ref::from_raw(&mut 9).unwrap());
+        v.set_int_reference_field(MutRef::from_raw(&mut 9).unwrap());
         assert_eq!(v.int_field(), 9);
 
         assert_eq!(v.class_field().get(), 42);
@@ -44,6 +44,8 @@ fn basic_class() {
         let mut converted = v.to_q_vector_of_int();
         assert_eq!(converted.count(), 1);
         assert_eq!(*converted.at(0), 7);
+
+        v.set_ref(Ref::from_raw_ref(&11));
     }
 }
 

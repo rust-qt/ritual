@@ -2,10 +2,13 @@ use ritual::config::Config;
 use ritual::cpp_checker::{PreliminaryTest, Snippet};
 use ritual::cpp_data::{CppItem, CppPath};
 use ritual::cpp_ffi_data::CppFfiFunctionKind;
+use ritual::cpp_parser::CppParserOutput;
+use ritual::cpp_template_instantiator::instantiate_function;
 use ritual::cpp_type::CppType;
+use ritual::processor::ProcessorData;
 use ritual::rust_info::{NameType, RustPathScope};
 use ritual::rust_type::RustPath;
-use ritual_common::errors::{bail, Result};
+use ritual_common::errors::{bail, err_msg, Result};
 use ritual_common::string_utils::CaseOperations;
 
 /// QtCore specific configuration.
@@ -166,7 +169,15 @@ pub fn core_config(config: &mut Config) -> Result<()> {
         CppType::new_reference(true, CppType::Class(CppPath::from_good_str("QMetaMethod")));
     config.set_rust_path_hook(move |_path, name_type, data| {
         if let NameType::ApiFunction(function) = name_type {
-            if let CppFfiFunctionKind::Function { cpp_function, .. } = &function.kind {
+            if let CppFfiFunctionKind::Function = &function.item.kind {
+                let cpp_function = data
+                    .db
+                    .source_cpp_item(&function.id)?
+                    .ok_or_else(|| err_msg("source cpp item not found"))?
+                    .item
+                    .as_function_ref()
+                    .ok_or_else(|| err_msg("invalid source cpp item type"))?;
+
                 if cpp_function.path == connect_path && cpp_function.arguments.len() >= 3 {
                     if !cpp_function.is_static_member() {
                         bail!("non-static QObject::connect is blacklisted");
@@ -175,7 +186,7 @@ pub fn core_config(config: &mut Config) -> Result<()> {
                     if arg == &qmetamethod_ref_type {
                         return Ok(Some(RustPath::from_good_str(&format!(
                             "{}::QObject::connect_by_meta_methods",
-                            data.current_database.crate_name()
+                            data.db.crate_name()
                         ))));
                     }
                 }
@@ -213,7 +224,7 @@ pub fn core_config(config: &mut Config) -> Result<()> {
                 if cpp_function.path.items().len() == 1
                     && q_text_stream_functions.contains(&cpp_function.path.items()[0].name.as_str())
                 {
-                    let path = RustPath::from_good_str(data.current_database.crate_name())
+                    let path = RustPath::from_good_str(data.db.crate_name())
                         .join("q_text_stream")
                         .join(cpp_function.path.items()[0].name.to_snake_case());
 
@@ -225,8 +236,8 @@ pub fn core_config(config: &mut Config) -> Result<()> {
     });
 
     config.set_ffi_generator_hook(|item| {
-        if let CppItem::Function(function) = &item.item {
-            if let Ok(class_type) = function.class_type() {
+        if let CppItem::Function(function) = &item {
+            if let Ok(class_type) = function.class_path() {
                 let class_text = class_type.to_templateless_string();
                 if class_text == "QFlags" {
                     return Ok(false);
@@ -236,6 +247,13 @@ pub fn core_config(config: &mut Config) -> Result<()> {
                 if let CppType::Class(path) = &function.return_type {
                     if path.to_templateless_string() == "QFlags" {
                         return Ok(false);
+                    }
+                    if path.to_templateless_string() == "QDebug" && function.arguments.len() == 2 {
+                        if let CppType::Class(path2) = &function.arguments[1].argument_type {
+                            if path2.to_templateless_string() == "QFlags" {
+                                return Ok(false);
+                            }
+                        }
                     }
                 }
             }
@@ -286,5 +304,29 @@ pub fn core_config(config: &mut Config) -> Result<()> {
         vec![test1, test2, test3]
     };
     config.add_cpp_checker_tests(tests);
+
+    config.add_after_cpp_parser_hook(add_find_child_methods);
+    Ok(())
+}
+
+pub fn add_find_child_methods(
+    data: &mut ProcessorData<'_>,
+    output: &CppParserOutput,
+) -> Result<()> {
+    for item in &output.0 {
+        let cpp_item = data.db.cpp_item(&item.id)?;
+        let function = if let Some(f) = cpp_item.item.as_function_ref() {
+            f
+        } else {
+            continue;
+        };
+        let path = function.path.to_templateless_string();
+        if path == "QObject::findChild" || path == "QObject::findChildren" {
+            let t = CppType::new_pointer(false, CppType::Class(CppPath::from_good_str("QObject")));
+            let new_function = instantiate_function(function, 0, &[t])?;
+            data.db
+                .add_cpp_item(Some(item.id.clone()), CppItem::Function(new_function))?;
+        }
+    }
     Ok(())
 }

@@ -2,6 +2,8 @@
 #define QOBJECT_H
 
 #include "moqt_core_exports.h"
+#include "QString.h"
+#include "QVector.h"
 
 #define Q_SIGNALS public
 #define Q_SLOTS
@@ -53,6 +55,16 @@ public:
     };
 
     static ConnectArgs nextConnectArgs();
+
+    template<typename T>
+    inline T findChild(const QString &aName = QString()) const {
+        return nullptr;
+    }
+
+    template<typename T>
+    inline QVector<T> findChildren(int arg1, int arg2 = 0) const {
+        return QVector<T>();
+    }
 
 private:
     struct QPrivateSignal {};

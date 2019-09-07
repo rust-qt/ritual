@@ -9,6 +9,7 @@ use ritual_common::cpp_build_config::CppBuildPaths;
 use ritual_common::file_utils::create_dir;
 use ritual_common::file_utils::create_file;
 use std::io::Write;
+use std::iter;
 
 struct ParserCppData {
     types: Vec<CppTypeDeclaration>,
@@ -40,46 +41,42 @@ fn run_parser(code: &'static str) -> ParserCppData {
     config.add_include_directive(include_name);
     config.set_cpp_build_paths(paths);
 
-    processor::process(&mut workspace, &config, &["cpp_parser".into()]).unwrap();
+    processor::process(&mut workspace, &config, &["cpp_parser".into()], None).unwrap();
 
-    let database = workspace.get_database("A", true, false).unwrap();
+    let database = workspace
+        .get_database_client("A", iter::empty(), true, false)
+        .unwrap();
 
     ParserCppData {
         types: database
             .cpp_items()
-            .iter()
             .filter_map(|item| item.item.as_type_ref())
             .cloned()
             .collect(),
         bases: database
             .cpp_items()
-            .iter()
             .filter_map(|item| item.item.as_base_ref())
             .cloned()
             .collect(),
         fields: database
             .cpp_items()
-            .iter()
             .filter_map(|item| item.item.as_field_ref())
             .cloned()
             .collect(),
         enum_values: database
             .cpp_items()
-            .iter()
             .filter_map(|item| item.item.as_enum_value_ref())
             .cloned()
             .collect(),
         methods: database
             .cpp_items()
-            .iter()
             .filter_map(|item| item.item.as_function_ref())
             .cloned()
             .collect(),
         namespaces: database
             .cpp_items()
-            .iter()
             .filter_map(|item| item.item.as_namespace_ref())
-            .cloned()
+            .map(|ns| ns.path.clone())
             .collect(),
     }
 }
@@ -101,8 +98,8 @@ fn simple_func() {
                 argument_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
                 has_default_value: false,
             }],
-            doc: Default::default(),
             allows_variadic_arguments: false,
+            cast: None,
             declaration_code: Some("int func1 ( int x )".to_string()),
         }
     );
@@ -131,8 +128,8 @@ fn simple_func_with_default_value() {
                 argument_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
                 has_default_value: true,
             }],
-            doc: Default::default(),
             allows_variadic_arguments: false,
+            cast: None,
             declaration_code: Some("bool func1 ( int x = 42 )".to_string()),
         }
     );
@@ -196,8 +193,8 @@ fn functions_with_class_arg() {
                 argument_type: CppType::Class(CppPath::from_good_str("Magic")),
                 has_default_value: false,
             }],
-            doc: Default::default(),
             allows_variadic_arguments: false,
+            cast: None,
             declaration_code: Some("bool func1 ( Magic x )".to_string()),
         }
     );
@@ -216,8 +213,8 @@ fn functions_with_class_arg() {
                 ),
                 has_default_value: false,
             }],
-            doc: Default::default(),
             allows_variadic_arguments: false,
+            cast: None,
             declaration_code: Some("bool func1 ( Magic * x )".to_string()),
         }
     );
@@ -236,8 +233,8 @@ fn functions_with_class_arg() {
                 ),
                 has_default_value: false,
             }],
-            doc: Default::default(),
             allows_variadic_arguments: false,
+            cast: None,
             declaration_code: Some("bool func2 ( const Magic & )".to_string()),
         }
     );
@@ -289,8 +286,8 @@ fn variadic_func() {
                 ),
                 has_default_value: false,
             }],
-            doc: Default::default(),
             allows_variadic_arguments: true,
+            cast: None,
             declaration_code: Some("int my_printf ( const char * format , ... )".to_string()),
         }
     );
@@ -310,11 +307,11 @@ fn free_template_func() {
     assert_eq!(data.methods.len(), 1);
     let abs_item = CppPathItem {
         name: "abs".into(),
-        template_arguments: Some(vec![CppType::TemplateParameter {
+        template_arguments: Some(vec![CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 0,
             index: 0,
             name: "T".into(),
-        }]),
+        })]),
     };
     assert_eq!(
         data.methods[0],
@@ -322,22 +319,22 @@ fn free_template_func() {
             path: CppPath::from_item(abs_item.clone()),
             member: None,
             operator: None,
-            return_type: CppType::TemplateParameter {
+            return_type: CppType::TemplateParameter(CppTemplateParameter {
                 nested_level: 0,
                 index: 0,
                 name: "T".into(),
-            },
+            }),
             arguments: vec![CppFunctionArgument {
                 name: "value".to_string(),
-                argument_type: CppType::TemplateParameter {
+                argument_type: CppType::TemplateParameter(CppTemplateParameter {
                     nested_level: 0,
                     index: 0,
                     name: "T".into(),
-                },
+                }),
                 has_default_value: false,
             }],
-            doc: Default::default(),
             allows_variadic_arguments: false,
+            cast: None,
             declaration_code: Some("template < typename T > T abs ( T value )".to_string()),
         }
     );
@@ -377,8 +374,8 @@ fn free_func_operator_sub() {
                         has_default_value: false,
                     },
                 ],
-                doc: Default::default(),
                 allows_variadic_arguments: false,
+                cast: None,
                 declaration_code: Some("C1 operator - ( C1 a , C1 b )".to_string()),
             }
         );
@@ -426,8 +423,8 @@ fn simple_class_method() {
                 argument_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
                 has_default_value: false,
             }],
-            doc: Default::default(),
             allows_variadic_arguments: false,
+            cast: None,
             declaration_code: Some("int func1 ( int x )".to_string()),
         }
     );
@@ -533,16 +530,16 @@ fn advanced_class_methods() {
     let func6_item = CppPathItem {
         name: "func6".to_string(),
         template_arguments: Some(vec![
-            CppType::TemplateParameter {
+            CppType::TemplateParameter(CppTemplateParameter {
                 nested_level: 0,
                 index: 0,
                 name: "K".into(),
-            },
-            CppType::TemplateParameter {
+            }),
+            CppType::TemplateParameter(CppTemplateParameter {
                 nested_level: 0,
                 index: 1,
                 name: "V".into(),
-            },
+            }),
         ]),
     };
     assert_eq!(
@@ -552,11 +549,11 @@ fn advanced_class_methods() {
     assert_eq!(data.methods[7].arguments.len(), 1);
     assert_eq!(
         data.methods[7].arguments[0].argument_type,
-        CppType::TemplateParameter {
+        CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 0,
             index: 1,
             name: "V".into(),
-        },
+        }),
     );
 }
 
@@ -573,18 +570,24 @@ fn template_class_method() {
         };
         ",
     );
-    assert_eq!(data.types.len(), 1);
+    assert_eq!(data.types.len(), 2);
     let my_vector_item = CppPathItem {
         name: "MyVector".into(),
-        template_arguments: Some(vec![CppType::TemplateParameter {
+        template_arguments: Some(vec![CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 0,
             index: 0,
             name: "T".into(),
-        }]),
+        })]),
     };
     let my_vector_path = CppPath::from_item(my_vector_item.clone());
     assert_eq!(data.types[0].path, my_vector_path);
     assert!(data.types[0].kind.is_class());
+
+    assert_eq!(
+        data.types[1].path,
+        my_vector_path.join(CppPathItem::from_good_str("Iterator"))
+    );
+    assert!(data.types[1].kind.is_class());
 
     assert!(data.bases.is_empty());
     assert!(data.fields.is_empty());
@@ -604,18 +607,18 @@ fn template_class_method() {
                 is_slot: false,
             }),
             operator: None,
-            return_type: CppType::TemplateParameter {
+            return_type: CppType::TemplateParameter(CppTemplateParameter {
                 nested_level: 0,
                 index: 0,
                 name: "T".into(),
-            },
+            }),
             arguments: vec![CppFunctionArgument {
                 name: "index".to_string(),
                 argument_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
                 has_default_value: false,
             }],
-            doc: Default::default(),
             allows_variadic_arguments: false,
+            cast: None,
             declaration_code: Some("T get ( int index )".to_string()),
         }
     );
@@ -649,11 +652,11 @@ fn template_parameter_level() {
     );
     assert_eq!(
         data.methods[0].return_type,
-        CppType::TemplateParameter {
+        CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 1,
             index: 0,
             name: "T".into(),
-        }
+        })
     );
 }
 
@@ -675,11 +678,11 @@ fn template_parameter_level2() {
     );
     assert_eq!(
         data.methods[0].return_type,
-        CppType::TemplateParameter {
+        CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 1,
             index: 0,
             name: "T".into(),
-        }
+        })
     );
 }
 
@@ -699,11 +702,11 @@ fn template_class_template_method() {
     );
     let vector_item = CppPathItem {
         name: "MyVector".to_string(),
-        template_arguments: Some(vec![CppType::TemplateParameter {
+        template_arguments: Some(vec![CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 0,
             index: 0,
             name: "T".into(),
-        }]),
+        })]),
     };
     assert_eq!(
         data.methods[0].path,
@@ -711,21 +714,21 @@ fn template_class_template_method() {
             vector_item.clone(),
             CppPathItem {
                 name: "get_f".into(),
-                template_arguments: Some(vec![CppType::TemplateParameter {
+                template_arguments: Some(vec![CppType::TemplateParameter(CppTemplateParameter {
                     nested_level: 1,
                     index: 0,
                     name: "F".into(),
-                }])
+                })])
             }
         ])
     );
     assert_eq!(
         data.methods[0].return_type,
-        CppType::TemplateParameter {
+        CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 1,
             index: 0,
             name: "F".into(),
-        },
+        }),
     );
 
     assert_eq!(
@@ -734,11 +737,11 @@ fn template_class_template_method() {
     );
     assert_eq!(
         data.methods[1].return_type,
-        CppType::TemplateParameter {
+        CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 0,
             index: 0,
             name: "T".into(),
-        },
+        }),
     );
 }
 
@@ -760,12 +763,10 @@ fn simple_enum() {
         vec![
             CppEnumValue {
                 value: 0,
-                doc: None,
                 path: CppPath::from_good_str("Enum1::Good"),
             },
             CppEnumValue {
                 value: 1,
-                doc: None,
                 path: CppPath::from_good_str("Enum1::Bad"),
             },
         ]
@@ -793,17 +794,14 @@ fn simple_enum2() {
         vec![
             CppEnumValue {
                 value: 1,
-                doc: None,
                 path: CppPath::from_good_str("ns1::Enum1::Good"),
             },
             CppEnumValue {
                 value: 2,
-                doc: None,
                 path: CppPath::from_good_str("ns1::Enum1::Bad"),
             },
             CppEnumValue {
                 value: 3,
-                doc: None,
                 path: CppPath::from_good_str("ns1::Enum1::Questionable"),
             },
         ]
@@ -1077,22 +1075,22 @@ fn template_class_with_base() {
     assert_eq!(data.types.len(), 2);
     let c1_item = CppPathItem {
         name: "C1".to_string(),
-        template_arguments: Some(vec![CppType::TemplateParameter {
+        template_arguments: Some(vec![CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 0,
             index: 0,
             name: "T".into(),
-        }]),
+        })]),
     };
     assert_eq!(data.types[0].path, CppPath::from_item(c1_item));
     assert!(data.types[0].kind.is_class());
 
     let c2_item = CppPathItem {
         name: "C2".to_string(),
-        template_arguments: Some(vec![CppType::TemplateParameter {
+        template_arguments: Some(vec![CppType::TemplateParameter(CppTemplateParameter {
             nested_level: 0,
             index: 0,
             name: "T".into(),
-        }]),
+        })]),
     };
     assert_eq!(data.types[1].path, CppPath::from_item(c2_item));
     assert!(data.types[1].kind.is_class());

@@ -1,5 +1,5 @@
 use crate::QApplication;
-use cpp_utils::{Ptr, Ref};
+use cpp_utils::{MutPtr, MutRef};
 use qt_core::QCoreApplicationArgs;
 use std::process;
 
@@ -23,13 +23,13 @@ impl QApplication {
     ///     })
     /// }
     /// ```
-    pub fn init<F: FnOnce(::cpp_utils::Ptr<QApplication>) -> i32>(f: F) -> ! {
+    pub fn init<F: FnOnce(::cpp_utils::MutPtr<QApplication>) -> i32>(f: F) -> ! {
         let exit_code = {
             unsafe {
                 let mut args = QCoreApplicationArgs::from_real();
                 let (argc, argv) = args.get();
                 let mut app =
-                    QApplication::new_2a(Ref::from_raw(argc).unwrap(), Ptr::from_raw(argv));
+                    QApplication::new_2a(MutRef::from_raw(argc).unwrap(), MutPtr::from_raw(argv));
                 f(app.as_mut_ptr())
             }
         }; // drop `app` and `args`

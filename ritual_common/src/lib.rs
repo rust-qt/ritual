@@ -17,6 +17,7 @@ pub mod string_utils;
 pub mod target;
 pub mod utils;
 
+use std::ops::Deref;
 pub use toml;
 
 /// This type contains data serialized by the generator and placed to the
@@ -29,6 +30,27 @@ pub struct BuildScriptData {
     pub cpp_wrapper_lib_name: String,
     /// Environments the generator was used in
     pub known_targets: Vec<LibraryTarget>,
+}
+
+#[derive(Debug)]
+pub struct ReadOnly<T>(T);
+
+impl<T> ReadOnly<T> {
+    pub fn new(value: T) -> Self {
+        ReadOnly(value)
+    }
+
+    pub fn into_inner(self) -> T {
+        self.0
+    }
+}
+
+impl<T> Deref for ReadOnly<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &self.0
+    }
 }
 
 #[cfg(test)]

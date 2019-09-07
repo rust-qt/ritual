@@ -2,9 +2,7 @@ use crate::cpp_code_generator;
 use crate::cpp_code_generator::generate_cpp_type_size_requester;
 use crate::processor::ProcessorData;
 use crate::rust_code_generator;
-use crate::rust_info::RustItem;
 use crate::versions;
-use itertools::Itertools;
 use ritual_common::errors::Result;
 use ritual_common::file_utils::{
     copy_file, copy_recursively, create_dir, create_dir_all, create_file, diff_paths, path_to_str,
@@ -13,7 +11,6 @@ use ritual_common::file_utils::{
 use ritual_common::toml;
 use ritual_common::utils::{run_command, MapIfOk};
 use ritual_common::BuildScriptData;
-use std::collections::HashSet;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -137,12 +134,12 @@ fn generate_crate_template(data: &mut ProcessorData<'_>, output_path: &Path) -> 
                         },
                     )?,
                 );
-                for dep in data.dep_databases {
+                for dep in data.config.dependent_cpp_crates() {
                     table.insert(
-                        dep.crate_name().to_string(),
+                        dep.to_string(),
                         dep_value(
-                            &dep.crate_version(),
-                            Some(data.workspace.crate_path(dep.crate_name())),
+                            data.db.dependency_version(dep)?,
+                            Some(data.workspace.crate_path(dep)),
                         )?,
                     );
                 }
@@ -263,46 +260,17 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         data.config.include_directives(),
     )?;
 
-    let used_ffi_functions = data
-        .current_database
-        .rust_items()
-        .iter()
-        .filter_map(|item| {
-            if let RustItem::FfiFunction(func) = &item.item {
-                Some(func.path.last())
-            } else {
-                None
-            }
-        })
-        .collect::<HashSet<&str>>();
-
     cpp_code_generator::generate_cpp_file(
-        &data
-            .current_database
-            .ffi_items()
-            .iter()
-            .filter(|item| {
-                !item.item.is_function()
-                    || used_ffi_functions.contains(item.path().last().name.as_str())
-            })
-            .collect_vec(),
-        data.current_database.environments(),
+        &data.db,
         &c_lib_path.join("file1.cpp"),
         &global_header_name,
-        data.current_database.crate_name(),
     )?;
 
     let file = create_file(c_lib_path.join("sized_types.cxx"))?;
-    generate_cpp_type_size_requester(
-        data.current_database.rust_database(),
-        data.config.include_directives(),
-        file,
-    )?;
+    generate_cpp_type_size_requester(data.db, data.config.include_directives(), file)?;
 
     rust_code_generator::generate(
-        data.config.crate_properties().name(),
-        &data.current_database,
-        data.current_database.rust_database(),
+        &data.db,
         &output_path.join("src"),
         data.config.crate_template_path().map(|s| s.join("src")),
     )?;
@@ -326,7 +294,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         &BuildScriptData {
             cpp_build_config: data.config.cpp_build_config().clone(),
             cpp_wrapper_lib_name: c_lib_name,
-            known_targets: data.current_database.environments().to_vec(),
+            known_targets: data.db.environments().to_vec(),
         },
         None,
     )?;

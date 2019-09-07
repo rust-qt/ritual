@@ -1,12 +1,13 @@
 use crate::config::Config;
+use crate::cpp_checks::CppChecksItem;
 use crate::cpp_data::CppPath;
-use crate::cpp_ffi_data::{CppFfiFunctionKind, CppFfiItem};
+use crate::cpp_ffi_data::CppFfiItem;
 use crate::cpp_type::CppType;
-use crate::database::CppFfiDatabaseItem;
+use crate::database::{DatabaseClient, DbItem, ItemId};
 use crate::processor::ProcessorData;
 use crate::{cluster_api, cpp_code_generator};
 use itertools::Itertools;
-use log::{debug, trace};
+use log::{debug, error, info, trace};
 use rayon::iter::ParallelIterator;
 use rayon::slice::ParallelSliceMut;
 use ritual_common::cpp_build_config::{CppBuildConfigData, CppBuildPaths};
@@ -22,7 +23,7 @@ use ritual_common::utils::{MapIfOk, ProgressBar};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::{hash_map::Entry, HashMap};
 use std::io::Write;
-use std::iter::{once, IntoIterator};
+use std::iter::once;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::thread::ThreadId;
@@ -31,30 +32,30 @@ use std::{iter, thread};
 
 pub const CHUNK_SIZE: usize = 64;
 
-fn snippet_for_item(
-    item: &CppFfiDatabaseItem,
-    all_items: &[CppFfiDatabaseItem],
-) -> Result<Snippet> {
+fn snippet_for_item(item: DbItem<&CppFfiItem>, database: &DatabaseClient) -> Result<Snippet> {
     match &item.item {
-        CppFfiItem::Function(cpp_ffi_function) => {
-            let item_code = cpp_code_generator::function_implementation(cpp_ffi_function)?;
+        CppFfiItem::Function(_) => {
+            let item = item.map(|item| item.as_function_ref().unwrap());
+            let item_code = cpp_code_generator::function_implementation(database, item.clone())?;
             let mut needs_moc = false;
-            let full_code = if let Some(index) = item.source_ffi_item {
-                let source_item = all_items
-                    .get(index)
-                    .ok_or_else(|| err_msg("ffi item references invalid index"))?;
-                match &source_item.item {
-                    CppFfiItem::Function(_) => {}
-                    CppFfiItem::QtSlotWrapper(_) => needs_moc = true,
+
+            let source_ffi_item = database.source_ffi_item(&item.id)?;
+
+            let full_code = if let Some(source_ffi_item) = source_ffi_item {
+                if source_ffi_item.item.is_slot_wrapper() {
+                    needs_moc = true
                 }
-                let source_item_code = source_item.source_item_cpp_code()?;
+                let source_item_code = source_ffi_item.item.source_item_cpp_code(database)?;
                 format!("{}\n{}", source_item_code, item_code)
             } else {
                 item_code
             };
             Ok(Snippet::new_global(full_code, needs_moc))
         }
-        CppFfiItem::QtSlotWrapper(_) => Ok(Snippet::new_global(item.source_item_cpp_code()?, true)),
+        CppFfiItem::QtSlotWrapper(_) => Ok(Snippet::new_global(
+            item.item.source_item_cpp_code(database)?,
+            true,
+        )),
     }
 }
 
@@ -218,7 +219,7 @@ pub struct SnippetTask<T> {
 }
 
 pub struct SnippetTaskLocalData {
-    pub ffi_item_index: usize,
+    pub ffi_item_id: ItemId,
     pub crate_name: String,
     pub library_target: LibraryTarget,
 }
@@ -435,7 +436,7 @@ impl CppChecker<'_, '_> {
 
     fn run_cluster(&mut self) -> Result<()> {
         let cluster_config = self.data.config.cluster_config().unwrap();
-        let crate_name = self.data.current_database.crate_name().to_string();
+        let crate_name = self.data.db.crate_name().to_string();
 
         let environments = cluster_config
             .workers
@@ -453,17 +454,17 @@ impl CppChecker<'_, '_> {
             .collect_vec();
 
         for env in &environments {
-            self.data.current_database.add_environment(env.clone());
+            self.data.db.add_environment(env.clone());
         }
 
-        let mut snippets = self.create_tasks(&environments);
+        let mut snippets = self.create_tasks(&environments)?;
         if snippets.is_empty() {
             return Ok(());
         }
 
         cluster_api::run_checks(cluster_config, &mut snippets)?;
 
-        self.save_results(snippets);
+        self.save_results(snippets)?;
 
         Ok(())
     }
@@ -476,9 +477,9 @@ impl CppChecker<'_, '_> {
 
         let env = self.env();
 
-        self.data.current_database.add_environment(env.clone());
+        self.data.db.add_environment(env.clone());
 
-        let mut snippets = self.create_tasks(&[env]);
+        let mut snippets = self.create_tasks(&[env])?;
         if snippets.is_empty() {
             return Ok(());
         }
@@ -499,30 +500,33 @@ impl CppChecker<'_, '_> {
                 instance.binary_check(chunk, Some(&progress_bar))
             })
             .collect::<Result<_>>()?;
-        self.save_results(snippets);
+        self.save_results(snippets)?;
 
         Ok(())
     }
 
-    fn create_tasks(&self, library_targets: &[LibraryTarget]) -> Vec<LocalSnippetTask> {
-        let crate_name = self.data.current_database.crate_name().to_string();
+    fn create_tasks(&self, library_targets: &[LibraryTarget]) -> Result<Vec<LocalSnippetTask>> {
+        let crate_name = self.data.db.crate_name().to_string();
 
         let mut snippets = Vec::new();
-        for (ffi_item_index, ffi_item) in self.data.current_database.ffi_items().iter().enumerate()
-        {
-            if ffi_item.checks.has_all_envs(library_targets) {
+        let mut old_items_count = 0;
+
+        for ffi_item in self.data.db.ffi_items() {
+            let checks = self.data.db.cpp_checks(&ffi_item.id)?;
+            if checks.has_all_envs(library_targets) {
+                old_items_count += 1;
                 continue;
             }
 
-            match snippet_for_item(ffi_item, self.data.current_database.ffi_items()) {
+            match snippet_for_item(ffi_item.clone(), &self.data.db) {
                 Ok(snippet) => {
                     for library_target in library_targets {
-                        if ffi_item.checks.has_env(library_target) {
+                        if checks.has_env(library_target) {
                             continue;
                         }
                         snippets.push(SnippetTask {
                             data: SnippetTaskLocalData {
-                                ffi_item_index,
+                                ffi_item_id: ffi_item.id.clone(),
                                 crate_name: crate_name.clone(),
                                 library_target: library_target.clone(),
                             },
@@ -540,27 +544,56 @@ impl CppChecker<'_, '_> {
                 }
             }
         }
-        snippets
+
+        if old_items_count == 0 {
+            info!("Checking {} items", snippets.len());
+        } else if snippets.is_empty() {
+            info!("Ignoring {} old items", old_items_count);
+        } else {
+            info!(
+                "Checking {} items, ignoring {} old items",
+                snippets.len(),
+                old_items_count
+            );
+        }
+
+        Ok(snippets)
     }
 
-    fn save_results(&mut self, snippets: Vec<LocalSnippetTask>) {
+    fn save_results(&mut self, snippets: Vec<LocalSnippetTask>) -> Result<()> {
+        let mut success_count = 0;
+        let mut error_count = 0;
+
         for snippet in snippets {
-            let ffi_item =
-                &mut self.data.current_database.ffi_items_mut()[snippet.data.ffi_item_index];
+            let ffi_item = self.data.db.ffi_item_mut(&snippet.data.ffi_item_id)?;
             if let Some(output) = snippet.output {
                 if output.is_success() {
                     debug!("success: {}", ffi_item.item.short_text());
+                    success_count += 1;
                 } else {
                     debug!("error: {}: {:?}", ffi_item.item.short_text(), output);
+                    error_count += 1;
                 }
-                ffi_item
-                    .checks
-                    .add(snippet.data.library_target, output.is_success());
+                let ffi_item_id = ffi_item.id;
+                self.data.db.add_cpp_checks_item(
+                    ffi_item_id,
+                    CppChecksItem {
+                        env: snippet.data.library_target,
+                        is_success: output.is_success(),
+                    },
+                );
             } else {
-                debug!("no output for item: {}", ffi_item.item.short_text());
+                error!("no output for item: {}", ffi_item.item.short_text());
             }
             trace!("snippet: {:?}", snippet.snippet);
         }
+
+        info!(
+            "Success: {} items; error: {} items",
+            success_count, error_count
+        );
+
+        Ok(())
     }
 }
 
@@ -588,37 +621,41 @@ fn type_paths(type1: &CppType) -> Vec<&CppPath> {
     }
 }
 
-pub fn apply_blacklist_to_checks(data: &mut ProcessorData<'_>) -> Result<()> {
+pub fn delete_blacklisted_items(data: &mut ProcessorData<'_>) -> Result<()> {
     if let Some(hook) = data.config.cpp_parser_path_hook() {
-        for item in data.current_database.ffi_items_mut() {
-            let (types, path) = match &item.item {
-                CppFfiItem::Function(function) => match &function.kind {
-                    CppFfiFunctionKind::Function { cpp_function, .. } => (
-                        cpp_function.all_involved_types(),
-                        Some(cpp_function.path.clone()),
-                    ),
-                    CppFfiFunctionKind::FieldAccessor { field, .. } => {
-                        (vec![field.field_type.clone()], Some(field.path.clone()))
-                    }
-                },
-                CppFfiItem::QtSlotWrapper(wrapper) => (wrapper.signal_arguments.clone(), None),
-            };
-
-            let any_blocked = types
+        let mut bad_cpp_item_ids = Vec::new();
+        for cpp_item in data.db.cpp_items() {
+            let all_types = cpp_item.item.all_involved_types();
+            let paths = all_types
                 .iter()
                 .flat_map(|type1| type_paths(type1))
-                .chain(path.as_ref())
-                .map_if_ok(|path| hook(path))?
-                .into_iter()
-                .any(|x| !x);
-
-            if any_blocked {
-                if item.checks.any_success() {
-                    log::info!("Checks are cleared for {}", item.item.short_text());
+                .chain(cpp_item.item.path());
+            for path in paths {
+                if !hook(path)? {
+                    bad_cpp_item_ids.push(cpp_item.id);
+                    break;
                 }
-                item.checks.clear();
             }
         }
+        data.db
+            .delete_items(|item| bad_cpp_item_ids.contains(&item.id));
     }
+
+    if let Some(hook) = data.config.ffi_generator_hook() {
+        let mut bad_cpp_item_ids = Vec::new();
+        for cpp_item in data.db.cpp_items() {
+            if !hook(&cpp_item.item)? {
+                bad_cpp_item_ids.push(cpp_item.id);
+            }
+        }
+        data.db.delete_items(|item| {
+            item.item.is_ffi_item()
+                && item
+                    .source_id
+                    .as_ref()
+                    .map_or(false, |source_id| bad_cpp_item_ids.contains(source_id))
+        });
+    }
+
     Ok(())
 }

@@ -1,19 +1,19 @@
 use crate::config::Config;
-use crate::cpp_checker::apply_blacklist_to_checks;
-use crate::database::{CppDatabaseItem, CppFfiDatabaseItem, Database};
+use crate::database::{DatabaseClient, ItemId};
 use crate::workspace::Workspace;
 use crate::{
-    cpp_checker, cpp_ffi_generator, cpp_implicit_methods, cpp_omitting_arguments, cpp_parser,
-    cpp_template_instantiator, crate_writer, rust_generator,
+    cpp_casts, cpp_checker, cpp_ffi_generator, cpp_implicit_methods, cpp_omitting_arguments,
+    cpp_parser, cpp_template_instantiator, crate_writer, rust_generator,
 };
+use itertools::Itertools;
 use log::{error, info, trace};
 use regex::Regex;
 use ritual_common::env_var_names;
 use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
 use ritual_common::utils::{run_command, MapIfOk};
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::fmt;
-use std::iter::once;
 use std::ops::Bound;
 use std::path::PathBuf;
 use std::process::Command;
@@ -59,24 +59,7 @@ fn check_all_paths(config: &Config) -> Result<()> {
 pub struct ProcessorData<'a> {
     pub workspace: &'a mut Workspace,
     pub config: &'a Config,
-    pub current_database: &'a mut Database,
-    pub dep_databases: &'a [Database],
-}
-
-impl<'a> ProcessorData<'a> {
-    pub fn all_databases(&self) -> impl Iterator<Item = &Database> {
-        once(&self.current_database as &_).chain(self.dep_databases.iter())
-    }
-    pub fn all_cpp_items(&self) -> impl Iterator<Item = &CppDatabaseItem> {
-        once(&self.current_database as &_)
-            .chain(self.dep_databases.iter())
-            .flat_map(|d| d.cpp_items().iter())
-    }
-    pub fn all_ffi_items(&self) -> impl Iterator<Item = &CppFfiDatabaseItem> {
-        once(&self.current_database as &_)
-            .chain(self.dep_databases.iter())
-            .flat_map(|d| d.ffi_items().iter())
-    }
+    pub db: &'a mut DatabaseClient,
 }
 
 struct ProcessingStep {
@@ -126,6 +109,7 @@ impl Default for ProcessingSteps {
                 &format!("omitting_arguments{}", suffix),
                 cpp_omitting_arguments::run,
             );
+            s.push(&format!("cpp_casts{}", suffix), cpp_casts::run);
             s.push(
                 &format!("cpp_ffi_generator{}", suffix),
                 cpp_ffi_generator::run,
@@ -142,18 +126,18 @@ impl Default for ProcessingSteps {
         s.push("build_crate", build_crate);
 
         s.add_custom("clear_ffi", |data| {
-            data.current_database.clear_ffi();
+            data.db.delete_items(|i| i.item.is_ffi_item());
             Ok(())
         });
         s.add_custom("clear_cpp_checks", |data| {
-            data.current_database.clear_cpp_checks();
+            data.db.delete_items(|i| i.item.is_cpp_checks_item());
             Ok(())
         });
-        s.add_custom("apply_blacklist_to_checks", apply_blacklist_to_checks);
         s.add_custom("clear_rust_info", |data| {
-            data.current_database.clear_rust_info();
+            data.db.delete_items(|i| i.item.is_rust_item());
             Ok(())
         });
+        s.add_custom("show_non_portable", show_non_portable);
 
         //        s.add_custom(
         //            "suggest_allocation_places",
@@ -228,7 +212,8 @@ fn build_crate(data: &mut ProcessorData<'_>) -> Result<()> {
             .arg(cargo_cmd)
             .arg("-p")
             .arg(crate_name)
-            .current_dir(path);
+            .current_dir(path)
+            .env_remove("CARGO_TARGET_DIR");
         if cargo_cmd == &"doc" {
             command.env(env_var_names::RUSTDOC, "1");
         }
@@ -236,6 +221,29 @@ fn build_crate(data: &mut ProcessorData<'_>) -> Result<()> {
         //     command.arg("-vv");
         // }
         run_command(&mut command)?;
+    }
+    Ok(())
+}
+
+fn show_non_portable(data: &mut ProcessorData<'_>) -> Result<()> {
+    let all_envs = data.db.environments();
+    let mut results = HashMap::<_, Vec<_>>::new();
+    for item in data.db.ffi_items() {
+        let checks = data.db.cpp_checks(&item.id)?;
+        if checks.any_success() && !checks.all_success(all_envs) {
+            let envs = checks.successful_envs().cloned().collect_vec();
+            let text = item.item.short_text();
+            results.entry(envs).or_default().push(text);
+        }
+    }
+    for (envs, texts) in results {
+        info!(
+            "envs: {}",
+            envs.iter().map(|env| format!("{:?}", env)).join(", ")
+        );
+        for text in texts {
+            info!("    {}", text);
+        }
     }
     Ok(())
 }
@@ -273,6 +281,7 @@ pub fn process(
     workspace: &mut Workspace,
     config: &Config,
     mut step_names: &[String],
+    trace_item_id: Option<&ItemId>,
 ) -> Result<()> {
     info!("Processing crate: {}", config.crate_properties().name());
     check_all_paths(&config)?;
@@ -287,23 +296,23 @@ pub fn process(
         step_names = &step_names[1..];
     } else {
         allow_load = true;
-        info!("Loading current crate data");
     }
 
     let mut current_database = workspace
-        .get_database(config.crate_properties().name(), allow_load, true)
+        .get_database_client(
+            config.crate_properties().name(),
+            config.dependent_cpp_crates().iter().map(|s| s.as_str()),
+            allow_load,
+            true,
+        )
         .with_context(|_| "failed to load current crate data")?;
 
-    if !config.dependent_cpp_crates().is_empty() {
-        info!("Loading dependencies");
-    }
-    let dependent_cpp_crates = config.dependent_cpp_crates().iter().map_if_ok(|name| {
-        workspace
-            .get_database(name, true, false)
-            .with_context(|_| "failed to load dependency")
-    })?;
-
     current_database.set_crate_version(config.crate_properties().version().to_string());
+
+    if let Some(trace_item_id) = trace_item_id {
+        current_database.print_item_trace(trace_item_id)?;
+        return Ok(());
+    }
 
     let mut steps_result = Ok(());
 
@@ -366,8 +375,7 @@ pub fn process(
 
             let mut data = ProcessorData {
                 workspace,
-                current_database: &mut current_database,
-                dep_databases: &dependent_cpp_crates,
+                db: &mut current_database,
                 config,
             };
 
@@ -382,18 +390,16 @@ pub fn process(
             let elapsed = started_time.elapsed();
             trace!("Step '{}' completed in {:?}", step.name, elapsed);
 
+            current_database.report_counters();
+
             if elapsed > Duration::from_secs(15) {
                 workspace.save_database(&mut current_database)?;
             }
         }
     }
 
-    for database in dependent_cpp_crates {
-        workspace.put_crate(database);
-    }
-
     workspace.save_database(&mut current_database)?;
-    workspace.put_crate(current_database);
+    workspace.put_database_client(current_database);
 
     steps_result
 }

@@ -1,79 +1,34 @@
-use crate::{
-    cmp::{Ge, Gt, Le, Lt},
-    CppBox, CppDeletable,
-};
-use std::cmp::{Ordering, PartialEq, PartialOrd};
-use std::ops::{Add, AddAssign, Shl};
+pub trait Increment {
+    type Output;
 
-impl<'a, T: CppDeletable, U> Add<U> for &'a CppBox<T>
-where
-    &'a T: Add<U>,
-{
-    type Output = <&'a T as Add<U>>::Output;
-
-    fn add(self, rhs: U) -> Self::Output {
-        &**self + rhs
-    }
+    fn inc(self) -> Self::Output;
 }
 
-impl<'a, T: CppDeletable, U> Shl<U> for &'a CppBox<T>
-where
-    &'a T: Shl<U>,
-{
-    type Output = <&'a T as Shl<U>>::Output;
+pub trait Decrement {
+    type Output;
 
-    fn shl(self, rhs: U) -> Self::Output {
-        &**self << rhs
-    }
+    fn dec(self) -> Self::Output;
 }
 
-impl<T: CppDeletable, U> AddAssign<U> for CppBox<T>
-where
-    T: AddAssign<U>,
-{
-    fn add_assign(&mut self, rhs: U) {
-        **self += rhs;
-    }
+pub trait Indirection {
+    type Output;
+
+    fn indirection(self) -> Self::Output;
 }
 
-impl<T: CppDeletable, U> PartialEq<U> for CppBox<T>
-where
-    T: PartialEq<U>,
-{
-    fn eq(&self, rhs: &U) -> bool {
-        &**self == rhs
-    }
+pub trait Begin {
+    type Output;
+    fn begin(self) -> Self::Output;
 }
-
-impl<T: CppDeletable, U> PartialOrd<U> for CppBox<T>
-where
-    T: Lt<U> + Le<U> + Gt<U> + Ge<U> + PartialEq<U>,
-{
-    fn partial_cmp(&self, other: &U) -> Option<Ordering> {
-        if &**self == other {
-            Some(Ordering::Equal)
-        } else if (**self).lt(other) {
-            Some(Ordering::Less)
-        } else if (**self).gt(other) {
-            Some(Ordering::Greater)
-        } else {
-            None
-        }
-    }
-
-    fn lt(&self, other: &U) -> bool {
-        (**self).lt(other)
-    }
-
-    fn le(&self, other: &U) -> bool {
-        (**self).le(other)
-    }
-
-    fn gt(&self, other: &U) -> bool {
-        (**self).gt(other)
-    }
-
-    fn ge(&self, other: &U) -> bool {
-        (**self).ge(other)
-    }
+pub trait BeginMut {
+    type Output;
+    fn begin_mut(self) -> Self::Output;
+}
+pub trait End {
+    type Output;
+    fn end(self) -> Self::Output;
+}
+pub trait EndMut {
+    type Output;
+    fn end_mut(self) -> Self::Output;
 }

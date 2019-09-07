@@ -2,7 +2,6 @@
 
 use crate::detect_signals_and_slots::detect_signals_and_slots;
 use crate::doc_parser::parse_docs;
-use crate::fix_header_names::fix_header_names;
 use crate::slot_wrappers::add_slot_wrappers;
 use crate::versions;
 use log::info;
@@ -15,9 +14,10 @@ use ritual_common::errors::{bail, format_err, Result, ResultExt};
 use ritual_common::file_utils::repo_dir_path;
 use ritual_common::target;
 use ritual_common::toml;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 mod _3d;
+mod charts;
 mod core;
 mod gui;
 mod widgets;
@@ -25,9 +25,7 @@ mod widgets;
 use self::_3d::{
     core_3d_config, extras_3d_config, input_3d_config, logic_3d_config, render_3d_config,
 };
-use self::core::core_config;
-use self::gui::gui_config;
-use self::widgets::widgets_config;
+use self::{charts::charts_config, core::core_config, gui::gui_config, widgets::widgets_config};
 use std::env;
 
 pub const MOQT_INSTALL_DIR_ENV_VAR_NAME: &str = "MOQT_INSTALL_DIR";
@@ -134,6 +132,12 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
             })?);
         config.set_crate_template_path(template_path.join(&crate_name));
 
+        let steps = config.processing_steps_mut();
+        let crate_name_clone = crate_name.to_string();
+        steps.add_after(&["cpp_parser"], "qt_doc_parser", move |data| {
+            parse_docs(data, &crate_name_clone, &Path::new("."))
+        })?;
+
         config
     } else {
         crate_properties.remove_default_build_dependencies();
@@ -169,13 +173,7 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
         }
         //config.add_cpp_parser_blocked_name(CppName::from_one_part("qt_check_for_QGADGET_macro"));
 
-        let lib_include_path = qt_config.installation_data.lib_include_path.clone();
-
         let steps = config.processing_steps_mut();
-        steps.add_after(&["cpp_parser"], "qt_fix_header_names", move |data| {
-            fix_header_names(data.current_database.cpp_items_mut(), &lib_include_path)
-        })?;
-
         let crate_name_clone = crate_name.to_string();
         let docs_path = qt_config.installation_data.docs_path.clone();
 
@@ -189,7 +187,7 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
         config
     };
 
-    config.set_after_cpp_parser_hook(detect_signals_and_slots);
+    config.add_after_cpp_parser_hook(detect_signals_and_slots);
 
     let steps = config.processing_steps_mut();
     for cpp_parser_stage in &["cpp_parser", "cpp_parser_stage2"] {
@@ -206,6 +204,8 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
         "qt_3d_logic" => logic_3d_config,
         "qt_3d_extras" => extras_3d_config,
         "qt_ui_tools" => empty_config,
+        "qt_charts" => charts_config,
+        "qt_qml" => empty_config,
         "moqt_core" => core_config,
         "moqt_gui" => gui_config,
         _ => bail!("Unknown crate name: {}", crate_name),

@@ -1,4 +1,4 @@
-use cpp_utils::Ptr;
+use cpp_utils::MutPtr;
 use qt_core::{QCoreApplication, QTimer, RawSlot};
 use std::ffi::c_void;
 
@@ -11,7 +11,7 @@ fn timer_quit() {
     println!("timer_quit: Started");
     QCoreApplication::init(|app| unsafe {
         let mut slot1 = RawSlot::new();
-        slot1.set(Some(func1), Ptr::from_raw(42 as *mut c_void));
+        slot1.set(Some(func1), MutPtr::from_raw(42 as *mut c_void));
         app.about_to_quit().connect(&slot1);
 
         let mut timer = QTimer::new_0a();

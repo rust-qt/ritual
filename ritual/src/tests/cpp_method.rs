@@ -1,5 +1,6 @@
 use crate::cpp_data::*;
 use crate::cpp_ffi_data::*;
+use crate::cpp_ffi_generator::NewFfiFunctionKind;
 use crate::cpp_function::*;
 use crate::cpp_type::*;
 use itertools::Itertools;
@@ -38,10 +39,10 @@ pub fn empty_regular_method() -> CppFunction {
         member: None,
         return_type: CppType::Void,
         arguments: vec![],
-        doc: Default::default(),
         allows_variadic_arguments: false,
         operator: None,
         declaration_code: None,
+        cast: None,
     }
 }
 
@@ -171,9 +172,8 @@ fn argument_types_equal8() {
 fn to_ffi(function: &CppFunction, force_stack: Option<CppPath>) -> CppFfiFunction {
     let movable_types = force_stack.into_iter().collect_vec();
     crate::cpp_ffi_generator::to_ffi_method(
-        &CppFfiFunctionKind::Function {
+        NewFfiFunctionKind::Function {
             cpp_function: function.clone(),
-            cast: None,
         },
         &movable_types,
         &mut crate::cpp_ffi_generator::FfiNameProvider::testing(),
@@ -189,7 +189,7 @@ fn c_signature_empty() {
     assert!(!method1.is_constructor());
     assert!(!method1.is_destructor());
     assert!(!method1.is_operator());
-    assert!(method1.class_type().is_err());
+    assert!(method1.class_path().is_err());
 
     let r = to_ffi(&method1, None);
     assert!(r.arguments.is_empty());
@@ -239,7 +239,7 @@ fn c_signature_method_with_this() {
     assert!(!method1.is_destructor());
     assert!(!method1.is_operator());
     assert_eq!(
-        method1.class_type().unwrap(),
+        method1.class_path().unwrap(),
         CppPath::from_good_str("MyClass")
     );
 
@@ -248,7 +248,7 @@ fn c_signature_method_with_this() {
     assert_eq!(r.arguments[0].name, "this_ptr");
     assert_eq!(
         r.arguments[0].argument_type.ffi_type(),
-        &CppType::new_pointer(false, CppType::Class(method1.class_type().unwrap()))
+        &CppType::new_pointer(false, CppType::Class(method1.class_path().unwrap()))
     );
     assert_eq!(
         r.arguments[0].argument_type.conversion(),
@@ -325,7 +325,7 @@ fn c_signature_constructor() {
     assert!(!method1.is_destructor());
     assert!(!method1.is_operator());
     assert_eq!(
-        method1.class_type().unwrap(),
+        method1.class_path().unwrap(),
         CppPath::from_good_str("MyClass")
     );
 
@@ -415,7 +415,7 @@ fn c_signature_destructor() {
     assert!(method1.is_destructor());
     assert!(!method1.is_operator());
     assert_eq!(
-        method1.class_type().unwrap(),
+        method1.class_path().unwrap(),
         CppPath::from_good_str("MyClass")
     );
 
@@ -424,7 +424,7 @@ fn c_signature_destructor() {
     assert_eq!(r_stack.arguments[0].name, "this_ptr");
     assert_eq!(
         r_stack.arguments[0].argument_type.ffi_type(),
-        &CppType::new_pointer(false, CppType::Class(method1.class_type().unwrap()))
+        &CppType::new_pointer(false, CppType::Class(method1.class_path().unwrap()))
     );
     assert_eq!(
         r_stack.arguments[0].argument_type.conversion(),
@@ -439,7 +439,7 @@ fn c_signature_destructor() {
     assert_eq!(r_heap.arguments[0].name, "this_ptr");
     assert_eq!(
         r_heap.arguments[0].argument_type.ffi_type(),
-        &CppType::new_pointer(false, CppType::Class(method1.class_type().unwrap()))
+        &CppType::new_pointer(false, CppType::Class(method1.class_path().unwrap()))
     );
     assert_eq!(
         r_heap.arguments[0].argument_type.conversion(),
@@ -466,7 +466,7 @@ fn c_signature_method_returning_class() {
     assert_eq!(r_stack.arguments[0].name, "this_ptr");
     assert_eq!(
         r_stack.arguments[0].argument_type.ffi_type(),
-        &CppType::new_pointer(false, CppType::Class(method1.class_type().unwrap()))
+        &CppType::new_pointer(false, CppType::Class(method1.class_path().unwrap()))
     );
     assert_eq!(
         r_stack.arguments[0].argument_type.conversion(),
@@ -511,7 +511,7 @@ fn c_signature_method_returning_class() {
     assert_eq!(r_heap.arguments[0].name, "this_ptr");
     assert_eq!(
         r_heap.arguments[0].argument_type.ffi_type(),
-        &CppType::new_pointer(false, CppType::Class(method1.class_type().unwrap()))
+        &CppType::new_pointer(false, CppType::Class(method1.class_path().unwrap()))
     );
     assert_eq!(
         r_heap.arguments[0].argument_type.conversion(),
@@ -549,7 +549,7 @@ fn c_signature_method_returning_class() {
 fn full_name_free_function_in_namespace() {
     let mut method1 = empty_regular_method();
     method1.path = CppPath::from_good_str("ns::func1");
-    assert!(method1.class_type().is_err());
+    assert!(method1.class_path().is_err());
 }
 
 #[test]
@@ -558,7 +558,7 @@ fn full_name_method() {
     method1.path = CppPath::from_good_str("MyClass::func1");
     method1.member = Some(empty_membership());
     assert_eq!(
-        method1.class_type().unwrap(),
+        method1.class_path().unwrap(),
         CppPath::from_good_str("MyClass")
     );
 }
@@ -573,7 +573,7 @@ fn full_name_static_method() {
         info
     });
     assert_eq!(
-        method1.class_type().unwrap(),
+        method1.class_path().unwrap(),
         CppPath::from_good_str("MyClass")
     );
 }
@@ -584,7 +584,7 @@ fn full_name_nested_class_method() {
     method1.path = CppPath::from_good_str("MyClass::Iterator::func1");
     method1.member = Some(empty_membership());
     assert_eq!(
-        method1.class_type().unwrap(),
+        method1.class_path().unwrap(),
         CppPath::from_good_str("MyClass::Iterator")
     );
 }
@@ -617,12 +617,12 @@ fn short_text1() {
                 has_default_value: true,
             },
         ],
-        doc: Default::default(),
         allows_variadic_arguments: false,
+        cast: None,
         declaration_code: None,
     };
     assert_eq!(
         method.short_text(),
-        "protected int Class1::method1(int arg1, double arg2 = ?) const"
+        "protected int Class1::method1(int arg1, double arg2 = …) const"
     );
 }

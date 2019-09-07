@@ -1,24 +1,25 @@
 //! Types and functions used for Rust code generation.
 
 use crate::cpp_checks::Condition;
-use crate::database::Database;
+use crate::cpp_ffi_data::CppFfiArgumentMeaning;
+use crate::database::{DatabaseClient, DbItem, ItemId};
 use crate::doc_formatter;
 use crate::rust_generator::qt_core_path;
 use crate::rust_info::{
-    RustDatabase, RustDatabaseItem, RustEnumValue, RustExtraImpl, RustExtraImplKind,
-    RustFFIFunction, RustFfiWrapperData, RustFunction, RustFunctionArgument, RustFunctionKind,
-    RustItem, RustModule, RustModuleKind, RustStruct, RustStructKind, RustTraitImpl,
-    RustWrapperTypeKind,
+    RustEnumValue, RustExtraImpl, RustExtraImplKind, RustFfiWrapperData, RustFunction,
+    RustFunctionArgument, RustFunctionKind, RustItem, RustModule, RustModuleKind,
+    RustSpecialModuleKind, RustStruct, RustStructKind, RustTraitImpl, RustWrapperTypeKind,
 };
 use crate::rust_type::{
     RustCommonType, RustFinalType, RustPath, RustPointerLikeTypeKind, RustToFfiTypeConversion,
     RustType,
 };
 use itertools::Itertools;
-use ritual_common::errors::{bail, err_msg, Result};
+use ritual_common::errors::{bail, err_msg, format_err, Result};
 use ritual_common::file_utils::{create_dir_all, create_file, file_to_string, File};
 use ritual_common::string_utils::trim_slice;
 use ritual_common::utils::MapIfOk;
+use std::fmt::Write as _;
 use std::fs;
 use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -32,6 +33,21 @@ fn wrap_unsafe(in_unsafe_context: bool, content: &str) -> String {
     format!("{}{}{}", unsafe_start, content, unsafe_end)
 }
 
+pub fn rust_common_type_to_code(rust_type: &RustCommonType, current_crate: Option<&str>) -> String {
+    let mut code = rust_type.path.full_name(current_crate);
+    if let Some(args) = &rust_type.generic_arguments {
+        write!(
+            code,
+            "<{}>",
+            args.iter()
+                .map(|x| rust_type_to_code(x, current_crate))
+                .join(", ",)
+        )
+        .unwrap();
+    }
+    code
+}
+
 /// Generates Rust code representing type `rust_type` inside crate `crate_name`.
 /// Same as `RustCodeGenerator::rust_type_to_code`, but accessible by other modules.
 pub fn rust_type_to_code(rust_type: &RustType, current_crate: Option<&str>) -> String {
@@ -43,6 +59,7 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: Option<&str>) -> S
                 .join("");
             format!("({})", types_text)
         }
+        RustType::Primitive(type1) => type1.to_string(),
         RustType::PointerLike {
             kind,
             target,
@@ -70,22 +87,7 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: Option<&str>) -> S
                 }
             }
         }
-        RustType::Common(RustCommonType {
-            path,
-            generic_arguments,
-        }) => {
-            let mut code = path.full_name(current_crate);
-            if let Some(args) = generic_arguments {
-                code = format!(
-                    "{}<{}>",
-                    code,
-                    args.iter()
-                        .map(|x| rust_type_to_code(x, current_crate))
-                        .join(", ",)
-                );
-            }
-            code
-        }
+        RustType::Common(common) => rust_common_type_to_code(common, current_crate),
         RustType::FunctionPointer {
             return_type,
             arguments,
@@ -101,15 +103,18 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: Option<&str>) -> S
                 format!(" -> {}", rust_type_to_code(return_type, current_crate))
             }
         ),
+        RustType::ImplTrait(trait_type) => format!(
+            "impl {}",
+            rust_common_type_to_code(trait_type, current_crate)
+        ),
     }
 }
 
 struct Generator<'a> {
-    crate_name: String,
     output_src_path: PathBuf,
     crate_template_src_path: Option<PathBuf>,
     destination: Vec<File<BufWriter<fs::File>>>,
-    current_database: &'a Database,
+    current_database: &'a DatabaseClient,
 }
 
 impl Write for Generator<'_> {
@@ -149,7 +154,7 @@ fn format_doc_extended(doc: &str, is_outer: bool) -> String {
         return String::new();
     }
     let prefix = if is_outer { "//! " } else { "/// " };
-    let lines = doc.split('\n').collect_vec();
+    let lines = doc.trim().split('\n').collect_vec();
     let lines = trim_slice(&lines, |x| x.is_empty());
     if lines.is_empty() {
         return String::new();
@@ -196,7 +201,8 @@ impl Generator<'_> {
         let parts = &rust_path.parts;
 
         assert_eq!(
-            &parts[0], &self.crate_name,
+            &parts[0],
+            &self.current_database.crate_name(),
             "Generator::push_file expects path from this crate"
         );
 
@@ -227,41 +233,61 @@ impl Generator<'_> {
 
     fn generate_item(
         &mut self,
-        item: &RustDatabaseItem,
+        item: DbItem<&RustItem>,
         self_type: Option<&RustType>,
-        database: &RustDatabase,
     ) -> Result<()> {
-        let ffi_item = if let Some(index) = item.ffi_item_index {
-            Some(
-                self.current_database
-                    .ffi_items()
-                    .get(index)
-                    .ok_or_else(|| err_msg("rust item refers to invalid ffi item index"))?,
-            )
-        } else if let Some(index) = item.cpp_item_index {
-            let cpp_item = self
-                .current_database
-                .cpp_items()
-                .get(index)
-                .ok_or_else(|| err_msg("rust item refers to invalid cpp item index"))?;
-            if let Some(index) = cpp_item.source_ffi_item {
-                Some(
-                    self.current_database
-                        .ffi_items()
-                        .get(index)
-                        .ok_or_else(|| err_msg("cpp item refers to invalid ffi item index"))?,
-                )
-            } else {
-                None
+        let mut item_for_condition = item.clone();
+        if let RustItem::Function(function) = &item.item {
+            if function.kind.is_signal_or_slot_getter() {
+                // find static cast from self to QObject
+                let target_type = function
+                    .arguments
+                    .get(0)
+                    .ok_or_else(|| err_msg("slot getter must have self argument"))?
+                    .argument_type
+                    .api_type()
+                    .pointer_like_to_target()
+                    .map_err(|_| err_msg("slot getter must have ref self argument"))?;
+
+                let q_object = RustType::Common(RustCommonType {
+                    path: self.qt_core_path().join("QObject"),
+                    generic_arguments: None,
+                });
+                if target_type != q_object {
+                    let trait_type = RustCommonType {
+                        path: RustPath::from_good_str("cpp_utils::StaticUpcast"),
+                        generic_arguments: Some(vec![q_object]),
+                    };
+                    item_for_condition = self
+                        .current_database
+                        .rust_items()
+                        .find(|item| {
+                            item.item.as_trait_impl_ref().map_or(false, |item| {
+                                item.target_type == target_type && item.trait_type == trait_type
+                            })
+                        })
+                        .ok_or_else(|| {
+                            format_err!(
+                                "can't find static cast corresponding to \
+                                 slot getter: target_type = {:?}, trait_type = {:?}",
+                                target_type,
+                                trait_type
+                            )
+                        })?;
+                }
             }
-        } else {
-            None
-        };
+        }
+
+        let ffi_item = self
+            .current_database
+            .source_ffi_item(&item_for_condition.id)?;
 
         let mut condition_texts = ConditionTexts::default();
+
         if let Some(ffi_item) = ffi_item {
-            let condition = ffi_item
-                .checks
+            let condition = self
+                .current_database
+                .cpp_checks(&ffi_item.id)?
                 .condition(self.current_database.environments());
             if condition != Condition::True {
                 let expression = condition_expression(&condition);
@@ -273,21 +299,33 @@ impl Generator<'_> {
         }
 
         match &item.item {
-            RustItem::Module(module) => self.generate_module(module, database),
-            RustItem::Struct(data) => self.generate_struct(data, database, &condition_texts),
-            RustItem::EnumValue(value) => self.generate_enum_value(value),
-            RustItem::TraitImpl(value) => self.generate_trait_impl(value, &condition_texts),
-            RustItem::Function(value) => {
-                self.generate_rust_final_function(value, false, self_type, &condition_texts)
+            RustItem::Module(_) => self.generate_module(item.map(|i| i.as_module_ref().unwrap())),
+            RustItem::Struct(_) => {
+                self.generate_struct(item.map(|i| i.as_struct_ref().unwrap()), &condition_texts)
             }
-            RustItem::FfiFunction(value) => self.generate_ffi_function(value, &condition_texts),
-            RustItem::ExtraImpl(value) => self.generate_extra_impl(value, &condition_texts),
-            RustItem::Reexport { path, target } => {
+            RustItem::EnumValue(_) => {
+                self.generate_enum_value(item.map(|i| i.as_enum_value_ref().unwrap()))
+            }
+            RustItem::TraitImpl(_) => self.generate_trait_impl(
+                item.map(|i| i.as_trait_impl_ref().unwrap()),
+                &condition_texts,
+            ),
+            RustItem::Function(_) => self.generate_function(
+                item.map(|i| i.as_function_ref().unwrap()),
+                false,
+                self_type,
+                &condition_texts,
+            ),
+            RustItem::ExtraImpl(_) => self.generate_extra_impl(
+                item.map(|i| i.as_extra_impl_ref().unwrap()),
+                &condition_texts,
+            ),
+            RustItem::Reexport(reexport) => {
                 writeln!(
                     self,
                     "pub use {} as {};",
-                    self.rust_path_to_string(target),
-                    path.last()
+                    self.rust_path_to_string(&reexport.target),
+                    reexport.path.last()
                 )?;
                 Ok(())
             }
@@ -295,76 +333,91 @@ impl Generator<'_> {
     }
 
     fn rust_type_to_code(&self, rust_type: &RustType) -> String {
-        rust_type_to_code(rust_type, Some(&self.crate_name))
+        rust_type_to_code(rust_type, Some(&self.current_database.crate_name()))
+    }
+
+    fn rust_common_type_to_code(&self, rust_type: &RustCommonType) -> String {
+        rust_common_type_to_code(rust_type, Some(&self.current_database.crate_name()))
     }
 
     #[allow(clippy::collapsible_if)]
-    fn generate_module(&mut self, module: &RustModule, database: &RustDatabase) -> Result<()> {
-        if database.children(&module.path).next().is_none() {
+    fn generate_module(&mut self, module: DbItem<&RustModule>) -> Result<()> {
+        if self
+            .current_database
+            .rust_children(&module.item.path)
+            .next()
+            .is_none()
+        {
             // skip empty module
             return Ok(());
         }
 
-        let vis = if module.is_public { "pub " } else { "" };
+        let vis = if module.item.is_public { "pub " } else { "" };
         let mut content_from_template = None;
-        if module.kind.is_in_separate_file() {
-            if module.kind != RustModuleKind::CrateRoot {
-                writeln!(self, "{}mod {};", vis, module.path.last())?;
+        if module.item.kind.is_in_separate_file() {
+            if module.item.kind != RustModuleKind::Special(RustSpecialModuleKind::CrateRoot) {
+                writeln!(self, "{}mod {};", vis, module.item.path.last())?;
             }
-            let path = self.module_path(&module.path, &self.output_src_path)?;
+            let path = self.module_path(&module.item.path, &self.output_src_path)?;
             self.push_file(&path)?;
 
             if let Some(crate_template_src_path) = &self.crate_template_src_path {
-                let template_path = self.module_path(&module.path, crate_template_src_path)?;
+                let template_path = self.module_path(&module.item.path, crate_template_src_path)?;
                 if template_path.exists() {
                     let content = file_to_string(template_path)?;
                     content_from_template = Some(content);
                 }
             }
         } else {
-            assert_ne!(module.kind, RustModuleKind::CrateRoot);
-            writeln!(self, "{}mod {} {{", vis, module.path.last())?;
+            assert_ne!(
+                module.item.kind,
+                RustModuleKind::Special(RustSpecialModuleKind::CrateRoot)
+            );
+            writeln!(self, "{}mod {} {{", vis, module.item.path.last())?;
         }
 
         write!(
             self,
             "{}",
-            format_doc_extended(&doc_formatter::module_doc(module), true)
+            format_doc_extended(
+                &doc_formatter::module_doc(module.clone(), self.current_database)?,
+                true
+            )
         )?;
 
         if let Some(content) = content_from_template {
             writeln!(self, "{}", content)?;
         }
 
-        match module.kind {
-            RustModuleKind::Ffi => {
+        match module.item.kind {
+            RustModuleKind::Special(RustSpecialModuleKind::Ffi) => {
                 writeln!(self, "include!(concat!(env!(\"OUT_DIR\"), \"/ffi.rs\"));")?;
             }
-            RustModuleKind::SizedTypes => {
+            RustModuleKind::Special(RustSpecialModuleKind::SizedTypes) => {
                 writeln!(
                     self,
                     "include!(concat!(env!(\"OUT_DIR\"), \"/sized_types.rs\"));"
                 )?;
             }
-            RustModuleKind::CrateRoot
-            | RustModuleKind::Ops
-            | RustModuleKind::CppNamespace
-            | RustModuleKind::CppNestedType => {
-                self.generate_children(&module.path, None, database)?;
+            RustModuleKind::Special(RustSpecialModuleKind::CrateRoot)
+            | RustModuleKind::Special(RustSpecialModuleKind::Ops)
+            | RustModuleKind::CppNamespace { .. }
+            | RustModuleKind::CppNestedTypes { .. } => {
+                self.generate_children(&module.item.path, None)?;
             }
         }
 
-        if module.kind.is_in_separate_file() {
+        if module.item.kind.is_in_separate_file() {
             self.pop_file();
         } else {
             // close `mod {}`
             writeln!(self, "}}")?;
         }
 
-        if module.kind == RustModuleKind::Ffi {
+        if module.item.kind == RustModuleKind::Special(RustSpecialModuleKind::Ffi) {
             let path = self.output_src_path.join("ffi.in.rs");
             self.destination.push(create_file(&path)?);
-            self.generate_children(&module.path, None, database)?;
+            self.generate_children(&module.item.path, None)?;
             self.pop_file();
         }
 
@@ -372,12 +425,12 @@ impl Generator<'_> {
     }
 
     fn qt_core_path(&self) -> RustPath {
-        qt_core_path(&self.crate_name)
+        qt_core_path(&self.current_database.crate_name())
     }
 
     fn qt_core_prefix(&self) -> String {
         let qt_core_path = self.qt_core_path();
-        if qt_core_path.parts[0] == self.crate_name {
+        if qt_core_path.parts[0] == self.current_database.crate_name() {
             "crate".to_string()
         } else {
             format!("::{}", qt_core_path.parts[0])
@@ -386,22 +439,26 @@ impl Generator<'_> {
 
     fn generate_struct(
         &mut self,
-        rust_struct: &RustStruct,
-        database: &RustDatabase,
+        rust_struct: DbItem<&RustStruct>,
         condition_texts: &ConditionTexts,
     ) -> Result<()> {
-        let doc = doc_formatter::struct_doc(rust_struct) + &condition_texts.doc_text;
+        let doc = doc_formatter::struct_doc(rust_struct.clone(), self.current_database)?
+            + &condition_texts.doc_text;
         write!(self, "{}", format_doc(&doc))?;
 
-        let visibility = if rust_struct.is_public { "pub " } else { "" };
-        match &rust_struct.kind {
-            RustStructKind::WrapperType(wrapper) => match &wrapper.kind {
+        let visibility = if rust_struct.item.is_public {
+            "pub "
+        } else {
+            ""
+        };
+        match &rust_struct.item.kind {
+            RustStructKind::WrapperType(kind) => match kind {
                 RustWrapperTypeKind::EnumWrapper => {
                     writeln!(
                         self,
                         include_str!("../templates/crate/enum_wrapper.rs.in"),
                         vis = visibility,
-                        name = rust_struct.path.last()
+                        name = rust_struct.item.path.last()
                     )?;
                 }
                 RustWrapperTypeKind::ImmovableClassWrapper => {
@@ -410,7 +467,7 @@ impl Generator<'_> {
                         self,
                         "{}struct {} {{ _unused: u8, }}",
                         visibility,
-                        rust_struct.path.last()
+                        rust_struct.item.path.last()
                     )?;
                 }
                 RustWrapperTypeKind::MovableClassWrapper { sized_type_path } => {
@@ -419,7 +476,7 @@ impl Generator<'_> {
                         self,
                         "{}struct {}({});",
                         visibility,
-                        rust_struct.path.last(),
+                        rust_struct.item.path.last(),
                         self.rust_path_to_string(sized_type_path),
                     )?;
                     writeln!(self)?;
@@ -452,7 +509,7 @@ impl Generator<'_> {
                     include_str!("../templates/crate/closure_slot_wrapper.rs.in"),
                     qt_core = self.qt_core_prefix(),
                     type_name = self.rust_path_to_string(&slot_wrapper.raw_slot_wrapper),
-                    pub_type_name = rust_struct.path.last(),
+                    pub_type_name = rust_struct.item.path.last(),
                     args = args,
                     func_args = func_args,
                     callback_args = callback_args,
@@ -464,14 +521,19 @@ impl Generator<'_> {
             }
         }
 
-        if database.children(&rust_struct.path).next().is_some() {
+        if self
+            .current_database
+            .rust_children(&rust_struct.item.path)
+            .next()
+            .is_some()
+        {
             let struct_type = RustType::Common(RustCommonType {
-                path: rust_struct.path.clone(),
+                path: rust_struct.item.path.clone(),
                 generic_arguments: None,
             });
 
-            writeln!(self, "impl {} {{", rust_struct.path.last())?;
-            self.generate_children(&rust_struct.path, Some(&struct_type), database)?;
+            writeln!(self, "impl {} {{", rust_struct.item.path.last())?;
+            self.generate_children(&rust_struct.item.path, Some(&struct_type))?;
             writeln!(self, "}}")?;
             writeln!(self)?;
         }
@@ -479,49 +541,36 @@ impl Generator<'_> {
         Ok(())
     }
 
-    fn generate_enum_value(&mut self, value: &RustEnumValue) -> Result<()> {
+    fn generate_enum_value(&mut self, value: DbItem<&RustEnumValue>) -> Result<()> {
         write!(
             self,
             "{}",
-            format_doc(&doc_formatter::enum_value_doc(value))
+            format_doc(&doc_formatter::enum_value_doc(
+                value.clone(),
+                self.current_database
+            )?)
         )?;
-        let struct_path =
-            self.rust_path_to_string(&value.path.parent().expect("enum value must have parent"));
+        let struct_path = self.rust_path_to_string(
+            &value
+                .item
+                .path
+                .parent()
+                .expect("enum value must have parent"),
+        );
         writeln!(self, "#[allow(non_upper_case_globals)]")?;
         writeln!(
             self,
             "pub const {value_name}: {struct_path} = {struct_path}({value});",
-            value_name = value.path.last(),
+            value_name = value.item.path.last(),
             struct_path = struct_path,
-            value = value.value
+            value = value.item.value
         )?;
         Ok(())
     }
 
     // TODO: generate relative paths for better readability
     fn rust_path_to_string(&self, path: &RustPath) -> String {
-        path.full_name(Some(&self.crate_name))
-    }
-
-    /// Generates Rust code containing declaration of a FFI function `func`.
-    fn rust_ffi_function_to_code(&self, func: &RustFFIFunction) -> String {
-        let mut args = func.arguments.iter().map(|arg| {
-            format!(
-                "{}: {}",
-                arg.name,
-                self.rust_type_to_code(&arg.argument_type)
-            )
-        });
-        format!(
-            "  pub fn {}({}){};\n",
-            func.path.last(),
-            args.join(", "),
-            if func.return_type.is_unit() {
-                String::new()
-            } else {
-                format!(" -> {}", self.rust_type_to_code(&func.return_type))
-            }
-        )
+        path.full_name(Some(&self.current_database.crate_name()))
     }
 
     /// Wraps `expression` of type `type1.rust_ffi_type` to convert
@@ -636,6 +685,9 @@ impl Generator<'_> {
                 )?;
                 format!("&{}", expr)
             }
+            RustToFfiTypeConversion::ImplCastInto(_) => {
+                bail!("ImplCastInto is not convertable from FFI type");
+            }
         };
         Ok(code1 + &code2)
     }
@@ -670,7 +722,23 @@ impl Generator<'_> {
             }
             RustToFfiTypeConversion::CppBoxToPtr => format!("{}.into_raw_ptr()", expr),
             RustToFfiTypeConversion::UtilsPtrToPtr { .. }
-            | RustToFfiTypeConversion::UtilsRefToPtr { .. } => format!("{}.as_raw_ptr()", expr),
+            | RustToFfiTypeConversion::UtilsRefToPtr { .. } => {
+                let api_type_path = &type1.api_type().as_common()?.path;
+                let api_is_const = api_type_path == &RustPath::from_good_str("cpp_utils::Ptr")
+                    || api_type_path == &RustPath::from_good_str("cpp_utils::Ref");
+                let ffi_is_const = type1.ffi_type().is_const_pointer_like()?;
+                let call = if !api_is_const && !ffi_is_const {
+                    format!("{}.as_mut_raw_ptr()", expr)
+                } else {
+                    format!("{}.as_raw_ptr()", expr)
+                };
+
+                if api_is_const != ffi_is_const {
+                    format!("{} as {}", call, self.rust_type_to_code(type1.ffi_type()))
+                } else {
+                    call
+                }
+            }
             RustToFfiTypeConversion::OptionUtilsRefToPtr { .. } => {
                 bail!("OptionUtilsRefToPtr is not supported in argument position");
             }
@@ -688,6 +756,17 @@ impl Generator<'_> {
                     code
                 }
             }
+            RustToFfiTypeConversion::ImplCastInto(conversion) => {
+                let intermediate =
+                    RustFinalType::new(type1.ffi_type().clone(), (**conversion).clone())?;
+
+                let intermediate_expr = format!(
+                    "::cpp_utils::CastInto::<{}>::cast_into({})",
+                    self.rust_type_to_code(&intermediate.api_type()),
+                    expr
+                );
+                self.convert_type_to_ffi(&intermediate_expr, &intermediate)?
+            }
         };
         Ok(code)
     }
@@ -697,22 +776,38 @@ impl Generator<'_> {
     /// an `unsafe` block.
     fn generate_ffi_call(
         &self,
+        id: &ItemId,
         arguments: &[RustFunctionArgument],
         return_type: &RustFinalType,
         wrapper_data: &RustFfiWrapperData,
         in_unsafe_context: bool,
     ) -> Result<String> {
         let mut final_args = Vec::new();
-        final_args.resize(wrapper_data.cpp_ffi_function.arguments.len(), None);
         for arg in arguments {
-            assert!(arg.ffi_index < final_args.len());
             let code = self.convert_type_to_ffi(&arg.name, &arg.argument_type)?;
+            final_args.resize(arg.ffi_index + 1, None);
             final_args[arg.ffi_index] = Some(code);
         }
 
         let mut result = Vec::new();
         let mut maybe_result_var_name = None;
-        if let Some(i) = &wrapper_data.return_type_ffi_index {
+
+        let ffi_item = self
+            .current_database
+            .source_ffi_item(id)?
+            .ok_or_else(|| err_msg("source ffi item not found"))?
+            .item
+            .as_function_ref()
+            .ok_or_else(|| err_msg("invalid source ffi item type"))?;
+
+        let return_type_ffi_index = ffi_item
+            .arguments
+            .iter()
+            .enumerate()
+            .find(|(_arg_index, arg)| arg.meaning == CppFfiArgumentMeaning::ReturnValue)
+            .map(|(index, _arg)| index);
+
+        if let Some(i) = return_type_ffi_index {
             let mut return_var_name = "object".to_string();
             let mut ii = 1;
             while arguments.iter().any(|x| x.name == return_var_name) {
@@ -745,7 +840,8 @@ impl Generator<'_> {
                 t = struct_name,
                 e = expr
             ));
-            final_args[*i as usize] = Some(format!("&mut {}", return_var_name));
+            final_args.resize(i + 1, None);
+            final_args[i] = Some(format!("&mut {}", return_var_name));
             maybe_result_var_name = Some(return_var_name);
         }
         let final_args = final_args
@@ -835,48 +931,56 @@ impl Generator<'_> {
     }
 
     /// Generates complete code of a Rust wrapper function.
-    fn generate_rust_final_function(
+    fn generate_function(
         &mut self,
-        func: &RustFunction,
+        func: DbItem<&RustFunction>,
         is_in_trait_context: bool,
         self_type: Option<&RustType>,
         condition_texts: &ConditionTexts,
     ) -> Result<()> {
-        let maybe_pub = if func.is_public && !is_in_trait_context {
+        let maybe_pub = if func.item.is_public && !is_in_trait_context {
             "pub "
         } else {
             ""
         };
-        let maybe_unsafe = if func.is_unsafe { "unsafe " } else { "" };
+        let maybe_unsafe = if func.item.is_unsafe { "unsafe " } else { "" };
 
-        let body = match &func.kind {
-            RustFunctionKind::FfiWrapper(data) => {
-                self.generate_ffi_call(&func.arguments, &func.return_type, data, func.is_unsafe)?
-            }
-            RustFunctionKind::CppDeletableImpl { deleter } => self.rust_path_to_string(deleter),
-            RustFunctionKind::SignalOrSlotGetter { receiver_id, .. } => {
-                let path = &func.return_type.api_type().as_common()?.path;
+        let body = match &func.item.kind {
+            RustFunctionKind::FfiWrapper(data) => Some(self.generate_ffi_call(
+                &func.id,
+                &func.item.arguments,
+                &func.item.return_type,
+                data,
+                func.item.is_unsafe,
+            )?),
+            RustFunctionKind::SignalOrSlotGetter(getter) => {
+                let path = &func.item.return_type.api_type().as_common()?.path;
                 let call = format!(
-                    "{}::new(::cpp_utils::ConstRef::from_raw(self as &{})\
-                     .expect(\"attempted to construct a null Ref\"), \
+                    "{}::new(::cpp_utils::Ref::from_raw_ref(self), \
                      ::std::ffi::CStr::from_bytes_with_nul_unchecked(b\"{}\\0\"))",
                     self.rust_path_to_string(&path),
-                    self.rust_path_to_string(&self.qt_core_path().join("QObject")),
-                    receiver_id
+                    getter.receiver_id
                 );
-                wrap_unsafe(func.is_unsafe, &call)
+                Some(wrap_unsafe(func.item.is_unsafe, &call))
             }
+            RustFunctionKind::FfiFunction => None,
         };
 
-        let return_type_for_signature = if func.return_type.api_type().is_unit() {
+        let maybe_body = match body {
+            None => ";".to_string(),
+            Some(text) => format!("{{\n{}\n}}", text),
+        };
+
+        let return_type_for_signature = if func.item.return_type.api_type().is_unit() {
             String::new()
         } else {
             format!(
                 " -> {}",
-                self.rust_type_to_code(func.return_type.api_type())
+                self.rust_type_to_code(func.item.return_type.api_type())
             )
         };
         let all_lifetimes = func
+            .item
             .arguments
             .iter()
             .filter_map(|x| x.argument_type.api_type().lifetime())
@@ -890,59 +994,63 @@ impl Generator<'_> {
             )
         };
 
-        let doc = doc_formatter::function_doc(&func) + &condition_texts.doc_text;
+        // TODO: move condition texts to doc parser
+        let doc = doc_formatter::function_doc(func.clone(), self.current_database)?
+            + &condition_texts.doc_text;
         writeln!(
             self,
-            "{doc}{condition}{maybe_pub}{maybe_unsafe}fn {name}{lifetimes_text}({args}){return_type} \
-             {{\n{body}}}\n\n",
+            "{doc}{condition}{maybe_pub}{maybe_unsafe} \
+             fn {name}{lifetimes_text}({args}){return_type} \
+             {maybe_body}\n\n",
             doc = format_doc(&doc),
             condition = condition_texts.attribute,
             maybe_pub = maybe_pub,
             maybe_unsafe = maybe_unsafe,
             lifetimes_text = lifetimes_text,
-            name = func.path.last(),
-            args = self.arg_texts(&func.arguments, None, self_type)?.join(", "),
+            name = func.item.path.last(),
+            args = self
+                .arg_texts(&func.item.arguments, None, self_type)?
+                .join(", "),
             return_type = return_type_for_signature,
-            body = body
+            maybe_body = maybe_body
         )?;
         Ok(())
     }
 
-    fn generate_children(
-        &mut self,
-        parent: &RustPath,
-        self_type: Option<&RustType>,
-        database: &RustDatabase,
-    ) -> Result<()> {
-        if database
-            .children(&parent)
+    fn generate_children(&mut self, parent: &RustPath, self_type: Option<&RustType>) -> Result<()> {
+        if self
+            .current_database
+            .rust_children(&parent)
             .any(|item| item.item.is_ffi_function())
         {
             writeln!(self, "extern \"C\" {{\n")?;
-            for item in database
-                .children(&parent)
+            for item in self
+                .current_database
+                .rust_children(&parent)
                 .filter(|item| item.item.is_ffi_function())
             {
-                self.generate_item(item, self_type, database)?;
+                self.generate_item(item, self_type)?;
             }
             writeln!(self, "}}\n")?;
         }
 
-        for item in database
-            .children(&parent)
+        for item in self
+            .current_database
+            .rust_children(&parent)
             .filter(|item| !item.item.is_ffi_function())
         {
-            self.generate_item(item, self_type, database)?;
+            self.generate_item(item, self_type)?;
         }
         Ok(())
     }
 
     fn generate_trait_impl(
         &mut self,
-        trait1: &RustTraitImpl,
+        trait_impl: DbItem<&RustTraitImpl>,
         condition_texts: &ConditionTexts,
     ) -> Result<()> {
-        let associated_types_text = trait1
+        let associated_types_text = trait_impl
+            .item
             .associated_types
             .iter()
             .map(|t| format!("type {} = {};", t.name, self.rust_type_to_code(&t.value)))
@@ -953,16 +1061,16 @@ impl Generator<'_> {
             self,
             "{}impl {} for {} {{\n{}",
             condition_texts.attribute,
-            self.rust_type_to_code(&trait1.trait_type),
-            self.rust_type_to_code(&trait1.target_type),
+            self.rust_common_type_to_code(&trait_impl.item.trait_type),
+            self.rust_type_to_code(&trait_impl.item.target_type),
             associated_types_text,
         )?;
 
-        for func in &trait1.functions {
-            self.generate_rust_final_function(
-                func,
+        for func in &trait_impl.item.functions {
+            self.generate_function(
+                trait_impl.clone().map(|_| func),
                 true,
-                Some(&trait1.target_type),
+                Some(&trait_impl.item.target_type),
                 &ConditionTexts::default(),
             )?;
         }
@@ -971,24 +1079,14 @@ impl Generator<'_> {
         Ok(())
     }
 
-    fn generate_ffi_function(
-        &mut self,
-        function: &RustFFIFunction,
-        condition_texts: &ConditionTexts,
-    ) -> Result<()> {
-        writeln!(self, "{}", condition_texts.attribute)?;
-        writeln!(self, "{}", self.rust_ffi_function_to_code(function))?;
-        Ok(())
-    }
-
     fn generate_extra_impl(
         &mut self,
-        data: &RustExtraImpl,
+        data: DbItem<&RustExtraImpl>,
         condition_texts: &ConditionTexts,
     ) -> Result<()> {
-        match &data.kind {
-            RustExtraImplKind::FlagEnum { enum_path } => {
-                let enum_path = self.rust_path_to_string(enum_path);
+        match &data.item.kind {
+            RustExtraImplKind::FlagEnum(data) => {
+                let enum_path = self.rust_path_to_string(&data.enum_path);
                 let qflags = self.rust_path_to_string(&self.qt_core_path().join("QFlags"));
 
                 writeln!(
@@ -1016,27 +1114,26 @@ impl Generator<'_> {
 }
 
 pub fn generate(
-    crate_name: &str,
-    current_database: &Database,
-    database: &RustDatabase,
+    current_database: &DatabaseClient,
     output_src_path: impl Into<PathBuf>,
     crate_template_src_path: Option<impl Into<PathBuf>>,
 ) -> Result<()> {
     let mut generator = Generator {
-        crate_name: crate_name.to_string(),
         destination: Vec::new(),
         output_src_path: output_src_path.into(),
         crate_template_src_path: crate_template_src_path.map(Into::into),
         current_database,
     };
 
-    let crate_root = database
-        .items()
-        .iter()
-        .filter_map(RustDatabaseItem::as_module_ref)
-        .find(|module| module.kind == RustModuleKind::CrateRoot)
+    let crate_root = generator
+        .current_database
+        .rust_items()
+        .filter_map(|i| i.filter_map(|i| i.as_module_ref()))
+        .find(|module| {
+            module.item.kind == RustModuleKind::Special(RustSpecialModuleKind::CrateRoot)
+        })
         .ok_or_else(|| err_msg("crate root not found"))?;
 
-    generator.generate_module(crate_root, database)?;
+    generator.generate_module(crate_root)?;
     Ok(())
 }

@@ -1,6 +1,6 @@
 use crate::q_meta_object::Connection;
 use crate::QObject;
-use cpp_utils::{ConstPtr, ConstRef, CppBox, CppDeletable, Ptr};
+use cpp_utils::{CastInto, CppBox, CppDeletable, MutPtr, MutRef, Ptr, Ref};
 use std::ffi::CStr;
 use std::fmt;
 use std::marker::PhantomData;
@@ -27,7 +27,7 @@ use std::marker::PhantomData;
 pub trait ArgumentsCompatible<T> {}
 
 pub struct Receiver<Arguments> {
-    q_object: ConstRef<QObject>,
+    q_object: Ref<QObject>,
     receiver_id: &'static CStr,
     _marker: PhantomData<Arguments>,
 }
@@ -53,9 +53,9 @@ impl<A> fmt::Debug for Receiver<A> {
 }
 
 impl<A> Receiver<A> {
-    pub fn new(q_object: ConstRef<QObject>, receiver_id: &'static CStr) -> Self {
+    pub unsafe fn new(q_object: impl CastInto<Ref<QObject>>, receiver_id: &'static CStr) -> Self {
         Self {
-            q_object,
+            q_object: q_object.cast_into(),
             receiver_id,
             _marker: PhantomData,
         }
@@ -82,7 +82,7 @@ impl<A> fmt::Debug for Signal<A> {
 }
 
 impl<A> Signal<A> {
-    pub fn new(q_object: ConstRef<QObject>, receiver_id: &'static CStr) -> Self {
+    pub unsafe fn new(q_object: impl CastInto<Ref<QObject>>, receiver_id: &'static CStr) -> Self {
         Signal(Receiver::new(q_object, receiver_id))
     }
 }
@@ -106,6 +106,16 @@ impl<A> AsReceiver for Signal<A> {
     }
 }
 
+impl<T> AsReceiver for MutPtr<T>
+where
+    T: AsReceiver,
+{
+    type Arguments = <T as AsReceiver>::Arguments;
+    fn as_receiver(&self) -> Receiver<Self::Arguments> {
+        (**self).as_receiver()
+    }
+}
+
 impl<T> AsReceiver for Ptr<T>
 where
     T: AsReceiver,
@@ -116,7 +126,17 @@ where
     }
 }
 
-impl<T> AsReceiver for ConstRef<T>
+impl<T> AsReceiver for MutRef<T>
+where
+    T: AsReceiver,
+{
+    type Arguments = <T as AsReceiver>::Arguments;
+    fn as_receiver(&self) -> Receiver<Self::Arguments> {
+        (**self).as_receiver()
+    }
+}
+
+impl<T> AsReceiver for Ref<T>
 where
     T: AsReceiver,
 {
@@ -147,10 +167,10 @@ impl<SignalArguments> Signal<SignalArguments> {
         // TODO: meta_object::Connection should have operator bool()
 
         crate::QObject::connect_4a(
-            self.0.q_object.into(),
-            ConstPtr::from_raw(self.0.receiver_id.as_ptr()),
-            receiver.q_object.into(),
-            ConstPtr::from_raw(receiver.receiver_id.as_ptr()),
+            self.0.q_object.as_ptr(),
+            Ptr::from_raw(self.0.receiver_id.as_ptr()),
+            receiver.q_object.as_ptr(),
+            Ptr::from_raw(receiver.receiver_id.as_ptr()),
         )
     }
 }

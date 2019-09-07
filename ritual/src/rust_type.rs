@@ -1,3 +1,4 @@
+use crate::rust_info::RustTypeCaptionStrategy;
 use itertools::Itertools;
 use ritual_common::errors::{bail, Error, Result};
 use ritual_common::string_utils::CaseOperations;
@@ -6,12 +7,9 @@ use serde_derive::{Deserialize, Serialize};
 use std::str::FromStr;
 
 /// Rust identifier. Represented by
-/// a vector of name parts. For a regular name,
-/// first part is name of the crate,
+/// a vector of name parts. First part is name of the crate,
 /// last part is own name of the entity,
 /// and intermediate names are module names.
-/// Built-in types are represented
-/// by a single vector item, like `vec!["i32"]`.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct RustPath {
     /// Parts of the name
@@ -62,7 +60,6 @@ impl RustPath {
         if self.parts.is_empty() {
             panic!("RustPath can't be empty");
         }
-        // TODO: forbid built-in types in RustPath
         Some(self.parts[0].as_str())
     }
 
@@ -92,12 +89,7 @@ impl RustPath {
             }
         }
 
-        // TODO: 1-part path can theoretically point to a crate instead of a built-in type
-        if self.parts.len() == 1 {
-            self.parts[0].to_string()
-        } else {
-            format!("::{}", self.parts.join("::"))
-        }
+        format!("::{}", self.parts.join("::"))
     }
 
     /// Returns true if `other` is nested within `self`.
@@ -125,6 +117,18 @@ impl RustPath {
             bail!("failed to get parent path for {:?}", self)
         }
     }
+
+    pub fn parent_parts(&self) -> Result<&[String]> {
+        if self.parts.len() > 1 {
+            Ok(&self.parts[..self.parts.len() - 1])
+        } else {
+            bail!("failed to get parent path for {:?}", self)
+        }
+    }
+
+    pub fn parts(&self) -> &[String] {
+        &self.parts
+    }
 }
 
 /// Conversion from public Rust API type to
@@ -138,22 +142,31 @@ pub enum RustToFfiTypeConversion {
         force_api_is_const: Option<bool>,
         lifetime: Option<String>,
     },
-    /// `ConstPtr<T>` to `*const T` (or similar mutable type)
-    UtilsPtrToPtr { force_api_is_const: Option<bool> },
-    /// `ConstRef<T>` to `*const T` (or similar mutable types)
-    UtilsRefToPtr { force_api_is_const: Option<bool> },
-    /// `Option<ConstRef<T>>` to `*const T` (or similar mutable types)
-    OptionUtilsRefToPtr { force_api_is_const: Option<bool> },
+    /// `Ptr<T>` to `*const T` (or similar mutable type)
+    UtilsPtrToPtr {
+        force_api_is_const: Option<bool>,
+    },
+    /// `Ref<T>` to `*const T` (or similar mutable types)
+    UtilsRefToPtr {
+        force_api_is_const: Option<bool>,
+    },
+    /// `Option<Ref<T>>` to `*const T` (or similar mutable types)
+    OptionUtilsRefToPtr {
+        force_api_is_const: Option<bool>,
+    },
     /// `T` to `*const T` (or similar mutable type)
     ValueToPtr,
     /// `CppBox<T>` to `*mut T`
     CppBoxToPtr,
     /// `qt_core::flags::Flags<T>` to `c_int`
-    QFlagsToUInt { api_type: RustType },
+    QFlagsToUInt {
+        api_type: RustType,
+    },
     /// `()` to any type
     UnitToAnything,
     /// Rust public type has an additional reference (`&`)
     RefTo(Box<RustToFfiTypeConversion>),
+    ImplCastInto(Box<RustToFfiTypeConversion>),
 }
 
 impl RustToFfiTypeConversion {
@@ -194,9 +207,9 @@ fn utils_ptr(ffi_type: &RustType, force_api_is_const: Option<bool>) -> Result<Ru
         ffi_type.is_const_pointer_like()?
     };
     let name = if is_const {
-        "cpp_utils::ConstPtr"
-    } else {
         "cpp_utils::Ptr"
+    } else {
+        "cpp_utils::MutPtr"
     };
 
     let target = ffi_type.pointer_like_to_target()?.clone();
@@ -213,9 +226,9 @@ fn utils_ref(ffi_type: &RustType, force_api_is_const: Option<bool>) -> Result<Ru
         ffi_type.is_const_pointer_like()?
     };
     let name = if is_const {
-        "cpp_utils::ConstRef"
-    } else {
         "cpp_utils::Ref"
+    } else {
+        "cpp_utils::MutRef"
     };
 
     let target = ffi_type.pointer_like_to_target()?.clone();
@@ -271,6 +284,14 @@ impl RustFinalType {
             RustToFfiTypeConversion::RefTo(conversion) => {
                 let intermediate = RustFinalType::new(ffi_type.clone(), (**conversion).clone())?;
                 RustType::new_reference(true, intermediate.api_type)
+            }
+            RustToFfiTypeConversion::ImplCastInto(conversion) => {
+                let intermediate = RustFinalType::new(ffi_type.clone(), (**conversion).clone())?;
+                let trait_type = RustCommonType {
+                    path: RustPath::from_good_str("cpp_utils::CastInto"),
+                    generic_arguments: Some(vec![intermediate.api_type]),
+                };
+                RustType::ImplTrait(trait_type)
             }
         };
         Ok(RustFinalType {
@@ -342,37 +363,61 @@ pub struct RustCommonType {
     pub generic_arguments: Option<Vec<RustType>>,
 }
 
+pub fn paths_can_be_same<T1, T2>(one: &T1, other: &T2) -> bool
+where
+    T1: for<'a> PartialEq<&'a str> + PartialEq<T2>,
+    T2: for<'a> PartialEq<&'a str>,
+{
+    let colliding: &[(&[&str], &[&str])] = &[
+        (
+            &[
+                "std::os::raw::c_char",
+                "std::os::raw::c_schar",
+                "std::os::raw::c_short",
+                "std::os::raw::c_int",
+                "std::os::raw::c_long",
+                "std::os::raw::c_longlong",
+            ],
+            &["u8", "u16", "u32", "u64"],
+        ),
+        (
+            &[
+                "std::os::raw::c_char",
+                "std::os::raw::c_uchar",
+                "std::os::raw::c_ushort",
+                "std::os::raw::c_uint",
+                "std::os::raw::c_ulong",
+                "std::os::raw::c_ulonglong",
+            ],
+            &["u8", "u16", "u32", "u64"],
+        ),
+        (
+            &["std::os::raw::c_float", "std::os::raw::c_double"],
+            &["f32", "f64"],
+        ),
+    ];
+
+    if one == other {
+        return true;
+    }
+
+    for (ambiguous, concrete) in colliding {
+        if ambiguous.iter().any(|s| one == s) && ambiguous.iter().any(|s| other == s) {
+            return true;
+        }
+        if ambiguous.iter().any(|s| one == s) && concrete.iter().any(|s| other == s) {
+            return true;
+        }
+        if concrete.iter().any(|s| one == s) && ambiguous.iter().any(|s| other == s) {
+            return true;
+        }
+    }
+
+    false
+}
+
 impl RustCommonType {
     pub fn can_be_same_as(&self, other: &RustCommonType) -> bool {
-        let colliding: &[(&[&str], &[&str])] = &[
-            (
-                &[
-                    "std::os::raw::c_char",
-                    "std::os::raw::c_schar",
-                    "std::os::raw::c_short",
-                    "std::os::raw::c_int",
-                    "std::os::raw::c_long",
-                    "std::os::raw::c_longlong",
-                ],
-                &["u8", "u16", "u32", "u64"],
-            ),
-            (
-                &[
-                    "std::os::raw::c_char",
-                    "std::os::raw::c_uchar",
-                    "std::os::raw::c_ushort",
-                    "std::os::raw::c_uint",
-                    "std::os::raw::c_ulong",
-                    "std::os::raw::c_ulonglong",
-                ],
-                &["u8", "u16", "u32", "u64"],
-            ),
-            (
-                &["std::os::raw::c_float", "std::os::raw::c_double"],
-                &["f32", "f64"],
-            ),
-        ];
-
         let self_args = self
             .generic_arguments
             .as_ref()
@@ -390,29 +435,7 @@ impl RustCommonType {
             return false;
         }
 
-        if self.path == other.path {
-            return true;
-        }
-
-        for (ambiguous, concrete) in colliding {
-            if ambiguous.iter().any(|&s| self.path == s)
-                && ambiguous.iter().any(|&s| other.path == s)
-            {
-                return true;
-            }
-            if ambiguous.iter().any(|&s| self.path == s)
-                && concrete.iter().any(|&s| other.path == s)
-            {
-                return true;
-            }
-            if concrete.iter().any(|&s| self.path == s)
-                && ambiguous.iter().any(|&s| other.path == s)
-            {
-                return true;
-            }
-        }
-
-        false
+        paths_can_be_same(&self.path, &other.path)
     }
 }
 
@@ -420,7 +443,9 @@ impl RustCommonType {
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum RustType {
     Tuple(Vec<RustType>),
-    /// A numeric, enum or struct type with some indirection
+    /// Primitive built-in type (`i32`, `str`, etc.)
+    Primitive(String),
+    /// A type specified by path with possible generic arguments
     Common(RustCommonType),
     /// A function pointer type.
     FunctionPointer {
@@ -434,6 +459,7 @@ pub enum RustType {
         is_const: bool,
         target: Box<RustType>,
     },
+    ImplTrait(RustCommonType),
 }
 
 impl RustType {
@@ -443,10 +469,7 @@ impl RustType {
     }
 
     pub fn bool() -> Self {
-        RustType::Common(RustCommonType {
-            path: RustPath::from_good_str("bool"),
-            generic_arguments: None,
-        })
+        RustType::Primitive("bool".into())
     }
 
     pub fn new_pointer(is_const: bool, target: RustType) -> Self {
@@ -482,9 +505,13 @@ impl RustType {
 
     /// Returns alphanumeric description of this type
     /// for purposes of name disambiguation.
-    pub fn caption(&self, context: &RustPath) -> Result<String> {
+    pub fn caption(&self, context: &RustPath, strategy: RustTypeCaptionStrategy) -> Result<String> {
         Ok(match self {
-            RustType::Tuple(types) => types.iter().map_if_ok(|t| t.caption(context))?.join("_"),
+            RustType::Tuple(types) => types
+                .iter()
+                .map_if_ok(|t| t.caption(context, strategy))?
+                .join("_"),
+            RustType::Primitive(type1) => type1.to_string(),
             RustType::PointerLike {
                 kind,
                 is_const,
@@ -495,20 +522,25 @@ impl RustType {
                     RustPointerLikeTypeKind::Pointer => "_ptr",
                     RustPointerLikeTypeKind::Reference { .. } => "_ref",
                 };
-                format!("{}{}{}", target.caption(context)?, const_text, kind_text)
+                format!(
+                    "{}{}{}",
+                    target.caption(context, strategy)?,
+                    const_text,
+                    kind_text
+                )
             }
             RustType::Common(RustCommonType {
                 path,
                 generic_arguments,
             }) => {
-                if path == &RustPath::from_good_str("cpp_utils::Ptr")
-                    || path == &RustPath::from_good_str("cpp_utils::ConstPtr")
+                if path == &RustPath::from_good_str("cpp_utils::MutPtr")
+                    || path == &RustPath::from_good_str("cpp_utils::Ptr")
                     || path == &RustPath::from_good_str("cpp_utils::Ref")
-                    || path == &RustPath::from_good_str("cpp_utils::ConstRef")
+                    || path == &RustPath::from_good_str("cpp_utils::MutRef")
                     || path == &RustPath::from_good_str("cpp_utils::CppBox")
                 {
                     let arg = &generic_arguments.as_ref().unwrap()[0];
-                    return arg.caption(context);
+                    return arg.caption(context, strategy);
                 }
 
                 let mut name = if path.parts.len() == 1 {
@@ -521,6 +553,8 @@ impl RustType {
                         last
                     };
                     last.to_snake_case()
+                } else if strategy == RustTypeCaptionStrategy::LastName {
+                    path.last().to_string().to_snake_case()
                 } else {
                     let mut remaining_context: &[String] = &context.parts;
                     let parts: &[String] = &path.parts;
@@ -537,7 +571,7 @@ impl RustType {
                         }
                     }
                     if good_parts.is_empty() {
-                        path.last().to_string()
+                        path.last().to_string().to_snake_case()
                     } else {
                         good_parts.join("_")
                     }
@@ -546,12 +580,26 @@ impl RustType {
                     name = format!(
                         "{}_{}",
                         name,
-                        args.iter().map_if_ok(|x| x.caption(context))?.join("_")
+                        args.iter()
+                            .map_if_ok(|x| x.caption(context, strategy))?
+                            .join("_")
                     );
                 }
                 name
             }
             RustType::FunctionPointer { .. } => "fn".to_string(),
+            RustType::ImplTrait(trait_type) => {
+                if trait_type.path == RustPath::from_good_str("cpp_utils::CastInto") {
+                    trait_type
+                        .generic_arguments
+                        .iter()
+                        .flatten()
+                        .map_if_ok(|x| x.caption(context, strategy))?
+                        .join("_")
+                } else {
+                    RustType::Common(trait_type.clone()).caption(context, strategy)?
+                }
+            }
         })
     }
 
@@ -615,6 +663,7 @@ impl RustType {
             RustType::PointerLike { kind, target, .. } => {
                 kind.is_pointer() || target.is_unsafe_argument()
             }
+            RustType::Primitive(_) => false,
             RustType::Common(RustCommonType {
                 generic_arguments, ..
             }) => {
@@ -633,6 +682,7 @@ impl RustType {
                 return_type.is_unsafe_argument()
                     || arguments.iter().any(RustType::is_unsafe_argument)
             }
+            RustType::ImplTrait(_) => true,
         }
     }
 
@@ -679,13 +729,22 @@ impl RustType {
                     false
                 }
             }
-            RustType::Common(self_type) => {
-                if let RustType::Common(other) = other {
-                    self_type.can_be_same_as(other)
-                } else {
-                    false
+            RustType::Common(self_type) => match other {
+                RustType::Common(other_type) => self_type.can_be_same_as(other_type),
+                RustType::Primitive(other_type) => {
+                    self_type.generic_arguments.is_none()
+                        && paths_can_be_same(&self_type.path, &other_type.as_str())
                 }
-            }
+                _ => false,
+            },
+            RustType::Primitive(type1) => match other {
+                RustType::Primitive(other_type) => type1 == other_type,
+                RustType::Common(other_type) => {
+                    other_type.generic_arguments.is_none()
+                        && paths_can_be_same(&other_type.path, &type1.as_str())
+                }
+                _ => false,
+            },
             RustType::FunctionPointer {
                 return_type: self_return_type,
                 arguments: self_arguments,
@@ -719,6 +778,13 @@ impl RustType {
                     self_kind == kind
                         && self_is_const == is_const
                         && self_target.can_be_same_as(target)
+                } else {
+                    false
+                }
+            }
+            RustType::ImplTrait(trait_type) => {
+                if let RustType::ImplTrait(other_trait_type) = other {
+                    trait_type.can_be_same_as(other_trait_type)
                 } else {
                     false
                 }

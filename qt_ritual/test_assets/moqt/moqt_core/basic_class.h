@@ -51,6 +51,8 @@ public:
     operator int();
     operator QVector<int>();
 
+    void setRef(const int& value);
+
 
     /*void overloaded_normal_const_and_static();
     void overloaded_normal_const_and_static() const;

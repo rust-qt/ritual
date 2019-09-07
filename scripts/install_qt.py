@@ -10,7 +10,7 @@ versions = ['5.9.7', '5.11.3', '5.12.2', '5.13.0']
 
 def get_links(url):
     print('Downloading file list from {}'.format(url))
-    html_page = urlopen(remote_dir).read().decode('utf-8')
+    html_page = urlopen(url).read().decode('utf-8')
     soup = BeautifulSoup(html_page, features="lxml")
     links = [
         link.get('href')
@@ -20,54 +20,100 @@ def get_links(url):
     links.sort()
     return links
 
-def install(url, message_caption):
+def install(file_url, message_caption):
     tmp_path = '/tmp/1.7z'
-    print('Downloading {} from {}'.format(message_caption, url))
+    print('Downloading {} from {}'.format(message_caption, file_url))
     with urlopen(file_url) as response, open(tmp_path, 'wb') as file:
         shutil.copyfileobj(response, file)
     subprocess.run([
-        "7z",
-        "x", # extract
+        '7z',
+        'x', # extract
         tmp_path
     ], check=True)
 
+def link_matches(link, text):
+    return ((text + '-') in link) or ((text + '.') in link)
+
+def install_dir(dir, modules):
+    remote_dir = (
+        'http://download.qt.io/online/qtsdkrepository/linux_x64/desktop/'
+        '{0}'.format(dir)
+    )
+    links = get_links(remote_dir)
+
+    for module in modules:
+        file_names = list(filter(lambda x: link_matches(x, module), links))
+        if not file_names:
+            print('links: ', links)
+            print('dir', dir)
+            raise Exception("Can't find package {} for {}".format(module, version))
+        latest_file_name = file_names[-1]
+        file_url = remote_dir + latest_file_name
+        install(file_url, module)
+
+
 for version in versions:
+    minor_version = int(version.split('.')[1])
     print('Installing Qt {}'.format(version))
     version_uglified = version.replace('.', '')
-    remote_dir = (
-        'http://download.qt.io/online/qtsdkrepository/linux_x64/desktop/'
-        'qt5_{0}/qt.qt5.{0}.gcc_64/'.format(version_uglified)
+    modules = [
+        'icu', 'qtbase', 'qttools', 'qtgamepad', 'qt3d', 'qtquickcontrols',
+        'qtquickcontrols2', 'qtmultimedia', 'qtwebview', 'qtwebsockets',
+        'qtwebchannel', 'qtsvg', 'qtserialport', 'qtserialbus',
+        'qtscxml', 'qtlocation', 'qtimageformats',
+        'qtgraphicaleffects', 'qtdeclarative'
+    ]
+    if minor_version > 9:
+        modules.extend(['qtspeech'])
+    if minor_version > 11:
+        modules.extend(['qtremoteobjects'])
+    install_dir(
+        'qt5_{0}/qt.qt5.{0}.gcc_64/'.format(version_uglified),
+        modules
     )
-    links = get_links(remote_dir)
-
-    for module in ['icu', 'qtbase', 'qttools', 'qtgamepad', 'qt3d']:
-        file_names = list(filter(lambda x: module in x, links))
-        if not file_names:
-            raise Exception("Can't find package {} for {}".format(module, version))
-        latest_file_name = file_names[-1]
-        file_url = remote_dir + latest_file_name
-        install(file_url, module)
+    install_dir(
+        'qt5_{0}/qt.qt5.{0}.qtwebengine.gcc_64/'.format(version_uglified),
+        ['qtwebengine']
+    )
+    install_dir(
+        'qt5_{0}/qt.qt5.{0}.qtcharts.gcc_64/'.format(version_uglified),
+        ['qtcharts']
+    )
+    install_dir(
+        'qt5_{0}/qt.qt5.{0}.qtdatavis3d.gcc_64/'.format(version_uglified),
+        ['qtdatavis3d']
+    )
 
 for version in versions:
+    minor_version = int(version.split('.')[1])
     print('Installing docs for Qt {}'.format(version))
     version_uglified = version.replace('.', '')
-    remote_dir = (
-        'http://download.qt.io/online/qtsdkrepository/linux_x64/desktop/'
-        'qt5_{0}_src_doc_examples/qt.qt5.{0}.doc/'.format(version_uglified)
-    )
-    links = get_links(remote_dir)
-
-    if any('qt-everywhere-documentation' in x for x in links):
-        modules = ['qt-everywhere-documentation']
+    if minor_version >= 13:
+        modules = [
+            'qtcore', 'qtgui', 'qtwidgets', 'qtuitools', 'qtgamepad', 'qt3d',
+            'qtquickcontrols', 'qtquickcontrols1', 'qtmultimedia', 'qtwebview',
+            'qtwebsockets', 'qtwebchannel', 'qtsvg', 'qtspeech', 'qtserialport', 'qtserialbus',
+            'qtscxml', 'qtremoteobjects', 'qtlocation', 'qtimageformats',
+            'qtgraphicaleffects', 'qtqml'
+        ]
     else:
-        modules = ['qtcore', 'qtgui', 'qtwidgets', 'qtuitools', 'qt3d']
-    for module in modules:
-        file_names = list(filter(lambda x: module in x, links))
-        if not file_names:
-            raise Exception("Can't find package {} for {}".format(module, version))
-        latest_file_name = file_names[-1]
-        file_url = remote_dir + latest_file_name
-        install(file_url, module)
+        modules = ['qt-everywhere-documentation']
+    install_dir(
+        'qt5_{0}_src_doc_examples/qt.qt5.{0}.doc/'.format(version_uglified),
+        modules
+    )
+    install_dir(
+        'qt5_{0}_src_doc_examples/qt.qt5.{0}.doc.qtwebengine/'.format(version_uglified),
+        ['qtwebengine']
+    )
+    install_dir(
+        'qt5_{0}_src_doc_examples/qt.qt5.{0}.doc.qtcharts/'.format(version_uglified),
+        ['qtcharts']
+    )
+    install_dir(
+        'qt5_{0}_src_doc_examples/qt.qt5.{0}.doc.qtdatavis3d/'.format(version_uglified),
+        ['qtdatavisualization']
+    )
 
 current_dir = os.getcwd()
 for name in os.listdir(current_dir):
@@ -78,4 +124,4 @@ for name in os.listdir(current_dir):
         print('Configuring Qt installation in {}'.format(dir))
         config_file = os.path.join(dir, 'bin', 'qt.conf')
         with open(config_file, 'w') as file:
-            file.write("[Paths]\nPrefix = ..\nDocumentation=../../Docs/Qt-{}".format(name))
+            file.write("[Paths]\nPrefix=..\nDocumentation=../../Docs/Qt-{}".format(name))

@@ -1,20 +1,18 @@
 use crate::cpp_data::CppClassField;
+use crate::cpp_data::CppItem;
 use crate::cpp_data::CppPath;
 use crate::cpp_data::CppPathItem;
-use crate::cpp_data::CppTypeDeclarationKind;
 use crate::cpp_data::CppVisibility;
-use crate::cpp_data::{CppBaseSpecifier, CppItem};
-use crate::cpp_ffi_data::CppFfiFunctionArgument;
 use crate::cpp_ffi_data::CppFfiType;
-use crate::cpp_ffi_data::{CppCast, CppFfiFunction, CppFfiFunctionKind, CppFieldAccessorType};
 use crate::cpp_ffi_data::{CppFfiArgumentMeaning, CppToFfiTypeConversion};
+use crate::cpp_ffi_data::{CppFfiFunction, CppFfiFunctionKind, CppFieldAccessorType};
+use crate::cpp_ffi_data::{CppFfiFunctionArgument, CppFfiItem};
 use crate::cpp_function::ReturnValueAllocationPlace;
-use crate::cpp_function::{CppFunction, CppFunctionArgument, CppFunctionDoc, CppFunctionKind};
+use crate::cpp_function::{CppFunction, CppFunctionArgument, CppFunctionKind};
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
 use crate::cpp_type::CppTypeRole;
 use crate::cpp_type::{is_qflags, CppFunctionPointerType};
-use crate::database::CppFfiDatabaseItem;
 use crate::processor::ProcessorData;
 use itertools::Itertools;
 use log::{debug, trace};
@@ -109,10 +107,9 @@ impl FfiNameProvider {
     pub fn new(data: &ProcessorData<'_>) -> Self {
         let prefix = format!("ctr_{}_ffi", &data.config.crate_properties().name());
         let names = data
-            .current_database
+            .db
             .ffi_items()
-            .iter()
-            .map(|f| f.path().to_cpp_code().unwrap())
+            .map(|f| f.item.path().to_cpp_code().unwrap())
             .collect();
 
         FfiNameProvider { prefix, names }
@@ -147,58 +144,38 @@ impl FfiNameProvider {
 
 /// Runs the FFI generator
 pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
-    let movable_types = data
-        .all_cpp_items()
-        .filter_map(|item| {
-            if let CppItem::Type(type_data) = &item.item {
-                if let CppTypeDeclarationKind::Class { is_movable } = type_data.kind {
-                    if is_movable {
-                        return Some(type_data.path.clone());
-                    }
-                }
-            }
-            None
-        })
-        .collect_vec();
+    // movable types are not supported for now
+    let movable_types = Vec::new();
 
     let mut name_provider = FfiNameProvider::new(data);
 
-    for index in 0..data.current_database.cpp_items().len() {
-        let item = &mut data.current_database.cpp_items_mut()[index];
-        if item.is_cpp_ffi_processed {
-            trace!("cpp_data = {}; already processed", item.item.to_string());
-            continue;
-        }
+    let all_cpp_item_ids = data.db.cpp_item_ids().collect_vec();
+
+    for cpp_item_id in all_cpp_item_ids {
+        let item = data.db.cpp_item(&cpp_item_id)?;
         if let Err(err) = check_preconditions(&item.item) {
             trace!("skipping {}: {}", item.item, err);
             continue;
         }
         if let Some(hook) = data.config.ffi_generator_hook() {
-            if !hook(item)? {
+            if !hook(&item.item)? {
                 trace!("skipping {} (by hook)", item.item);
                 continue;
             }
         }
         let result = match &item.item {
-            CppItem::Function(method) => generate_ffi_methods_for_method(
-                method,
-                &movable_types,
-                item.source_ffi_item,
-                &mut name_provider,
-            )
-            .map(|v| v.into_iter().collect_vec()),
-            CppItem::ClassField(field) => generate_field_accessors(
-                field,
-                &movable_types,
-                item.source_ffi_item,
-                &mut name_provider,
-            )
-            .map(|v| v.into_iter().collect_vec()),
-            CppItem::ClassBase(base) => {
-                generate_casts(base, item.source_ffi_item, &mut name_provider)
+            CppItem::Function(method) => {
+                generate_ffi_methods_for_method(method, &movable_types, &mut name_provider)
                     .map(|v| v.into_iter().collect_vec())
             }
-            CppItem::Type(_) | CppItem::EnumValue(_) | CppItem::Namespace(_) => {
+            CppItem::ClassField(field) => {
+                generate_field_accessors(field, &movable_types, &mut name_provider)
+                    .map(|v| v.into_iter().collect_vec())
+            }
+            CppItem::ClassBase(_)
+            | CppItem::Type(_)
+            | CppItem::EnumValue(_)
+            | CppItem::Namespace(_) => {
                 // no FFI methods for these items
                 continue;
             }
@@ -209,149 +186,41 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
                 debug!("failed to add FFI item: {}: {}", item.item, error);
             }
             Ok(r) => {
-                debug!("added FFI items (count: {}) for: {}", r.len(), item.item);
-                for item in &r {
-                    trace!("* {:?}", item);
+                let source_id = item.id;
+                for new_item in r {
+                    data.db.add_ffi_item(Some(source_id.clone()), new_item)?;
                 }
-                item.is_cpp_ffi_processed = true;
-                data.current_database.add_ffi_items(r);
             }
         }
     }
     Ok(())
 }
 
-/// Convenience function to create `CppMethod` object for
-/// `static_cast` or `dynamic_cast` from type `from` to type `to`.
-/// See `CppMethod`'s documentation for more information
-/// about `is_unsafe_static_cast` and `is_direct_static_cast`.
-fn create_cast_method(
-    cast: CppCast,
-    from: &CppType,
-    to: &CppType,
-    source_ffi_item: Option<usize>,
-    name_provider: &mut FfiNameProvider,
-) -> Result<CppFfiDatabaseItem> {
-    let method: CppFunction = CppFunction {
-        path: CppPath::from_item(CppPathItem {
-            name: cast.cpp_method_name().into(),
-            template_arguments: Some(vec![to.clone()]),
-        }),
-        member: None,
-        operator: None,
-        return_type: to.clone(),
-        arguments: vec![CppFunctionArgument {
-            name: "ptr".to_string(),
-            argument_type: from.clone(),
-            has_default_value: false,
-        }],
-        allows_variadic_arguments: false,
-        declaration_code: None,
-        doc: CppFunctionDoc::default(),
-    };
-    // no need for movable_types since all cast methods operate on pointers
-    let r = to_ffi_method(
-        &CppFfiFunctionKind::Function {
-            cpp_function: method.clone(),
-            cast: Some(cast),
-        },
-        &[],
-        name_provider,
-    )?;
-
-    Ok(CppFfiDatabaseItem::from_function(r, source_ffi_item))
-}
-
-/// Performs a portion of `generate_casts` operation.
-/// Adds casts between `target_type` and `base_type` and calls
-/// `generate_casts_one` recursively to add casts between `target_type`
-/// and base types of `base_type`.
-fn generate_casts_one(
-    target_type: &CppPath,
-    base_type: &CppPath,
-    direct_base_index: usize,
-    source_ffi_item: Option<usize>,
-    name_provider: &mut FfiNameProvider,
-) -> Result<Vec<CppFfiDatabaseItem>> {
-    let target_ptr_type = CppType::PointerLike {
-        is_const: false,
-        kind: CppPointerLikeTypeKind::Pointer,
-        target: Box::new(CppType::Class(target_type.clone())),
-    };
-    let base_ptr_type = CppType::PointerLike {
-        is_const: false,
-        kind: CppPointerLikeTypeKind::Pointer,
-        target: Box::new(CppType::Class(base_type.clone())),
-    };
-    let mut new_methods = Vec::new();
-    new_methods.push(create_cast_method(
-        CppCast::Static {
-            is_unsafe: true,
-            base_index: direct_base_index,
-        },
-        &base_ptr_type,
-        &target_ptr_type,
-        source_ffi_item,
-        name_provider,
-    )?);
-    new_methods.push(create_cast_method(
-        CppCast::Static {
-            is_unsafe: false,
-            base_index: direct_base_index,
-        },
-        &target_ptr_type,
-        &base_ptr_type,
-        source_ffi_item,
-        name_provider,
-    )?);
-    new_methods.push(create_cast_method(
-        CppCast::Dynamic,
-        &base_ptr_type,
-        &target_ptr_type,
-        source_ffi_item,
-        name_provider,
-    )?);
-
-    Ok(new_methods)
-}
-
-/// Adds `static_cast` and `dynamic_cast` functions for all appropriate pairs of types
-/// in this `CppData`.
-fn generate_casts(
-    base: &CppBaseSpecifier,
-    source_ffi_item: Option<usize>,
-    name_provider: &mut FfiNameProvider,
-) -> Result<Vec<CppFfiDatabaseItem>> {
-    //log::status("Adding cast functions");
-    generate_casts_one(
-        &base.derived_class_type,
-        &base.base_class_type,
-        base.base_index,
-        source_ffi_item,
-        name_provider,
-    )
-}
-
 fn generate_ffi_methods_for_method(
     method: &CppFunction,
     movable_types: &[CppPath],
-    source_ffi_item: Option<usize>,
     name_provider: &mut FfiNameProvider,
-) -> Result<Vec<CppFfiDatabaseItem>> {
+) -> Result<Vec<CppFfiItem>> {
     let mut methods = Vec::new();
-    methods.push(CppFfiDatabaseItem::from_function(
-        to_ffi_method(
-            &CppFfiFunctionKind::Function {
-                cpp_function: method.clone(),
-                cast: None,
-            },
-            movable_types,
-            name_provider,
-        )?,
-        source_ffi_item,
-    ));
+    methods.push(CppFfiItem::Function(to_ffi_method(
+        NewFfiFunctionKind::Function {
+            cpp_function: method.clone(),
+        },
+        movable_types,
+        name_provider,
+    )?));
 
     Ok(methods)
+}
+
+pub enum NewFfiFunctionKind {
+    Function {
+        cpp_function: CppFunction,
+    },
+    FieldAccessor {
+        accessor_type: CppFieldAccessorType,
+        field: CppClassField,
+    },
 }
 
 /// Creates FFI function signature for this function:
@@ -360,13 +229,13 @@ fn generate_ffi_methods_for_method(
 /// - adds "output" argument for return value if
 ///   the return value is stack-allocated.
 pub fn to_ffi_method(
-    kind: &CppFfiFunctionKind,
+    kind: NewFfiFunctionKind,
     movable_types: &[CppPath],
     name_provider: &mut FfiNameProvider,
 ) -> Result<CppFfiFunction> {
     let ascii_caption = match &kind {
-        CppFfiFunctionKind::Function { cpp_function, .. } => cpp_function.path.ascii_caption(),
-        CppFfiFunctionKind::FieldAccessor {
+        NewFfiFunctionKind::Function { cpp_function, .. } => cpp_function.path.ascii_caption(),
+        NewFfiFunctionKind::FieldAccessor {
             field,
             accessor_type,
         } => {
@@ -386,18 +255,23 @@ pub fn to_ffi_method(
         return_type: CppFfiType::void(),
         path: name_provider.create_path(&ascii_caption),
         allocation_place: ReturnValueAllocationPlace::NotApplicable,
-        kind: kind.clone(),
+        kind: match kind {
+            NewFfiFunctionKind::Function { .. } => CppFfiFunctionKind::Function,
+            NewFfiFunctionKind::FieldAccessor { accessor_type, .. } => {
+                CppFfiFunctionKind::FieldAccessor { accessor_type }
+            }
+        },
     };
 
     let this_arg_type = match &kind {
-        CppFfiFunctionKind::Function { cpp_function, .. } => match &cpp_function.member {
+        NewFfiFunctionKind::Function { cpp_function, .. } => match &cpp_function.member {
             Some(info) if !info.is_static && info.kind != CppFunctionKind::Constructor => {
-                let class_type = CppType::Class(cpp_function.class_type().unwrap());
+                let class_type = CppType::Class(cpp_function.class_path().unwrap());
                 Some(CppType::new_pointer(info.is_const, class_type))
             }
             _ => None,
         },
-        CppFfiFunctionKind::FieldAccessor {
+        NewFfiFunctionKind::FieldAccessor {
             field,
             accessor_type,
         } => {
@@ -423,7 +297,7 @@ pub fn to_ffi_method(
     }
 
     let normal_args = match &kind {
-        CppFfiFunctionKind::Function { cpp_function, .. } => {
+        NewFfiFunctionKind::Function { cpp_function, .. } => {
             if cpp_function.allows_variadic_arguments {
                 bail!("Variable arguments are not supported");
             }
@@ -431,7 +305,7 @@ pub fn to_ffi_method(
             if cpp_function.is_destructor() {
                 // destructor doesn't have a return type that needs special handling,
                 // but its `allocation_place` must match `allocation_place` of the type's constructor
-                let class_type = &cpp_function.class_type().unwrap();
+                let class_type = &cpp_function.class_path().unwrap();
                 r.allocation_place = if movable_types.iter().any(|t| t == class_type) {
                     ReturnValueAllocationPlace::Stack
                 } else {
@@ -440,7 +314,7 @@ pub fn to_ffi_method(
             }
             cpp_function.arguments.clone()
         }
-        CppFfiFunctionKind::FieldAccessor {
+        NewFfiFunctionKind::FieldAccessor {
             field,
             accessor_type,
         } => {
@@ -467,13 +341,13 @@ pub fn to_ffi_method(
     }
 
     let real_return_type = match &kind {
-        CppFfiFunctionKind::Function { cpp_function, .. } => match &cpp_function.member {
+        NewFfiFunctionKind::Function { cpp_function, .. } => match &cpp_function.member {
             Some(info) if info.kind.is_constructor() => {
-                CppType::Class(cpp_function.class_type().unwrap())
+                CppType::Class(cpp_function.class_path().unwrap())
             }
             _ => cpp_function.return_type.clone(),
         },
-        CppFfiFunctionKind::FieldAccessor {
+        NewFfiFunctionKind::FieldAccessor {
             field,
             accessor_type,
         } => match *accessor_type {
@@ -515,20 +389,16 @@ pub fn to_ffi_method(
 fn generate_field_accessors(
     field: &CppClassField,
     movable_types: &[CppPath],
-    source_ffi_item: Option<usize>,
     name_provider: &mut FfiNameProvider,
-) -> Result<Vec<CppFfiDatabaseItem>> {
+) -> Result<Vec<CppFfiItem>> {
     let mut new_methods = Vec::new();
-    let mut create_method = |accessor_type| -> Result<CppFfiDatabaseItem> {
-        let kind = CppFfiFunctionKind::FieldAccessor {
+    let mut create_method = |accessor_type| -> Result<CppFfiItem> {
+        let kind = NewFfiFunctionKind::FieldAccessor {
             field: field.clone(),
             accessor_type,
         };
-        let ffi_function = to_ffi_method(&kind, movable_types, name_provider)?;
-        Ok(CppFfiDatabaseItem::from_function(
-            ffi_function,
-            source_ffi_item,
-        ))
+        let ffi_function = to_ffi_method(kind, movable_types, name_provider)?;
+        Ok(CppFfiItem::Function(ffi_function))
     };
 
     if field.visibility == CppVisibility::Public {
@@ -560,8 +430,13 @@ fn check_preconditions(item: &CppItem) -> Result<()> {
                     bail!("signals are excluded");
                 }
             }
-            if function.path.last().template_arguments.is_some() {
-                bail!("template functions are excluded");
+            if let Some(args) = &function.path.last().template_arguments {
+                if args
+                    .iter()
+                    .any(|arg| arg.is_or_contains_template_parameter())
+                {
+                    bail!("template functions are excluded");
+                }
             }
         }
         CppItem::ClassField(field) => {

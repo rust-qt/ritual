@@ -2,7 +2,7 @@
 
 use crate::cpp_function::CppFunction;
 pub use crate::cpp_operator::CppOperator;
-use crate::cpp_type::CppType;
+use crate::cpp_type::{CppTemplateParameter, CppType};
 use itertools::Itertools;
 use ritual_common::errors::{bail, ensure, Error, Result};
 use ritual_common::utils::MapIfOk;
@@ -17,8 +17,6 @@ pub struct CppEnumValue {
     pub path: CppPath,
     /// Corresponding value
     pub value: i64,
-    /// C++ documentation for this item in HTML
-    pub doc: Option<String>,
 }
 
 impl CppEnumValue {
@@ -42,7 +40,6 @@ fn unscoped_path_should_work() {
         let v = CppEnumValue {
             path: CppPath::from_good_str(path),
             value: 0,
-            doc: None,
         };
         assert_eq!(v.unscoped_path(), CppPath::from_good_str(result));
     }
@@ -50,8 +47,6 @@ fn unscoped_path_should_work() {
     check("A::B::C::D", "A::B::D");
     check("A::B", "B");
 }
-
-pub type CppClassFieldDoc = ();
 
 /// Member field of a C++ class declaration
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
@@ -62,8 +57,6 @@ pub struct CppClassField {
     /// Visibility
     pub visibility: CppVisibility,
     pub is_static: bool,
-
-    pub doc: Option<CppClassFieldDoc>,
 }
 
 impl CppClassField {
@@ -124,17 +117,6 @@ pub enum CppVisibility {
     Public,
     Protected,
     Private,
-}
-
-/// C++ documentation for a type
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct CppTypeDoc {
-    /// HTML content
-    pub html: String,
-    /// Absolute URL to online documentation page for this type
-    pub url: String,
-    /// Absolute documentation URLs encountered in the content
-    pub cross_references: Vec<String>,
 }
 
 #[derive(PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
@@ -213,6 +195,14 @@ impl CppPath {
         }
     }
 
+    pub fn parent_parts(&self) -> Result<&[CppPathItem]> {
+        if self.items.len() > 1 {
+            Ok(&self.items[..self.items.len() - 1])
+        } else {
+            bail!("failed to get parent path for {:?}", self)
+        }
+    }
+
     pub fn ascii_caption(&self) -> String {
         self.items
             .iter()
@@ -277,10 +267,12 @@ impl CppPath {
         for item in &mut path.items {
             if let Some(args) = &mut item.template_arguments {
                 *args = (0..args.len())
-                    .map(|index| CppType::TemplateParameter {
-                        nested_level,
-                        index,
-                        name: format!("T{}_{}", nested_level, index),
+                    .map(|index| {
+                        CppType::TemplateParameter(CppTemplateParameter {
+                            nested_level,
+                            index,
+                            name: format!("T{}_{}", nested_level, index),
+                        })
                     })
                     .collect();
                 nested_level += 1;
@@ -374,20 +366,18 @@ impl fmt::Debug for CppPathItem {
 }
 
 /// Information about a C++ type declaration
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Hash)]
 pub enum CppTypeDeclarationKind {
     Enum,
-    Class { is_movable: bool },
+    Class,
 }
 
 /// Information about a C++ type declaration
-#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize, Hash)]
 pub struct CppTypeDeclaration {
     /// Identifier, including namespaces and nested classes
     pub path: CppPath,
     pub kind: CppTypeDeclarationKind,
-    /// C++ documentation for the type
-    pub doc: Option<CppTypeDoc>,
 }
 
 impl CppTypeDeclaration {
@@ -414,9 +404,14 @@ impl CppTypeDeclarationKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CppNamespace {
+    pub path: CppPath,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[allow(clippy::large_enum_variant)]
 pub enum CppItem {
-    Namespace(CppPath),
+    Namespace(CppNamespace),
     Type(CppTypeDeclaration),
     EnumValue(CppEnumValue),
     Function(CppFunction),
@@ -476,7 +471,7 @@ impl CppItem {
 
     pub fn path(&self) -> Option<&CppPath> {
         let path = match self {
-            CppItem::Namespace(data) => data,
+            CppItem::Namespace(data) => &data.path,
             CppItem::Type(data) => &data.path,
             CppItem::EnumValue(data) => &data.path,
             CppItem::Function(data) => &data.path,
@@ -514,7 +509,7 @@ impl CppItem {
         }
     }
 
-    pub fn as_namespace_ref(&self) -> Option<&CppPath> {
+    pub fn as_namespace_ref(&self) -> Option<&CppNamespace> {
         if let CppItem::Namespace(data) = self {
             Some(data)
         } else {
@@ -572,7 +567,9 @@ impl CppItem {
 impl fmt::Display for CppItem {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let s = match self {
-            CppItem::Namespace(path) => format!("namespace {}", path.to_cpp_pseudo_code()),
+            CppItem::Namespace(namespace) => {
+                format!("namespace {}", namespace.path.to_cpp_pseudo_code())
+            }
             CppItem::Type(type1) => match type1.kind {
                 CppTypeDeclarationKind::Enum => format!("enum {}", type1.path.to_cpp_pseudo_code()),
                 CppTypeDeclarationKind::Class { .. } => {

@@ -14,6 +14,8 @@ public:
         return m_baseFunctionResult;
     }
 
+    void setParent(BaseClass1 *parent) {}
+
 private:
     int m_baseFunctionResult = 0;
 };
@@ -30,7 +32,11 @@ public:
     int virtualFunction() const override { return 44; }
 };
 
-
+class MOQT_CORE_EXPORT DerivedSubClass1 : public DerivedClass1 {
+public:
+    DerivedSubClass1() {}
+    int virtualFunction() const override { return 48; }
+};
 
 class MOQT_CORE_EXPORT AbstractBaseClass1 {
 public:

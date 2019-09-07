@@ -26,6 +26,38 @@ public:
         return SomethingElse<T>();
     }
 
+    class MOQT_CORE_EXPORT Iterator {
+    public:
+        bool operator==(const Iterator& other) {
+            return m_pos == other.m_pos;
+        }
+        bool operator!=(const Iterator& other) {
+            return m_pos != other.m_pos;
+        }
+        T& operator*() {
+            return *m_pos;
+        }
+        void operator++() {
+            m_pos++;
+        }
+        void operator--() {
+            m_pos--;
+        }
+
+    private:
+        Iterator(T* pos) : m_pos(pos) {}
+        T* m_pos;
+
+        friend class QVector<T>;
+    };
+
+    Iterator begin() {
+        return Iterator(&m_data[0]);
+    }
+    Iterator end() {
+        return Iterator(&m_data[m_size]);
+    }
+
 private:
     T m_data[32];
     int m_size = 0;

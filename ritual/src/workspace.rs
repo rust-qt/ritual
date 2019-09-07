@@ -1,11 +1,12 @@
-use crate::database::Database;
+use crate::database::{Database, DatabaseClient, IndexedDatabase};
 use log::info;
 use ritual_common::errors::{bail, Result};
 use ritual_common::file_utils::{
     create_dir_all, load_json, os_string_into_string, read_dir, remove_file, save_json,
     save_toml_table,
 };
-use ritual_common::toml;
+use ritual_common::utils::MapIfOk;
+use ritual_common::{toml, ReadOnly};
 use serde_derive::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -21,7 +22,7 @@ pub struct WorkspaceConfig {}
 pub struct Workspace {
     path: PathBuf,
     config: WorkspaceConfig,
-    databases: Vec<Database>,
+    databases: Vec<IndexedDatabase>,
 }
 
 fn config_path(path: &Path) -> PathBuf {
@@ -81,10 +82,10 @@ impl Workspace {
 
     // TODO: import published crates
 
-    fn take_loaded_crate(&mut self, crate_name: &str) -> Option<Database> {
+    fn take_loaded_crate(&mut self, crate_name: &str) -> Option<IndexedDatabase> {
         self.databases
             .iter()
-            .position(|d| d.crate_name() == crate_name)
+            .position(|d| d.database().crate_name() == crate_name)
             .and_then(|i| Some(self.databases.swap_remove(i)))
     }
     /*
@@ -99,7 +100,8 @@ impl Workspace {
     }*/
 
     pub fn delete_database_if_exists(&mut self, crate_name: &str) -> Result<()> {
-        self.databases.retain(|d| d.crate_name() != crate_name);
+        self.databases
+            .retain(|d| d.database().crate_name() != crate_name);
         let path = database_path(&self.path, crate_name);
         if path.exists() {
             remove_file(path)?;
@@ -107,29 +109,50 @@ impl Workspace {
         Ok(())
     }
 
-    pub fn get_database(
+    fn get_database(
         &mut self,
         crate_name: &str,
         allow_load: bool,
         allow_create: bool,
-    ) -> Result<Database> {
+    ) -> Result<IndexedDatabase> {
         if allow_load {
             if let Some(r) = self.take_loaded_crate(crate_name) {
                 return Ok(r);
             }
             let path = database_path(&self.path, crate_name);
             if path.exists() {
-                return load_json(path);
+                info!("Loading database for {}", crate_name);
+                let db = load_json(path)?;
+                return Ok(IndexedDatabase::new(db));
             }
         }
         if allow_create {
-            return Ok(Database::empty(crate_name));
+            let db = Database::empty(crate_name.into());
+            return Ok(IndexedDatabase::new(db));
         }
         bail!("can't get database");
     }
 
-    pub fn put_crate(&mut self, database: Database) {
-        self.databases.push(database);
+    pub fn get_database_client<'a>(
+        &mut self,
+        crate_name: &str,
+        dependency_names: impl Iterator<Item = &'a str>,
+        allow_load: bool,
+        allow_create: bool,
+    ) -> Result<DatabaseClient> {
+        let current_database = self.get_database(crate_name, allow_load, allow_create)?;
+        let dependencies =
+            dependency_names.map_if_ok(|name| self.get_database(name, true, false))?;
+        Ok(DatabaseClient::new(
+            current_database,
+            ReadOnly::new(dependencies),
+        ))
+    }
+
+    pub fn put_database_client(&mut self, client: DatabaseClient) {
+        let (db, dependencies) = client.into_inner();
+        self.databases.push(db);
+        self.databases.extend(dependencies.into_inner());
     }
 
     fn database_backup_path(&self, crate_name: &str) -> PathBuf {
@@ -141,13 +164,13 @@ impl Workspace {
         ))
     }
 
-    pub fn save_database(&self, database: &mut Database) -> Result<()> {
+    pub fn save_database(&self, database: &mut DatabaseClient) -> Result<()> {
         if database.is_modified() {
             info!("Saving data");
             let backup_path = self.database_backup_path(database.crate_name());
             save_json(
                 database_path(&self.path, database.crate_name()),
-                database,
+                database.data(),
                 Some(&backup_path),
             )?;
             database.set_saved();

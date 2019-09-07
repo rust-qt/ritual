@@ -7,12 +7,7 @@ use std::collections::HashSet;
 
 pub fn detect_signal_argument_types(data: &mut ProcessorData<'_>) -> Result<HashSet<Vec<CppType>>> {
     let mut all_types = HashSet::new();
-    for method in data
-        .current_database
-        .cpp_items()
-        .iter()
-        .filter_map(|i| i.item.as_function_ref())
-    {
+    for method in data.db.cpp_items().filter_map(|i| i.item.as_function_ref()) {
         if let Some(method_info) = &method.member {
             if method_info.is_signal {
                 let types = method
