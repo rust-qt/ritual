@@ -911,11 +911,9 @@ impl Generator<'_> {
             RustFunctionKind::SignalOrSlotGetter(getter) => {
                 let path = &func.item.return_type.api_type().as_common()?.path;
                 let call = format!(
-                    "{}::new(::cpp_utils::Ref::from_raw(self as &{})\
-                     .expect(\"attempted to construct a null Ref\"), \
+                    "{}::new(::cpp_utils::Ref::from_raw_ref(self), \
                      ::std::ffi::CStr::from_bytes_with_nul_unchecked(b\"{}\\0\"))",
                     self.rust_path_to_string(&path),
-                    self.rust_path_to_string(&self.qt_core_path().join("QObject")),
                     getter.receiver_id
                 );
                 Some(wrap_unsafe(func.item.is_unsafe, &call))

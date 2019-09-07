@@ -1,6 +1,6 @@
 use crate::q_meta_object::Connection;
 use crate::QObject;
-use cpp_utils::{CppBox, CppDeletable, MutPtr, Ptr, Ref};
+use cpp_utils::{CastInto, CppBox, CppDeletable, MutPtr, MutRef, Ptr, Ref};
 use std::ffi::CStr;
 use std::fmt;
 use std::marker::PhantomData;
@@ -53,9 +53,9 @@ impl<A> fmt::Debug for Receiver<A> {
 }
 
 impl<A> Receiver<A> {
-    pub fn new(q_object: Ref<QObject>, receiver_id: &'static CStr) -> Self {
+    pub fn new(q_object: impl CastInto<Ref<QObject>>, receiver_id: &'static CStr) -> Self {
         Self {
-            q_object,
+            q_object: q_object.cast_into(),
             receiver_id,
             _marker: PhantomData,
         }
@@ -82,7 +82,7 @@ impl<A> fmt::Debug for Signal<A> {
 }
 
 impl<A> Signal<A> {
-    pub fn new(q_object: Ref<QObject>, receiver_id: &'static CStr) -> Self {
+    pub fn new(q_object: impl CastInto<Ref<QObject>>, receiver_id: &'static CStr) -> Self {
         Signal(Receiver::new(q_object, receiver_id))
     }
 }
@@ -107,6 +107,26 @@ impl<A> AsReceiver for Signal<A> {
 }
 
 impl<T> AsReceiver for MutPtr<T>
+where
+    T: AsReceiver,
+{
+    type Arguments = <T as AsReceiver>::Arguments;
+    fn as_receiver(&self) -> Receiver<Self::Arguments> {
+        (**self).as_receiver()
+    }
+}
+
+impl<T> AsReceiver for Ptr<T>
+where
+    T: AsReceiver,
+{
+    type Arguments = <T as AsReceiver>::Arguments;
+    fn as_receiver(&self) -> Receiver<Self::Arguments> {
+        (**self).as_receiver()
+    }
+}
+
+impl<T> AsReceiver for MutRef<T>
 where
     T: AsReceiver,
 {
