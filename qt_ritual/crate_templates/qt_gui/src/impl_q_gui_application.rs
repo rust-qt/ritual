@@ -26,7 +26,7 @@ impl QGuiApplication {
     pub fn init<F: FnOnce(::cpp_utils::MutPtr<QGuiApplication>) -> i32>(f: F) -> ! {
         let exit_code = {
             unsafe {
-                let mut args = QCoreApplicationArgs::from_real();
+                let mut args = QCoreApplicationArgs::new();
                 let (argc, argv) = args.get();
                 let mut app = QGuiApplication::new_2a(
                     MutRef::from_raw(argc).unwrap(),
