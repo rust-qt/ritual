@@ -26,7 +26,7 @@ public:
         return SomethingElse<T>();
     }
 
-    class Iterator {
+    class MOQT_CORE_EXPORT Iterator {
     public:
         bool operator==(const Iterator& other) {
             return m_pos == other.m_pos;
