@@ -8,8 +8,8 @@ version = "0.0.0"
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 
 description = "Build script implementation for C++ library wrappers"
-repository = "https://github.com/rust-qt/cpp_to_rust/tree/master/cpp_to_rust/cpp_to_rust_build_tools"
-license = "MIT"
+repository = "https://github.com/rust-qt/ritual"
+license = "MIT OR Apache-2.0"
 
 [dependencies]
 

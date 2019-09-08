@@ -4,9 +4,9 @@ edition = "2018"
 
 version = "0.0.0"
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
-license = "MIT"
+license = "MIT OR Apache-2.0"
 description = "Common utilities for generating and building Rust-Qt crates"
-repository = "https://github.com/rust-qt/cpp_to_rust/tree/master/qt_generator/qt_generator_common"
+repository = "https://github.com/rust-qt/ritual"
 
 [dependencies]
 ritual_common = { version = "0.0.0", path = "../ritual_common" }

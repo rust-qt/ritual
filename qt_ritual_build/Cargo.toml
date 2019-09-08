@@ -7,9 +7,9 @@ edition = "2018"
 version = "0.0.0"
 
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
-license = "MIT"
+license = "MIT OR Apache-2.0"
 description = "Build script implementation for Rust Qt crates"
-repository = "https://github.com/rust-qt/cpp_to_rust/tree/master/qt_generator/qt_build_tools"
+repository = "https://github.com/rust-qt/ritual"
 
 [dependencies]
 ritual_build = { version = "0.0.0", path = "../ritual_build" }
