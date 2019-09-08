@@ -1,6 +1,11 @@
 use crate::ops::{Begin, BeginMut, Decrement, End, EndMut, Increment, Indirection};
 use crate::{CppBox, CppDeletable, MutPtr, MutRef, Ptr, Ref};
 
+/// `Iterator` and `DoubleEndedIterator` backed by C++ iterators.
+///
+/// This object is produced by `IntoIterator` implementations on  pointer types
+/// (`&CppBox`, `&mut CppBox`, `Ptr`, `MutPtr`, `Ref`, `MutRef`). You can also use
+/// `cpp_iter` function to construct it manually from two C++ iterator objects.
 pub struct CppIterator<T1, T2>
 where
     T1: CppDeletable,
@@ -10,6 +15,13 @@ where
     end: CppBox<T2>,
 }
 
+/// Constructs a Rust-style iterator from C++ iterators pointing to begin and end
+/// of the collection.
+///
+/// ### Safety
+///
+/// `begin` and `end` must be valid. It's not possible to make any guarantees about safety, since
+/// `CppIterator` will call arbitrary C++ library code when used.
 pub unsafe fn cpp_iter<T1, T2>(begin: CppBox<T1>, end: CppBox<T2>) -> CppIterator<T1, T2>
 where
     T1: CppDeletable,

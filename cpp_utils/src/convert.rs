@@ -3,13 +3,29 @@ use crate::{CppBox, CppDeletable, MutPtr, MutRef, Ptr, Ref, StaticUpcast};
 use std::ffi::CStr;
 use std::os::raw::c_char;
 
-/// Used to do value-to-value conversions while consuming the input value.
+/// Performs some of the conversions that are available implicitly in C++.
+///
+/// `CastInto` is automatically implemented for all `CastFrom` conversions,
+/// similar to `From` and `Into` traits from `std`.
 pub trait CastFrom<T>: Sized {
     /// Performs the conversion.
-    unsafe fn cast_from(_: T) -> Self;
+    ///
+    /// ### Safety
+    ///
+    /// This operation is safe as long as `value` is valid.
+    unsafe fn cast_from(value: T) -> Self;
 }
 
+/// Performs some of the conversions that are available implicitly in C++.
+///
+/// `CastInto` is automatically implemented for all `CastFrom` conversions,
+/// similar to `From` and `Into` traits from `std`.
 pub trait CastInto<T>: Sized {
+    /// Performs the conversion.
+    ///
+    /// ### Safety
+    ///
+    /// This operation is safe as long as `self` is valid.
     unsafe fn cast_into(self) -> T;
 }
 
