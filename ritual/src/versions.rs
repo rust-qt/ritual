@@ -7,7 +7,7 @@
 //! Make sure to update versions here when the actual version of the dependency changes.
 
 /// Version of `ritual_build` crate.
-pub const RITUAL_BUILD_VERSION: &str = "0.0.0";
+pub const RITUAL_BUILD_VERSION: &str = "0.1.0";
 
 /// Version of `cpp_utils` crate.
-pub const CPP_UTILS_VERSION: &str = "0.2.1";
+pub const CPP_UTILS_VERSION: &str = "0.3.0";

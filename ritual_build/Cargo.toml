@@ -4,7 +4,8 @@ edition = "2018"
 
 # Don't forget to update `ritual/src/versions.rs`
 # when changing this version.
-version = "0.0.0"
+version = "0.1.0"
+
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 
 description = "Build script implementation for C++ library wrappers"
@@ -13,6 +14,6 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 
-ritual_common = { version = "0.0.0", path = "../ritual_common" }
+ritual_common = { version = "0.1.0", path = "../ritual_common" }
 
 log = "0.4.6"

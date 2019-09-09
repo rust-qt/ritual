@@ -4,7 +4,7 @@ edition = "2018"
 
 # Don't forget to update `ritual/src/versions.rs`
 # when changing this version.
-version = "0.2.1"
+version = "0.3.0"
 
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 description = "Utilities for interoperability with C++"
