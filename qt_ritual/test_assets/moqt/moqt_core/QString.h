@@ -2,15 +2,8 @@
 #define QSTRING_H
 
 #include "moqt_core_exports.h"
+#include "QByteArray.h"
 
-class MOQT_CORE_EXPORT QByteArray {
-public:
-    QByteArray(int, char) {}
-    QByteArray(const char*, int) {}
-    QByteArray() {}
-    const char *constData() const;
-    int size() const;
-};
 
 class QString;
 
@@ -26,6 +19,7 @@ public:
     static QString fromUtf8(const char *str, int size = -1);
     static QString fromUtf8(const QByteArray& str);
     QByteArray toUtf8() const;
+    QByteArray toLocal8Bit() const;
 };
 
 

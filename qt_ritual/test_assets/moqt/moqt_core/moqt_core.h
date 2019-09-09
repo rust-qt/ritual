@@ -10,3 +10,4 @@
 #include "QCoreApplication.h"
 #include "QString.h"
 #include "Overloaded.h"
+#include "QByteArray.h"
