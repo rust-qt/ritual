@@ -122,7 +122,7 @@ define_assign_op!(ShrAssign, shr_assign);
 
 macro_rules! define_comparison_op {
     ($container:ident) => {
-        impl<T: CppDeletable, U> PartialEq<U> for $container<T>
+        impl<T, U> PartialEq<U> for $container<T>
         where
             T: PartialEq<U>,
         {
@@ -131,7 +131,7 @@ macro_rules! define_comparison_op {
             }
         }
 
-        impl<T: CppDeletable, U> PartialOrd<U> for $container<T>
+        impl<T, U> PartialOrd<U> for $container<T>
         where
             T: Lt<U> + Le<U> + Gt<U> + Ge<U> + PartialEq<U>,
         {
@@ -166,8 +166,49 @@ macro_rules! define_comparison_op {
     };
 }
 
-define_comparison_op!(CppBox);
 define_comparison_op!(Ptr);
 define_comparison_op!(MutPtr);
 define_comparison_op!(Ref);
 define_comparison_op!(MutRef);
+
+impl<T: CppDeletable, U> PartialEq<U> for CppBox<T>
+where
+    T: PartialEq<U>,
+{
+    fn eq(&self, rhs: &U) -> bool {
+        &**self == rhs
+    }
+}
+
+impl<T: CppDeletable, U> PartialOrd<U> for CppBox<T>
+where
+    T: Lt<U> + Le<U> + Gt<U> + Ge<U> + PartialEq<U>,
+{
+    fn partial_cmp(&self, other: &U) -> Option<Ordering> {
+        if &**self == other {
+            Some(Ordering::Equal)
+        } else if (**self).lt(other) {
+            Some(Ordering::Less)
+        } else if (**self).gt(other) {
+            Some(Ordering::Greater)
+        } else {
+            None
+        }
+    }
+
+    fn lt(&self, other: &U) -> bool {
+        (**self).lt(other)
+    }
+
+    fn le(&self, other: &U) -> bool {
+        (**self).le(other)
+    }
+
+    fn gt(&self, other: &U) -> bool {
+        (**self).gt(other)
+    }
+
+    fn ge(&self, other: &U) -> bool {
+        (**self).ge(other)
+    }
+}

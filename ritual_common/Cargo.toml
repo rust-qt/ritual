@@ -1,15 +1,11 @@
 [package]
 name = "ritual_common"
 edition = "2018"
-
-# when changing version of this crate, change corresponding dependency version in
-# `ritual`, `ritual_build` and `qt_ritual_common`
-version = "0.0.0"
-
+version = "0.1.0"
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 description = "Common utilities for ritual and ritual_build"
-license = "MIT"
-repository = "https://github.com/rust-qt/ritual/tree/master/ritual_common"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/rust-qt/ritual"
 
 [dependencies]
 failure = "0.1.5" # error handling

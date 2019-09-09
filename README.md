@@ -138,7 +138,7 @@ Not implemented yet but planned:
 - Translate C++ `typedef`s to Rust type aliases.
 - Implement `Debug` and `Display` traits for structs if applicable methods exist on C++ side.
 - Implement iterator traits for collections.
-- ([Implement subclassing API](https://github.com/rust-qt/cpp_to_rust/issues/26)).
+- ([Implement subclassing API](https://github.com/rust-qt/ritual/issues/26)).
 
 Not planned to support:
 
@@ -215,9 +215,9 @@ If you use Qt, you should also take into account [Qt licensing](https://www.qt.i
 
 Contributions are always welcome! You can contribute in different ways:
 
-- Submit a bug report, a feature request, or an improvement suggestion at the [issue tracker](https://github.com/rust-qt/cpp_to_rust/issues);
+- Submit a bug report, a feature request, or an improvement suggestion at the [issue tracker](https://github.com/rust-qt/ritual/issues);
 - Suggest a C++ library to adapt;
 - Write a test or an example for a Qt crate (porting examples from the official Qt documentation is a good option);
-- Pick up an issue with [help wanted](https://github.com/rust-qt/cpp_to_rust/labels/help%20wanted) tag.
+- Pick up an issue with [help wanted](https://github.com/rust-qt/ritual/labels/help%20wanted) tag.
 
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the project by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.

@@ -1,5 +1,6 @@
-use crate::QCoreApplication;
+use crate::{QCoreApplication, QString};
 use cpp_utils::{MutPtr, MutRef};
+use std::iter::once;
 use std::os::raw::{c_char, c_int};
 use std::process;
 
@@ -25,12 +26,21 @@ pub struct QCoreApplicationArgs {
 
 impl QCoreApplicationArgs {
     /// Creates an object containing `args`.
-    pub fn new(mut args: Vec<Vec<u8>>) -> QCoreApplicationArgs {
-        for arg in &mut args {
-            if !arg.ends_with(&[0]) {
-                arg.push(0);
-            }
-        }
+    pub fn new() -> QCoreApplicationArgs {
+        // Qt uses `QString::fromLocal8Bit()` to decode `argv`,
+        // so we use `QString::toLocal8Bit()` to encode it.
+        let mut args = std::env::args()
+            .map(|arg| unsafe {
+                QString::from_std_str(&arg)
+                    .to_local8_bit()
+                    .as_slice()
+                    .iter()
+                    .map(|&c| c as u8)
+                    .chain(once(0))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+
         QCoreApplicationArgs {
             argc: Box::new(args.len() as c_int),
             argv: args
@@ -45,26 +55,6 @@ impl QCoreApplicationArgs {
     /// constructors.
     pub fn get(&mut self) -> (*mut c_int, *mut *mut c_char) {
         (self.argc.as_mut(), self.argv.as_mut_ptr())
-    }
-
-    #[cfg(unix)]
-    /// Creates an object representing real arguments of the application.
-    /// On Windows, this function uses empty argument list for performance reasons because
-    /// Qt doesn't use `argc` and `argv` on Windows at all.
-    pub fn from_real() -> QCoreApplicationArgs {
-        use std::os::unix::ffi::OsStringExt;
-
-        let args = std::env::args_os().map(|arg| arg.into_vec()).collect();
-        QCoreApplicationArgs::new(args)
-    }
-    #[cfg(windows)]
-    /// Creates an object representing real arguments of the application.
-    /// On Windows, this function uses empty argument list for performance reasons because
-    /// Qt doesn't use `argc` and `argv` on Windows at all.
-    pub fn from_real() -> QCoreApplicationArgs {
-        // Qt doesn't use argc and argv on Windows anyway
-        // TODO: check this
-        QCoreApplicationArgs::new(Vec::new())
     }
 }
 
@@ -91,7 +81,7 @@ impl QCoreApplication {
     pub fn init<F: FnOnce(::cpp_utils::MutPtr<QCoreApplication>) -> i32>(f: F) -> ! {
         let exit_code = {
             unsafe {
-                let mut args = QCoreApplicationArgs::from_real();
+                let mut args = QCoreApplicationArgs::new();
                 let (argc, argv) = args.get();
                 let mut app = QCoreApplication::new_2a(
                     MutRef::from_raw(argc).unwrap(),

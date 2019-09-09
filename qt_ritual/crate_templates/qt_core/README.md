@@ -4,7 +4,7 @@ Some methods are unsafe even though they are not marked as unsafe.
 Users must carefully track ownership of the objects, as usual Rust guarantees
 do not take effect. This will hopefully improve in the future.
 Please report any issues to the
-[issue tracker](https://github.com/rust-qt/cpp_to_rust/issues).
+[issue tracker](https://github.com/rust-qt/ritual/issues).
 
 # Starting up
 

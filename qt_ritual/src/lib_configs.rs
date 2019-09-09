@@ -1,7 +1,7 @@
 //! Generator configurations specific for each Qt module.
 
 use crate::detect_signals_and_slots::detect_signals_and_slots;
-use crate::doc_parser::parse_docs;
+use crate::doc_parser::{parse_docs, set_crate_root_doc};
 use crate::slot_wrappers::add_slot_wrappers;
 use crate::versions;
 use log::info;
@@ -47,20 +47,33 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
             "Pavel Strakhov <ri@idzaaus.org>".to_string(),
         )]),
     );
-    let description = format!(
-        "Bindings for {} C++ library (generated automatically with cpp_to_rust project)",
-        lib_folder_name(crate_name)
-    );
+    let description = format!("Bindings for {} C++ library", lib_folder_name(crate_name));
     package_data.insert("description".to_string(), toml::Value::String(description));
     let doc_url = format!("https://rust-qt.github.io/rustdoc/qt/{}", &crate_name);
     package_data.insert("documentation".to_string(), toml::Value::String(doc_url));
     package_data.insert(
         "repository".to_string(),
-        toml::Value::String("https://github.com/rust-qt/cpp_to_rust".to_string()),
+        toml::Value::String("https://github.com/rust-qt/ritual".to_string()),
     );
     package_data.insert(
         "license".to_string(),
-        toml::Value::String("MIT".to_string()),
+        toml::Value::String("MIT OR Apache-2.0".to_string()),
+    );
+    package_data.insert(
+        "keywords".to_string(),
+        toml::Value::Array(vec![
+            toml::Value::String("gui".to_string()),
+            toml::Value::String("ffi".to_string()),
+            toml::Value::String("qt".to_string()),
+            toml::Value::String("ritual".to_string()),
+        ]),
+    );
+    package_data.insert(
+        "categories".to_string(),
+        toml::Value::Array(vec![
+            toml::Value::String("external-ffi-bindings".to_string()),
+            toml::Value::String("gui".to_string()),
+        ]),
     );
 
     custom_fields.insert("package".to_string(), toml::Value::Table(package_data));
@@ -193,6 +206,12 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
     for cpp_parser_stage in &["cpp_parser", "cpp_parser_stage2"] {
         steps.add_after(&[cpp_parser_stage], "add_slot_wrappers", add_slot_wrappers)?;
     }
+
+    steps.add_after(
+        &["rust_generator"],
+        "set_crate_root_doc",
+        set_crate_root_doc,
+    )?;
 
     let lib_config = match crate_name {
         "qt_core" => core_config,

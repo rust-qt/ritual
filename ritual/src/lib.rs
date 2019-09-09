@@ -1,7 +1,7 @@
 //! Implementation of `cpp_to_rust` generator that
 //! analyzes a C++ library and produces a Rust crate for it.
 //! See [README]
-//! (https://github.com/rust-qt/cpp_to_rust/tree/master/cpp_to_rust/cpp_to_rust_generator)
+//! (https://github.com/rust-qt/ritual)
 //! for more information.
 
 pub mod cli;

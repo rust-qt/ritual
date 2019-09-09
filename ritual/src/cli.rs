@@ -1,6 +1,6 @@
 //! Generator of Rust-Qt crates.
 //!
-//! See [README](https://github.com/rust-qt/cpp_to_rust/tree/master/qt_generator/qt_generator)
+//! See [README](https://github.com/rust-qt/ritual)
 //! for more information.
 
 use crate::config::GlobalConfig;
