@@ -1,7 +1,7 @@
 //! Generator configurations specific for each Qt module.
 
 use crate::detect_signals_and_slots::detect_signals_and_slots;
-use crate::doc_parser::parse_docs;
+use crate::doc_parser::{parse_docs, set_crate_root_doc};
 use crate::slot_wrappers::add_slot_wrappers;
 use crate::versions;
 use log::info;
@@ -10,11 +10,10 @@ use ritual::config::CrateProperties;
 use ritual::config::{Config, GlobalConfig};
 use ritual_common::cpp_build_config::CppLibraryType;
 use ritual_common::cpp_build_config::{CppBuildConfigData, CppBuildPaths};
-use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
+use ritual_common::errors::{bail, format_err, Result, ResultExt};
 use ritual_common::file_utils::repo_dir_path;
 use ritual_common::target;
 use ritual_common::toml;
-use std::fmt::Write;
 use std::path::{Path, PathBuf};
 
 mod _3d;
@@ -27,10 +26,6 @@ use self::_3d::{
     core_3d_config, extras_3d_config, input_3d_config, logic_3d_config, render_3d_config,
 };
 use self::{charts::charts_config, core::core_config, gui::gui_config, widgets::widgets_config};
-use itertools::Itertools;
-use ritual::database::DocItem;
-use ritual::rust_info::{RustModuleKind, RustSpecialModuleKind};
-use ritual_common::utils::MapIfOk;
 use std::env;
 
 pub const MOQT_INSTALL_DIR_ENV_VAR_NAME: &str = "MOQT_INSTALL_DIR";
@@ -53,10 +48,7 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
         )]),
     );
     let description = format!("Bindings for {} C++ library", lib_folder_name(crate_name));
-    package_data.insert(
-        "description".to_string(),
-        toml::Value::String(description.clone()),
-    );
+    package_data.insert("description".to_string(), toml::Value::String(description));
     let doc_url = format!("https://rust-qt.github.io/rustdoc/qt/{}", &crate_name);
     package_data.insert("documentation".to_string(), toml::Value::String(doc_url));
     package_data.insert(
@@ -215,67 +207,11 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
         steps.add_after(&[cpp_parser_stage], "add_slot_wrappers", add_slot_wrappers)?;
     }
 
-    steps.add_after(&["rust_generator"], "set_crate_root_doc", move |data| {
-        let module = data
-            .db
-            .rust_items()
-            .filter_map(|i| i.filter_map(|i| i.as_module_ref()))
-            .find(|module| {
-                module.item.kind == RustModuleKind::Special(RustSpecialModuleKind::CrateRoot)
-            })
-            .ok_or_else(|| err_msg("crate root not found"))?;
-        if data.db.find_doc_for(&module.id)?.is_none() {
-            let mut html = String::new();
-            writeln!(html, "<p>{}.</p>", description)?;
-            writeln!(
-                html,
-                "<p>
-                    Starting guide and examples are available at
-                    [https://github.com/rust-qt/examples](https://github.com/rust-qt/examples).
-                 </p>"
-            )?;
-
-            let versions = data
-                .db
-                .environments()
-                .iter()
-                .filter_map(|env| env.cpp_library_version.clone())
-                .unique()
-                .collect_vec();
-            if !versions.is_empty() {
-                let min_version = versions
-                    .iter()
-                    .map_if_ok(|s| semver::Version::parse(s))?
-                    .into_iter()
-                    .min()
-                    .expect("vec can't be empty");
-                writeln!(
-                    html,
-                    "<p>
-                        This crate was generated for Qt {}.
-                        It should work with other Qt versions later than {},
-                        but API specific to other versions will not be available.
-                    </p>",
-                    versions.join(", "),
-                    min_version,
-                )?;
-            }
-
-            let module_id = module.id;
-            data.db.add_doc_item(
-                module_id,
-                DocItem {
-                    anchor: None,
-                    html,
-                    mismatched_declaration: None,
-                    url: None,
-                    cross_references: Vec::new(),
-                },
-            );
-        }
-
-        Ok(())
-    })?;
+    steps.add_after(
+        &["rust_generator"],
+        "set_crate_root_doc",
+        set_crate_root_doc,
+    )?;
 
     let lib_config = match crate_name {
         "qt_core" => core_config,

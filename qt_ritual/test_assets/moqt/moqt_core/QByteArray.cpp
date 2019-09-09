@@ -14,4 +14,3 @@ const char* QByteArray::begin() const {
 const char* QByteArray::end() const {
     return 0;
 }
-

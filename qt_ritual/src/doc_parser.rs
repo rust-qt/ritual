@@ -5,15 +5,19 @@ use crate::doc_decoder::DocData;
 use crate::mock_doc_parser::MockDocParser;
 use itertools::Itertools;
 use log::{debug, error, trace};
+use qt_ritual_common::lib_folder_name;
 use regex::Regex;
 use ritual::cpp_data::{CppItem, CppPath};
 use ritual::cpp_function::CppFunction;
 use ritual::database::{DatabaseClient, DocItem, ItemWithSource};
 use ritual::processor::ProcessorData;
+use ritual::rust_info::{RustModuleKind, RustSpecialModuleKind};
 use ritual_common::errors::{bail, err_msg, format_err, Error, Result, ResultExt};
+use ritual_common::utils::MapIfOk;
 use select::document::Document;
 use select::node::Node;
 use std::collections::{hash_map, HashMap, HashSet};
+use std::fmt::Write;
 use std::path::Path;
 
 /// Documentation data for an enum variant.
@@ -812,5 +816,70 @@ pub fn parse_docs(
         data.db.add_doc_item(item.source_id, item.item);
     }
     parser.report_unused_anchors();
+    Ok(())
+}
+
+pub fn set_crate_root_doc(data: &mut ProcessorData<'_>) -> Result<()> {
+    let module_id = data
+        .db
+        .rust_items()
+        .filter_map(|i| i.filter_map(|i| i.as_module_ref()))
+        .find(|module| {
+            module.item.kind == RustModuleKind::Special(RustSpecialModuleKind::CrateRoot)
+        })
+        .ok_or_else(|| err_msg("crate root not found"))?
+        .id;
+
+    if let Some(old_doc) = data.db.find_doc_for(&module_id)? {
+        let old_doc_id = old_doc.id;
+        data.db.delete_items(|item| item.id == old_doc_id);
+    }
+    let mut html = String::new();
+    writeln!(
+        html,
+        "Bindings for {} C++ library.\n",
+        lib_folder_name(data.db.crate_name())
+    )?;
+    writeln!(
+        html,
+        "Starting guide and examples are available at
+            [https://github.com/rust-qt/examples](https://github.com/rust-qt/examples).\n"
+    )?;
+
+    let versions = data
+        .db
+        .environments()
+        .iter()
+        .filter_map(|env| env.cpp_library_version.clone())
+        .unique()
+        .collect_vec();
+    if !versions.is_empty() {
+        let min_version = versions
+            .iter()
+            .map_if_ok(|s| semver::Version::parse(s))?
+            .into_iter()
+            .min()
+            .expect("vec can't be empty");
+        writeln!(
+            html,
+            "This crate was generated for Qt {}.
+                It should work with other Qt versions later than {},
+                but API specific to other versions will not be available.\n",
+            versions.join(", "),
+            min_version,
+        )?;
+    }
+
+    data.db.add_doc_item(
+        module_id,
+        DocItem {
+            anchor: None,
+            html,
+            mismatched_declaration: None,
+            url: None,
+            cross_references: Vec::new(),
+        },
+    );
+
     Ok(())
 }
