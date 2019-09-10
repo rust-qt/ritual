@@ -68,32 +68,33 @@ pub fn get_installation_data(
     let docs_path = run_qmake_query("QT_INSTALL_DOCS", qmake_path)?;
     debug!("QT_INSTALL_DOCS = \"{}\"", docs_path.display());
     let folder_name = lib_folder_name(crate_name);
-    let dir = root_include_path.join(&folder_name);
-    if dir.exists() {
+
+    let framework_headers_dir = lib_path.join(format!("{}.framework/Headers", folder_name));
+    if framework_headers_dir.exists() {
         Ok(InstallationData {
             root_include_path,
             lib_path,
             docs_path,
-            lib_include_path: dir,
-            is_framework: false,
+            lib_include_path: framework_headers_dir,
+            is_framework: true,
             qt_version,
         })
     } else {
-        let dir2 = lib_path.join(format!("{}.framework/Headers", folder_name));
-        if dir2.exists() {
+        let lib_headers_dir = root_include_path.join(&folder_name);
+        if lib_headers_dir.exists() {
             Ok(InstallationData {
                 root_include_path,
                 lib_path,
                 docs_path,
-                lib_include_path: dir2,
-                is_framework: true,
+                lib_include_path: lib_headers_dir,
+                is_framework: false,
                 qt_version,
             })
         } else {
             bail!(
                 "extra header dir not found (tried: {}, {})",
-                dir.display(),
-                dir2.display()
+                framework_headers_dir.display(),
+                lib_headers_dir.display()
             );
         }
     }
