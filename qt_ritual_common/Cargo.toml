@@ -2,7 +2,7 @@
 name = "qt_ritual_common"
 edition = "2018"
 
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 license = "MIT OR Apache-2.0"
 description = "Common utilities for generating and building Rust-Qt crates"
