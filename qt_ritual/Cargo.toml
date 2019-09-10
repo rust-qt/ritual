@@ -9,7 +9,7 @@ repository = "https://github.com/rust-qt/ritual"
 
 [dependencies]
 ritual = { version = "0.0.0", path = "../ritual" }
-qt_ritual_common = { version = "0.1.0", path = "../qt_ritual_common" }
+qt_ritual_common = { version = "0.1.1", path = "../qt_ritual_common" }
 ritual_common = { version = "0.1.0", path = "../ritual_common" }
 
 regex = "1.1.0"
