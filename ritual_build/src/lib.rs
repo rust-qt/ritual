@@ -28,7 +28,7 @@ use ritual_common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryT
 use ritual_common::cpp_lib_builder::{BuildType, CMakeConfigData, CppLibBuilder};
 use ritual_common::errors::{bail, err_msg, FancyUnwrap, Result, ResultExt};
 use ritual_common::file_utils::{create_file, file_to_string, load_json, path_to_str};
-use ritual_common::target::{current_target, LibraryTarget};
+use ritual_common::target::{current_target, LibraryTarget, OS};
 use ritual_common::utils::{exe_suffix, get_command_output};
 use ritual_common::{env_var_names, BuildScriptData};
 use std::env;
@@ -203,10 +203,14 @@ impl Config {
         for name in cpp_build_config_data.linked_libs() {
             println!("cargo:rustc-link-lib={}", name);
         }
-        if crate::common::target::current_env() != crate::common::target::Env::Msvc {
-            // TODO: make it configurable
+
+        // TODO: make it configurable
+        if crate::common::target::current_os() == OS::MacOS {
+            println!("cargo:rustc-link-lib=c++");
+        } else if crate::common::target::current_env() != crate::common::target::Env::Msvc {
             println!("cargo:rustc-link-lib=stdc++");
         }
+
         for name in cpp_build_config_data.linked_frameworks() {
             println!("cargo:rustc-link-lib=framework={}", name);
         }
