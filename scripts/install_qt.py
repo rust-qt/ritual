@@ -23,14 +23,11 @@ def get_links(url):
 def install(file_url, message_caption):
     tmp_dir = tempfile.gettempdir()
     tmp_path = os.path.join(tmp_dir, '1.7z')
+    print(tmp_path)
     print('Downloading {} from {}'.format(message_caption, file_url))
     with urlopen(file_url) as response, open(tmp_path, 'wb') as file:
         shutil.copyfileobj(response, file)
-    subprocess.run([
-        '7z',
-        'x', # extract
-        tmp_path
-    ], check=True)
+    subprocess.check_call("7z x \"{}\"".format(tmp_path), shell=True)
 
 def link_matches(link, text):
     return ((text + '-') in link) or ((text + '.') in link)
