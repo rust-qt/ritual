@@ -120,6 +120,7 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
             for &lib in lib_dependencies(crate_name)? {
                 data.add_linked_lib(lib);
             }
+            // TODO: why shared for moqt?
             data.set_library_type(CppLibraryType::Shared);
             config
                 .cpp_build_config_mut()
