@@ -6,6 +6,10 @@ set -x
 export RUST_BACKTRACE=1
 export RITUAL_TEMP_TEST_DIR=$HOME/ritual_temp_test_dir
 
+cd "$TRAVIS_BUILD_DIR"
+rustup component add rustfmt
+cargo fmt -- --check
+
 if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
     export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:/Library/Developer/CommandLineTools/usr/lib
 elif [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
@@ -23,13 +27,21 @@ fi
 
 cd "$TRAVIS_BUILD_DIR"
 rustup component add clippy
-rustup component add rustfmt
-
-cargo fmt -- --check
 cargo clippy --color=always --all-targets -- -D warnings
 
+function build() {
+    if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
+        COMMAND="$@"
+        cmd.exe /C "\"C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvarsall.bat\" amd64 && $COMMAND"
+    else
+        "$@"
+    fi
+}
+
 if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
-cmd.exe /C '"C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" amd64 && cargo test --color=always --release -- --nocapture'
+    export BUILD_MODE=--release
 else
-    cargo test --color=always -- --nocapture
+    export BUILD_MODE=
 fi
+
+build cargo test $BUILD_MODE --color=always -- --nocapture
