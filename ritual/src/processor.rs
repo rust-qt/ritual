@@ -9,15 +9,16 @@ use itertools::Itertools;
 use log::{error, info, trace};
 use regex::Regex;
 use ritual_common::env_var_names;
+use ritual_common::env_var_names::WORKSPACE_TARGET_DIR;
 use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
 use ritual_common::utils::{run_command, MapIfOk};
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::fmt;
 use std::ops::Bound;
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::{Duration, Instant};
+use std::{env, fmt};
 
 /// Creates output and cache directories if they don't exist.
 /// Returns `Err` if any path in `config` is invalid or relative.
@@ -212,8 +213,14 @@ fn build_crate(data: &mut ProcessorData<'_>) -> Result<()> {
             .arg(cargo_cmd)
             .arg("-p")
             .arg(crate_name)
-            .current_dir(path)
-            .env_remove("CARGO_TARGET_DIR");
+            .current_dir(path);
+
+        if let Ok(dir) = env::var(WORKSPACE_TARGET_DIR) {
+            command.env("CARGO_TARGET_DIR", dir);
+        } else {
+            command.env_remove("CARGO_TARGET_DIR");
+        }
+
         if cargo_cmd == &"doc" {
             command.env(env_var_names::RUSTDOC, "1");
         }
