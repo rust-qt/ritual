@@ -1,10 +1,10 @@
-FROM debian:stretch as common
+FROM debian:buster as common
 ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=DontWarn
 RUN apt-get update && \
     apt-get install -y build-essential mesa-common-dev libgl1-mesa-glx \
                        cmake curl software-properties-common && \
     curl https://apt.llvm.org/llvm-snapshot.gpg.key -sSf | apt-key add - && \
-    add-apt-repository "deb http://apt.llvm.org/stretch/ llvm-toolchain-stretch-6.0 main" && \
+    add-apt-repository "deb http://apt.llvm.org/buster/ llvm-toolchain-buster-6.0 main" && \
     apt-get update
 
 
