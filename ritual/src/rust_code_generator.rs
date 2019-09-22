@@ -347,6 +347,7 @@ impl Generator<'_> {
             .rust_children(&module.item.path)
             .next()
             .is_none()
+            && module.item.kind != RustModuleKind::Special(RustSpecialModuleKind::Ffi)
         {
             // skip empty module
             return Ok(());
@@ -417,7 +418,9 @@ impl Generator<'_> {
         if module.item.kind == RustModuleKind::Special(RustSpecialModuleKind::Ffi) {
             let path = self.output_src_path.join("ffi.in.rs");
             self.destination.push(create_file(&path)?);
+            writeln!(self, "extern \"C\" {{\n")?;
             self.generate_children(&module.item.path, None)?;
+            writeln!(self, "}}\n")?;
             self.pop_file();
         }
 
@@ -1018,27 +1021,7 @@ impl Generator<'_> {
     }
 
     fn generate_children(&mut self, parent: &RustPath, self_type: Option<&RustType>) -> Result<()> {
-        if self
-            .current_database
-            .rust_children(&parent)
-            .any(|item| item.item.is_ffi_function())
-        {
-            writeln!(self, "extern \"C\" {{\n")?;
-            for item in self
-                .current_database
-                .rust_children(&parent)
-                .filter(|item| item.item.is_ffi_function())
-            {
-                self.generate_item(item, self_type)?;
-            }
-            writeln!(self, "}}\n")?;
-        }
-
-        for item in self
-            .current_database
-            .rust_children(&parent)
-            .filter(|item| !item.item.is_ffi_function())
-        {
+        for item in self.current_database.rust_children(&parent) {
             self.generate_item(item, self_type)?;
         }
         Ok(())

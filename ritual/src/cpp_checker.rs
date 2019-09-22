@@ -546,7 +546,9 @@ impl CppChecker<'_, '_> {
         }
 
         if old_items_count == 0 {
-            info!("Checking {} items", snippets.len());
+            if !snippets.is_empty() {
+                info!("Checking {} items", snippets.len());
+            }
         } else if snippets.is_empty() {
             info!("Ignoring {} old items", old_items_count);
         } else {

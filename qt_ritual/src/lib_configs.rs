@@ -173,10 +173,6 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
 
         config.add_include_directive(&lib_folder_name(crate_name));
 
-        // DEBUG!
-        //config.add_include_directive("QObject");
-        //config.add_include_directive("QMetaObject");
-
         // TODO: allow to override parser flags
         config.add_cpp_parser_arguments(vec!["-fPIC", "-fcxx-exceptions"]);
 
