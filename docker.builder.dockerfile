@@ -17,3 +17,4 @@ RUN rustup component add rustfmt
 ENV CARGO_HOME=/build/cargo_home
 ENV CARGO_TARGET_DIR=/build/target
 ENV RITUAL_WORKSPACE_TARGET_DIR=/build/workspace_target
+ENV RITUAL_STD_HEADERS=/usr/include/c++/8

@@ -15,6 +15,7 @@ use crate::database::ItemId;
 use crate::processor::ProcessorData;
 use clang::diagnostic::{Diagnostic, Severity};
 use clang::*;
+use dunce::canonicalize;
 use itertools::Itertools;
 use log::{debug, trace, warn};
 use regex::Regex;
@@ -1262,6 +1263,42 @@ impl CppParser<'_, '_> {
         Ok(())
     }
 
+    // we pass parent manually because both lexical and semantic parent are missing for these
+    // entities for some reason
+    fn parse_class_base(
+        &mut self,
+        entity: Entity<'_>,
+        base_index: usize,
+        parent: Entity<'_>,
+    ) -> Result<()> {
+        let base_type = self
+            .parse_type(
+                entity.get_type().unwrap(),
+                &get_context_template_args(parent),
+            )
+            .with_context(|_| "Can't parse base class type")?;
+        if let CppType::Class(base_type) = &base_type {
+            self.add_output(
+                self.entity_include_file(entity)?,
+                get_origin_location(entity).unwrap(),
+                CppItem::ClassBase(CppBaseSpecifier {
+                    base_class_type: base_type.clone(),
+                    is_virtual: entity.is_virtual_base(),
+                    visibility: match entity.get_accessibility().unwrap_or(Accessibility::Public) {
+                        Accessibility::Public => CppVisibility::Public,
+                        Accessibility::Protected => CppVisibility::Protected,
+                        Accessibility::Private => CppVisibility::Private,
+                    },
+                    base_index,
+                    derived_class_type: get_full_name(parent)?,
+                }),
+            )?;
+        } else {
+            bail!("base type is not a class: {:?}", base_type);
+        }
+        Ok(())
+    }
+
     /// Parses a class or a struct `entity`.
     fn parse_class(&mut self, entity: Entity<'_>) -> Result<()> {
         let include_file = self.entity_include_file(entity).with_context(|_| {
@@ -1303,35 +1340,14 @@ impl CppParser<'_, '_> {
                 }
             }
             if child.get_kind() == EntityKind::BaseSpecifier {
-                let base_type = self
-                    .parse_type(
-                        child.get_type().unwrap(),
-                        &get_context_template_args(entity),
-                    )
-                    .with_context(|_| "Can't parse base class type")?;
-                if let CppType::Class(base_type) = &base_type {
-                    self.add_output(
-                        include_file.clone(),
-                        get_origin_location(entity).unwrap(),
-                        CppItem::ClassBase(CppBaseSpecifier {
-                            base_class_type: base_type.clone(),
-                            is_virtual: child.is_virtual_base(),
-                            visibility: match child
-                                .get_accessibility()
-                                .unwrap_or(Accessibility::Public)
-                            {
-                                Accessibility::Public => CppVisibility::Public,
-                                Accessibility::Protected => CppVisibility::Protected,
-                                Accessibility::Private => CppVisibility::Private,
-                            },
-                            base_index: current_base_index,
-                            derived_class_type: full_name.clone(),
-                        }),
-                    )?;
-                    current_base_index += 1;
-                } else {
-                    bail!("base type is not a class: {:?}", base_type);
+                if let Err(err) = self.parse_class_base(child, current_base_index, entity) {
+                    debug!(
+                        "failed to parse class base: {}: {}",
+                        get_full_name_display(entity),
+                        err
+                    );
                 }
+                current_base_index += 1;
             }
             if child.get_kind() == EntityKind::NonTypeTemplateParameter {
                 bail!("Non-type template parameter is not supported");
@@ -1349,13 +1365,13 @@ impl CppParser<'_, '_> {
     }
 
     /// Determines file path of the include file this `entity` is located in.
-    fn entity_include_path(&self, entity: Entity<'_>) -> Result<String> {
+    fn entity_include_path(&self, entity: Entity<'_>) -> Result<PathBuf> {
         if let Some(location) = entity.get_location() {
             let file_path = location.get_presumed_location().0;
             if file_path.is_empty() {
                 bail!("empty file path")
             } else {
-                Ok(file_path)
+                Ok(canonicalize(file_path)?)
             }
         } else {
             bail!("no location for entity")
@@ -1364,7 +1380,7 @@ impl CppParser<'_, '_> {
 
     /// Determines file name of the include file this `entity` is located in.
     fn entity_include_file(&self, entity: Entity<'_>) -> Result<String> {
-        let file_path_buf = PathBuf::from(self.entity_include_path(entity)?);
+        let file_path_buf = self.entity_include_path(entity)?;
         let file_name = file_path_buf
             .file_name()
             .ok_or_else(|| err_msg("no file name in file path"))?;

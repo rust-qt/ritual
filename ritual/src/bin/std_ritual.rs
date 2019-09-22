@@ -1,10 +1,13 @@
 use ritual::cli;
 use ritual::config::{Config, CrateProperties, GlobalConfig};
 use ritual_common::cpp_build_config::{CppBuildConfigData, CppLibraryType};
-use ritual_common::errors::{FancyUnwrap, Result};
+use ritual_common::errors::{bail, FancyUnwrap, Result, ResultExt};
 use ritual_common::{target, toml};
+use std::env;
+use std::path::PathBuf;
 
 pub const CPP_STD_VERSION: &str = "0.0.0";
+pub const STD_HEADERS_PATH_ENV_VAR_NAME: &str = "RITUAL_STD_HEADERS";
 
 fn create_config() -> Result<Config> {
     let mut crate_properties = CrateProperties::new("cpp_std", CPP_STD_VERSION);
@@ -50,8 +53,71 @@ fn create_config() -> Result<Config> {
     let mut config = Config::new(crate_properties);
     config.set_cpp_lib_version("11");
 
-    //config.add_include_directive("...");
+    /*let headers = [
+        "array",
+        "bitset",
+        "deque",
+        "forward_list",
+        "list",
+        "map",
+        "queue",
+        "set",
+        "stack",
+        "unordered_map",
+        "unordered_set",
+        "vector",
+        "ios",
+        "istream",
+        "iostream",
+        "fstream",
+        "sstream",
+        "atomic",
+        "condition_variable",
+        "future",
+        "mutex",
+        "thread",
+        "algorithm",
+        "chrono",
+        "codecvt",
+        "complex",
+        "exception",
+        "functional",
+        "initializer_list",
+        "iterator",
+        "limits",
+        "locale",
+        "memory",
+        "new",
+        "numeric",
+        "random",
+        "ratio",
+        "regex",
+        "stdexcept",
+        "string",
+        "system_error",
+        "tuple",
+        "typeindex",
+        "typeinfo",
+        "type_traits",
+        "utility",
+        "valarray",
+    ];*/
 
+    //let headers = ["memory", "string"];
+    let headers = ["string"];
+
+    for header in &headers[..] {
+        config.add_include_directive(header);
+    }
+
+    let include_path = PathBuf::from(
+        env::var(STD_HEADERS_PATH_ENV_VAR_NAME)
+            .with_context(|_| format!("missing env var: {}", STD_HEADERS_PATH_ENV_VAR_NAME))?,
+    );
+    if !include_path.exists() {
+        bail!("std headers path doesn't exist: {}", include_path.display());
+    }
+    config.add_target_include_path(include_path);
     config.add_cpp_parser_argument("-std=c++11");
     let mut data = CppBuildConfigData::new();
     data.set_library_type(CppLibraryType::Static);
