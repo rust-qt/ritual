@@ -115,6 +115,7 @@ impl CppLibBuilder {
         if !self.skip_cmake {
             let mut cmake_command = Command::new("cmake");
             cmake_command
+                .arg("-Wno-dev")
                 .arg(&self.cmake_source_dir)
                 .current_dir(&self.build_dir);
             let actual_build_type = if target::current_env() == target::Env::Msvc {
