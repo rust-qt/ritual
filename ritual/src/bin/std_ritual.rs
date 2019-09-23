@@ -146,6 +146,11 @@ fn create_config() -> Result<Config> {
         Ok(true)
     });
 
+    config.add_after_cpp_parser_hook(|_data, _output| {
+        // TODO: add u16string, u32string, wstring
+        Ok(())
+    });
+
     let namespace = CppPath::from_good_str("std");
     config.set_rust_path_scope_hook(move |path| {
         if path == &namespace {
@@ -176,6 +181,7 @@ fn create_config() -> Result<Config> {
                     };
                     return Ok(Some(RustPath::from_good_str(name)));
                 }
+                CppType::BuiltInNumeric(CppBuiltInNumericType::Char16) => unimplemented!(),
                 _ => {}
             }
         }
