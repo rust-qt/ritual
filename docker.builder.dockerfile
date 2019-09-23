@@ -13,6 +13,7 @@ COPY rust-toolchain /tmp/rust-toolchain
 RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain $(cat /tmp/rust-toolchain) -y
 ENV PATH=/root/.cargo/bin:$PATH
 RUN rustup component add rustfmt
+ENV RUST_BACKTRACE=1
 
 ENV CARGO_HOME=/build/cargo_home
 ENV CARGO_TARGET_DIR=/build/target
