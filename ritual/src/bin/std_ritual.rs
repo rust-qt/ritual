@@ -1,7 +1,11 @@
 use ritual::cli;
 use ritual::config::{Config, CrateProperties, GlobalConfig};
+use ritual::cpp_data::CppPath;
+use ritual::cpp_type::{CppBuiltInNumericType, CppType};
+use ritual::rust_info::{NameType, RustPathScope};
+use ritual::rust_type::RustPath;
 use ritual_common::cpp_build_config::{CppBuildConfigData, CppLibraryType};
-use ritual_common::errors::{bail, FancyUnwrap, Result, ResultExt};
+use ritual_common::errors::{bail, err_msg, FancyUnwrap, Result, ResultExt};
 use ritual_common::{target, toml};
 use std::env;
 use std::path::PathBuf;
@@ -118,6 +122,66 @@ fn create_config() -> Result<Config> {
         bail!("std headers path doesn't exist: {}", include_path.display());
     }
     config.add_target_include_path(include_path);
+
+    config.set_cpp_parser_path_hook(|path| {
+        //        if path.last().name.starts_with("__throw_") {
+        //            // `__throw_bad_exception`, etc.
+        //            return Ok(false);
+        //        }
+
+        if path.items().iter().any(|item| item.name.starts_with('_')) {
+            //println!("skipping {}", path.to_cpp_pseudo_code());
+            return Ok(false);
+        }
+
+        let string = path.to_templateless_string();
+        let blocked = &[
+            // not in C++ standard
+            "__gnu_cxx",
+        ];
+        if blocked.contains(&string.as_str()) {
+            return Ok(false);
+        }
+
+        Ok(true)
+    });
+
+    let namespace = CppPath::from_good_str("std");
+    config.set_rust_path_scope_hook(move |path| {
+        if path == &namespace {
+            return Ok(Some(RustPathScope {
+                path: RustPath::from_good_str("cpp_std"),
+                prefix: None,
+            }));
+        }
+        Ok(None)
+    });
+
+    config.set_rust_path_hook(move |path, name_type, _data| {
+        if path.to_templateless_string() == "std::basic_string" {
+            let args = path
+                .last()
+                .template_arguments
+                .as_ref()
+                .ok_or_else(|| err_msg("std::basic_string must have template arguments"))?;
+            let arg = args
+                .get(0)
+                .ok_or_else(|| err_msg("std::basic_string: first argument is missing"))?;
+            match arg {
+                CppType::BuiltInNumeric(CppBuiltInNumericType::Char) => {
+                    let name = match name_type {
+                        NameType::Type => "cpp_std::String",
+                        NameType::Module => "cpp_std::string",
+                        _ => bail!("unexpected name type for std::basic_string"),
+                    };
+                    return Ok(Some(RustPath::from_good_str(name)));
+                }
+                _ => {}
+            }
+        }
+        Ok(None)
+    });
+
     config.add_cpp_parser_argument("-std=c++11");
     let mut data = CppBuildConfigData::new();
     data.set_library_type(CppLibraryType::Static);

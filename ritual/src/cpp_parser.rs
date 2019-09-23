@@ -165,7 +165,7 @@ fn get_path_item(entity: Entity<'_>) -> Result<CppPathItem> {
 }
 
 /// Returns fully qualified name of `entity`.
-fn get_full_name(entity: Entity<'_>) -> Result<CppPath> {
+fn get_path(entity: Entity<'_>) -> Result<CppPath> {
     let mut current_entity = entity;
     let mut parts = vec![get_path_item(entity)?];
     loop {
@@ -190,11 +190,15 @@ fn get_full_name(entity: Entity<'_>) -> Result<CppPath> {
             _ => bail!("get_full_name: unexpected parent kind: {:?}", p),
         }
     }
+    if parts.len() > 1 && parts[0].name == "std" && parts[1].name == "__cxx11" {
+        // this is an inline namespace (not portable)
+        parts.remove(1);
+    }
     Ok(CppPath::from_items(parts))
 }
 
 fn get_full_name_display(entity: Entity<'_>) -> String {
-    match get_full_name(entity) {
+    match get_path(entity) {
         Ok(name) => name.to_cpp_pseudo_code(),
         Err(_) => "[unnamed]".into(),
     }
@@ -444,7 +448,7 @@ impl CppParser<'_, '_> {
                         } else {
                             bail!("invalid matches count in regexp");
                         }
-                        let mut name = get_full_name(declaration)?;
+                        let mut name = get_path(declaration)?;
                         name.last_mut().template_arguments = Some(arg_types);
                         return Ok(CppType::Class(name));
                     } else {
@@ -639,7 +643,7 @@ impl CppParser<'_, '_> {
             }
             TypeKind::Enum => {
                 if let Some(declaration) = type1.get_declaration() {
-                    let path = get_full_name(declaration)?;
+                    let path = get_path(declaration)?;
                     if let Some(hook) = self.data.config.cpp_parser_path_hook() {
                         if !hook(&path)? {
                             bail!("blacklisted path: {}", path.to_cpp_pseudo_code());
@@ -662,7 +666,7 @@ impl CppParser<'_, '_> {
                             get_full_name_display(declaration)
                         );
                     }
-                    let mut declaration_name = get_full_name(declaration)?;
+                    let mut declaration_name = get_path(declaration)?;
                     if let Some(hook) = self.data.config.cpp_parser_path_hook() {
                         if !hook(&declaration_name)? {
                             bail!(
@@ -885,10 +889,12 @@ impl CppParser<'_, '_> {
                     is_signed: true,
                 })
             }
-            "quintptr" => Some(CppType::PointerSizedInteger {
-                path: CppPath::from_good_str(name),
-                is_signed: false,
-            }),
+            "quintptr" | "size_t" | "std::size_t" | "std::initializer_list::size_type" => {
+                Some(CppType::PointerSizedInteger {
+                    path: CppPath::from_good_str(name),
+                    is_signed: false,
+                })
+            }
             _ => None,
         }
     }
@@ -899,7 +905,7 @@ impl CppParser<'_, '_> {
         let class_name = match entity.get_semantic_parent() {
             Some(p) => match p.get_kind() {
                 EntityKind::ClassDecl | EntityKind::ClassTemplate | EntityKind::StructDecl => {
-                    match get_full_name(p) {
+                    match get_path(p) {
                         Ok(class_name) => Some(class_name),
                         Err(msg) => {
                             bail!(
@@ -1002,7 +1008,7 @@ impl CppParser<'_, '_> {
             });
         }
 
-        let mut name_with_namespace = get_full_name(entity)?;
+        let mut name_with_namespace = get_path(entity)?;
 
         let mut name = entity
             .get_name()
@@ -1200,7 +1206,7 @@ impl CppParser<'_, '_> {
                 entity
             )
         })?;
-        let enum_name = get_full_name(entity)?;
+        let enum_name = get_path(entity)?;
         self.add_output(
             include_file.clone(),
             get_origin_location(entity)?,
@@ -1290,7 +1296,7 @@ impl CppParser<'_, '_> {
                         Accessibility::Private => CppVisibility::Private,
                     },
                     base_index,
-                    derived_class_type: get_full_name(parent)?,
+                    derived_class_type: get_path(parent)?,
                 }),
             )?;
         } else {
@@ -1308,7 +1314,7 @@ impl CppParser<'_, '_> {
                 entity
             )
         })?;
-        let full_name = get_full_name(entity)?;
+        let full_name = get_path(entity)?;
         let template_arguments = get_template_arguments(entity);
         if entity.get_kind() == EntityKind::ClassTemplate {
             if entity
@@ -1405,7 +1411,7 @@ impl CppParser<'_, '_> {
         } else {
             return Ok(false);
         }
-        if let Ok(full_name) = get_full_name(entity) {
+        if let Ok(full_name) = get_path(entity) {
             if let Some(hook) = self.data.config.cpp_parser_path_hook() {
                 if !hook(&full_name)? {
                     return Ok(false);
@@ -1468,7 +1474,7 @@ impl CppParser<'_, '_> {
                     }
                 }
             }
-            EntityKind::Namespace => match get_full_name(entity) {
+            EntityKind::Namespace => match get_path(entity) {
                 Ok(path) => {
                     self.add_output(
                         self.entity_include_file(entity)?,
