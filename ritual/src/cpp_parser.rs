@@ -24,6 +24,7 @@ use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
 use ritual_common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
 use ritual_common::target::{current_target, LibraryTarget};
 use std::io::Write;
+use std::mem;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -403,7 +404,7 @@ impl CppParser<'_, '_> {
         string: Option<String>,
         context_template_args: &[CppType],
     ) -> Result<CppType> {
-        let template_class_regex = Regex::new(r"^([\w:]+)<(.+)>$")?;
+        trace!("parse_unexposed_type {:?}, {:?}", type1, string);
         let (is_const, name) = if let Some(type1) = type1 {
             let is_const = type1.is_const_qualified();
             let mut name = type1.get_display_name();
@@ -429,24 +430,20 @@ impl CppParser<'_, '_> {
                             get_full_name_display(declaration)
                         );
                     }
-                    if let Some(matches) = template_class_regex.captures(name.as_ref()) {
+                    if let Some((_class_name, args)) = parse_template_args(&name) {
                         let mut arg_types = Vec::new();
-                        if let Some(items) = matches.get(2) {
-                            for arg in items.as_str().split(',') {
-                                match self.parse_unexposed_type(
-                                    None,
-                                    Some(arg.trim().to_string()),
-                                    context_template_args,
-                                ) {
-                                    Ok(arg_type) => arg_types.push(arg_type),
-                                    Err(msg) => {
-                                        bail!("Template argument of unexposed type is not parsed: {}: {}",                        arg, msg
-                      );
-                                    }
+                        for arg in args {
+                            match self.parse_unexposed_type(
+                                None,
+                                Some(arg.trim().to_string()),
+                                context_template_args,
+                            ) {
+                                Ok(arg_type) => arg_types.push(arg_type),
+                                Err(msg) => {
+                                    bail!("(1) Template argument of unexposed type is not parsed: {}: {}",                        arg, msg
+                  );
                                 }
                             }
-                        } else {
-                            bail!("invalid matches count in regexp");
                         }
                         let mut name = get_path(declaration)?;
                         name.last_mut().template_arguments = Some(arg_types);
@@ -552,17 +549,13 @@ impl CppParser<'_, '_> {
             }
         }
 
-        if let Some(matches) = template_class_regex.captures(&name) {
-            if matches.len() < 3 {
-                bail!("invalid matches len in regexp");
-            }
-            let class_text = &matches[1];
+        if let Some((class_text, args)) = parse_template_args(&name) {
             if self
                 .find_type(|x| x.kind.is_class() && x.path.to_templateless_string() == class_text)
                 .is_some()
             {
                 let mut arg_types = Vec::new();
-                for arg in matches[2].split(',') {
+                for arg in args {
                     match self.parse_unexposed_type(
                         None,
                         Some(arg.trim().to_string()),
@@ -571,14 +564,14 @@ impl CppParser<'_, '_> {
                         Ok(arg_type) => arg_types.push(arg_type),
                         Err(msg) => {
                             bail!(
-                                "Template argument of unexposed type is not parsed: {}: {}",
+                                "(2) Template argument of unexposed type is not parsed: {}: {}",
                                 arg,
                                 msg
                             );
                         }
                     }
                 }
-                let mut class_name = CppPath::from_str(class_text)?;
+                let mut class_name = CppPath::from_str(&class_text)?;
                 class_name.last_mut().template_arguments = Some(arg_types);
                 return Ok(CppType::Class(class_name));
             }
@@ -605,17 +598,14 @@ impl CppParser<'_, '_> {
         }
         match type1.get_kind() {
             TypeKind::Typedef => {
-                let parsed = self.parse_type(type1.get_canonical_type(), context_template_args)?;
-                if let CppType::BuiltInNumeric(..) = parsed {
-                    let mut name = type1.get_display_name();
-                    if name.starts_with("const ") {
-                        name = name[6..].trim().to_string();
-                    }
-                    if let Some(r) = self.parse_special_typedef(&name) {
-                        return Ok(r);
-                    }
+                let mut name = type1.get_display_name();
+                if name.starts_with("const ") {
+                    name = name[6..].trim().to_string();
                 }
-                Ok(parsed)
+                if let Some(r) = self.parse_special_typedef(&name) {
+                    return Ok(r);
+                }
+                self.parse_type(type1.get_canonical_type(), context_template_args)
             }
             TypeKind::Void => Ok(CppType::Void),
             TypeKind::Bool
@@ -787,7 +777,9 @@ impl CppParser<'_, '_> {
                 self.parse_type(type1.get_canonical_type(), context_template_args)
             }
             TypeKind::Unexposed => {
+                trace!("found unexposed type: {:?}", type1);
                 let canonical = type1.get_canonical_type();
+                trace!("canonical type: {:?}", canonical);
                 if canonical.get_kind() == TypeKind::Unexposed {
                     self.parse_unexposed_type(Some(type1), None, context_template_args)
                 } else {
@@ -889,9 +881,13 @@ impl CppParser<'_, '_> {
                     is_signed: true,
                 })
             }
-            "quintptr" | "size_t" | "std::size_t" | "std::initializer_list::size_type" => {
+            "quintptr" | "size_t" | "std::size_t" => Some(CppType::PointerSizedInteger {
+                path: CppPath::from_good_str(name),
+                is_signed: false,
+            }),
+            "std::initializer_list::size_type" | "std::__cxx11::basic_string::size_type" => {
                 Some(CppType::PointerSizedInteger {
-                    path: CppPath::from_good_str(name),
+                    path: CppPath::from_good_str("size_t"),
                     is_signed: false,
                 })
             }
@@ -936,6 +932,7 @@ impl CppParser<'_, '_> {
         let return_type_parsed = match self.parse_type(return_type, &context_template_args) {
             Ok(x) => x,
             Err(msg) => {
+                trace!("return type: {:?}", return_type);
                 bail!(
                     "Can't parse return type: {}: {}",
                     return_type.get_display_name(),
@@ -1568,4 +1565,69 @@ impl CppParser<'_, '_> {
         }
         Ok(())
     }
+}
+
+fn parse_template_args(str: &str) -> Option<(String, Vec<String>)> {
+    let mut level = 0;
+    let mut current_str = String::new();
+    let mut name = String::new();
+    let mut args = Vec::new();
+    let mut chars = str.chars().peekable();
+    while let Some(char) = chars.next() {
+        match char {
+            '<' => {
+                if level == 0 {
+                    name = mem::replace(&mut current_str, String::new());
+                } else {
+                    current_str.push(char);
+                }
+                level += 1;
+            }
+            '>' => {
+                level -= 1;
+                if level == 0 {
+                    args.push(mem::replace(&mut current_str, String::new()));
+                    if chars.peek().is_some() {
+                        return None;
+                    } else {
+                        return Some((name, args));
+                    }
+                } else {
+                    current_str.push(char);
+                }
+            }
+            ',' => {
+                if level == 0 {
+                    return None;
+                } else if level == 1 {
+                    args.push(mem::replace(&mut current_str, String::new()));
+                } else {
+                    current_str.push(char);
+                }
+            }
+            c => current_str.push(c),
+        }
+    }
+    None
+}
+
+#[test]
+fn should_parse_template_args_works() {
+    assert_eq!(
+        parse_template_args("name<arg, arg2>"),
+        Some((
+            "name".to_string(),
+            vec!["arg".to_string(), " arg2".to_string()]
+        ))
+    );
+    assert_eq!(
+        parse_template_args("name<arg, name2<arg2, arg3>>"),
+        Some((
+            "name".to_string(),
+            vec!["arg".to_string(), " name2<arg2, arg3>".to_string()]
+        ))
+    );
+    assert_eq!(parse_template_args("name<arg, arg2>bad"), None);
+    assert_eq!(parse_template_args("name<arg,arg2"), None);
+    assert_eq!(parse_template_args("name<arg<arg3,arg4>,arg2"), None);
 }
