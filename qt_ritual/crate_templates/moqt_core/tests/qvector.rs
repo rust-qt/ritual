@@ -1,4 +1,4 @@
-use cpp_utils::cpp_iter;
+use cpp_core::cpp_iter;
 use moqt_core::{BasicClassField, QVectorOfBasicClassField, QVectorOfInt};
 use std::os::raw::c_int;
 

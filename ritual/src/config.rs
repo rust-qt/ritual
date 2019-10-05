@@ -100,7 +100,7 @@ impl CrateProperties {
         });
     }
     /// Removes default dependencies from output `Cargo.toml`. Default
-    /// dependencies are `libc`, `cpp_utils` and crates added using
+    /// dependencies are `libc`, `cpp_core` and crates added using
     /// `Config::set_dependent_cpp_crates`.
     pub fn remove_default_dependencies(&mut self) {
         self.remove_default_dependencies = true;

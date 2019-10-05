@@ -1,4 +1,4 @@
-use cpp_utils::{CppBox, MutPtr};
+use cpp_core::{CppBox, MutPtr};
 use moqt_core::{BasicClass, QPoint, QVectorOfInt};
 use moqt_gui::{get_window, QVectorOfQWindow, QWindow};
 

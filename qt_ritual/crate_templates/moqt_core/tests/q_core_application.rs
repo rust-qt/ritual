@@ -1,4 +1,4 @@
-use cpp_utils::Ref;
+use cpp_core::Ref;
 use moqt_core::{QCoreApplication, QString, SlotOfQString};
 
 #[test]

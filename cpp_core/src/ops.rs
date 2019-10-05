@@ -1,6 +1,6 @@
 //! Operator traits not present in Rust's `std`
 //!
-//! See also `cpp_utils::cmp` for comparison operator traits.
+//! See also `cpp_core::cmp` for comparison operator traits.
 
 // TODO: `&mut self` for increment and decrement?
 

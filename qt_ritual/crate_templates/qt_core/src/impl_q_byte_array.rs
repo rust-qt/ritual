@@ -1,5 +1,5 @@
 use crate::QByteArray;
-use cpp_utils::CppBox;
+use cpp_core::CppBox;
 use std::os::raw::{c_char, c_int};
 
 impl QByteArray {

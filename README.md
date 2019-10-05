@@ -35,7 +35,7 @@ Each crate re-exports its depenencies, so, for example, you can access `qt_core`
 
 - `ritual` is the main part of the generator;
 - `qt_ritual` provides Qt-specific generator features, generator configuration for the Qt crates, and a binary file for running the generator.
-- `cpp_utils` provides essential utilities used by generated crates;
+- `cpp_core` provides essential utilities used by generated crates;
 - `ritual_build` and `qt_ritual_build` provide build scripts for the generated crates;
 - `ritual_common` and `qt_ritual_common` contain common functionality for other crates.
 
@@ -119,7 +119,7 @@ Supported features:
 
 - Primitive types are mapped to Rust's primitive types (like `bool`) and FFI types (like `c_int`).
 - Fixed-size numeric types (e.g `int8_t` or `qint8`) are mapped to Rust's fixed size types (e.g. `i8`).
-- Pointers, references and values are mapped to special smart pointer types (`Ref`, `Ptr`, `CppBox`, etc.) provided by the `cpp_utils` crate.
+- Pointers, references and values are mapped to special smart pointer types (`Ref`, `Ptr`, `CppBox`, etc.) provided by the `cpp_core` crate.
 - C++ namespaces are mapped to Rust modules.
 - C++ classes, structs, and enums are mapped to Rust structs. This also applies to all instantiations of template classes encountered in the library's API, including template classes of dependencies.
 - Free functions are mapped to free functions.

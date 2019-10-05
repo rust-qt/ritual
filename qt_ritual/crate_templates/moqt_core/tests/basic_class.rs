@@ -1,4 +1,4 @@
-use cpp_utils::{MutRef, Ref};
+use cpp_core::{MutRef, Ref};
 use moqt_core::basic_class::{inner_struct::InnerEnum, UpdateType};
 use moqt_core::{BasicClass, BasicClassField};
 

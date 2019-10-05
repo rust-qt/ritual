@@ -1,4 +1,4 @@
-use cpp_utils::CppBox;
+use cpp_core::CppBox;
 use moqt_core::{QPoint, QVectorOfInt};
 
 #[test]

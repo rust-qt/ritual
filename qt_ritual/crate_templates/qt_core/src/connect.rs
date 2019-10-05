@@ -1,6 +1,6 @@
 use crate::q_meta_object::Connection;
 use crate::QObject;
-use cpp_utils::{CastInto, CppBox, CppDeletable, MutPtr, MutRef, Ptr, Ref};
+use cpp_core::{CastInto, CppBox, CppDeletable, MutPtr, MutRef, Ptr, Ref};
 use std::ffi::CStr;
 use std::fmt;
 use std::marker::PhantomData;

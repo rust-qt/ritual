@@ -6,7 +6,7 @@
 //!
 //! # Pointers
 //!
-//! `cpp_utils` provides three kinds of pointers:
+//! `cpp_core` provides three kinds of pointers:
 //!
 //! - `CppBox`: owned, non-null (corresponds to C++ objects passed by value)
 //! - `Ptr` and `MutPtr`: possibly owned, possibly null (correspond to C++ pointers)
@@ -59,6 +59,7 @@ pub use crate::cpp_box::{CppBox, CppDeletable};
 pub use crate::iterator::{cpp_iter, CppIterator};
 pub use crate::ptr::{MutPtr, NullPtr, Ptr};
 pub use crate::ref_::{MutRef, Ref};
+pub use libc::wchar_t;
 
 mod casts;
 pub mod cmp;

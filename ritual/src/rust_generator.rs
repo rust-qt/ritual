@@ -183,22 +183,22 @@ impl OperatorInfo {
                     kind: OperatorKind::Comparison,
                 },
                 CppOperator::GreaterThan => OperatorInfo {
-                    trait_path: "cpp_utils::cmp::Gt",
+                    trait_path: "cpp_core::cmp::Gt",
                     function_name: "gt",
                     kind: OperatorKind::Comparison,
                 },
                 CppOperator::LessThan => OperatorInfo {
-                    trait_path: "cpp_utils::cmp::Lt",
+                    trait_path: "cpp_core::cmp::Lt",
                     function_name: "lt",
                     kind: OperatorKind::Comparison,
                 },
                 CppOperator::GreaterThanOrEqualTo => OperatorInfo {
-                    trait_path: "cpp_utils::cmp::Ge",
+                    trait_path: "cpp_core::cmp::Ge",
                     function_name: "ge",
                     kind: OperatorKind::Comparison,
                 },
                 CppOperator::LessThanOrEqualTo => OperatorInfo {
-                    trait_path: "cpp_utils::cmp::Le",
+                    trait_path: "cpp_core::cmp::Le",
                     function_name: "le",
                     kind: OperatorKind::Comparison,
                 },
@@ -283,17 +283,17 @@ impl OperatorInfo {
                     kind: OperatorKind::WithAssign,
                 },
                 CppOperator::PrefixIncrement => OperatorInfo {
-                    trait_path: "cpp_utils::ops::Increment",
+                    trait_path: "cpp_core::ops::Increment",
                     function_name: "inc",
                     kind: OperatorKind::MutableUnary,
                 },
                 CppOperator::PrefixDecrement => OperatorInfo {
-                    trait_path: "cpp_utils::ops::Decrement",
+                    trait_path: "cpp_core::ops::Decrement",
                     function_name: "dec",
                     kind: OperatorKind::MutableUnary,
                 },
                 CppOperator::Indirection => OperatorInfo {
-                    trait_path: "cpp_utils::ops::Indirection",
+                    trait_path: "cpp_core::ops::Indirection",
                     function_name: "indirection",
                     kind: OperatorKind::NormalUnary,
                 },
@@ -319,22 +319,22 @@ impl OperatorInfo {
             },
             OperatorOrSpecialFunction::SpecialFunction(func) => match func {
                 SpecialFunction::Begin => OperatorInfo {
-                    trait_path: "cpp_utils::ops::Begin",
+                    trait_path: "cpp_core::ops::Begin",
                     function_name: "begin",
                     kind: OperatorKind::NormalUnary,
                 },
                 SpecialFunction::BeginMut => OperatorInfo {
-                    trait_path: "cpp_utils::ops::BeginMut",
+                    trait_path: "cpp_core::ops::BeginMut",
                     function_name: "begin_mut",
                     kind: OperatorKind::MutableUnary,
                 },
                 SpecialFunction::End => OperatorInfo {
-                    trait_path: "cpp_utils::ops::End",
+                    trait_path: "cpp_core::ops::End",
                     function_name: "end",
                     kind: OperatorKind::NormalUnary,
                 },
                 SpecialFunction::EndMut => OperatorInfo {
-                    trait_path: "cpp_utils::ops::EndMut",
+                    trait_path: "cpp_core::ops::EndMut",
                     function_name: "end_mut",
                     kind: OperatorKind::MutableUnary,
                 },
@@ -438,6 +438,12 @@ impl State<'_, '_> {
                         CppBuiltInNumericType::ULongLong => "c_ulonglong",
                         CppBuiltInNumericType::Float => "c_float",
                         CppBuiltInNumericType::Double => "c_double",
+                        CppBuiltInNumericType::WChar => {
+                            return Ok(RustType::Common(RustCommonType {
+                                path: RustPath::from_good_str("cpp_core::wchar_t"),
+                                generic_arguments: None,
+                            }));
+                        }
                         _ => bail!("unsupported numeric type: {:?}", numeric),
                     };
                     let path = RustPath::from_good_str("std::os::raw").join(own_name);
@@ -925,7 +931,7 @@ impl State<'_, '_> {
             }
             ReturnValueAllocationPlace::Heap => {
                 function_name = "delete";
-                trait_path = RustPath::from_good_str("cpp_utils::CppDeletable");
+                trait_path = RustPath::from_good_str("cpp_core::CppDeletable");
                 is_unsafe = true;
             }
             ReturnValueAllocationPlace::NotApplicable => {
@@ -970,19 +976,19 @@ impl State<'_, '_> {
         match &cast {
             CppCast::Static { is_unsafe, .. } => {
                 if *is_unsafe {
-                    trait_path = RustPath::from_good_str("cpp_utils::StaticDowncast");
+                    trait_path = RustPath::from_good_str("cpp_core::StaticDowncast");
                     derived_type = to_type;
                     cast_function_name = "static_downcast";
                     cast_function_name_mut = "static_downcast_mut";
                 } else {
-                    trait_path = RustPath::from_good_str("cpp_utils::StaticUpcast");
+                    trait_path = RustPath::from_good_str("cpp_core::StaticUpcast");
                     derived_type = from_type;
                     cast_function_name = "static_upcast";
                     cast_function_name_mut = "static_upcast_mut";
                 }
             }
             CppCast::Dynamic => {
-                trait_path = RustPath::from_good_str("cpp_utils::DynamicCast");
+                trait_path = RustPath::from_good_str("cpp_core::DynamicCast");
                 derived_type = to_type;
                 cast_function_name = "dynamic_cast";
                 cast_function_name_mut = "dynamic_cast_mut";
@@ -2155,7 +2161,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         state.generate_special_module(module)?;
     }
 
-    state.generate_crate_reexport("cpp_utils")?;
+    state.generate_crate_reexport("cpp_core")?;
     let dependencies = state.data.config.dependent_cpp_crates().to_vec();
     for crate_name in dependencies {
         state.generate_crate_reexport(&crate_name)?;

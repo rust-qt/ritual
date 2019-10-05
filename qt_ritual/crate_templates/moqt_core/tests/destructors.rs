@@ -1,4 +1,4 @@
-use cpp_utils::{CppBox, CppDeletable, MutPtr};
+use cpp_core::{CppBox, CppDeletable, MutPtr};
 use moqt_core::{BaseHandle, HandleFactory};
 
 #[test]

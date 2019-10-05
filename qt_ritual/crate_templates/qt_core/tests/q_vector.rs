@@ -1,4 +1,4 @@
-use cpp_utils::Ref;
+use cpp_core::Ref;
 use qt_core::QVectorOfInt;
 
 #[test]

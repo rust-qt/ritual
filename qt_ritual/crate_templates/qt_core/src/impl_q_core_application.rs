@@ -1,5 +1,5 @@
 use crate::{QCoreApplication, QString};
-use cpp_utils::{MutPtr, MutRef};
+use cpp_core::{MutPtr, MutRef};
 use std::iter::once;
 use std::os::raw::{c_char, c_int};
 use std::process;
@@ -78,7 +78,7 @@ impl QCoreApplication {
     ///     })
     /// }
     /// ```
-    pub fn init<F: FnOnce(::cpp_utils::MutPtr<QCoreApplication>) -> i32>(f: F) -> ! {
+    pub fn init<F: FnOnce(::cpp_core::MutPtr<QCoreApplication>) -> i32>(f: F) -> ! {
         let exit_code = {
             unsafe {
                 let mut args = QCoreApplicationArgs::new();

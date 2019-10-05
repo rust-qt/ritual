@@ -124,11 +124,11 @@ fn generate_crate_template(data: &mut ProcessorData<'_>, output_path: &Path) -> 
                 .should_remove_default_dependencies()
             {
                 table.insert(
-                    "cpp_utils".to_string(),
+                    "cpp_core".to_string(),
                     dep_value(
-                        versions::CPP_UTILS_VERSION,
+                        versions::CPP_CORE_VERSION,
                         if data.config.write_dependencies_local_paths() {
-                            Some(repo_dir_path("cpp_utils")?)
+                            Some(repo_dir_path("cpp_core")?)
                         } else {
                             None
                         },

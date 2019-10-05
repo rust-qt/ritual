@@ -255,7 +255,7 @@ impl Generator<'_> {
                 });
                 if target_type != q_object {
                     let trait_type = RustCommonType {
-                        path: RustPath::from_good_str("cpp_utils::StaticUpcast"),
+                        path: RustPath::from_good_str("cpp_core::StaticUpcast"),
                         generic_arguments: Some(vec![q_object]),
                     };
                     item_for_condition = self
@@ -622,7 +622,7 @@ impl Generator<'_> {
             }
             RustToFfiTypeConversion::CppBoxToPtr => {
                 let code = format!(
-                    "::cpp_utils::CppBox::from_raw({}).expect(\"attempted to \
+                    "::cpp_core::CppBox::from_raw({}).expect(\"attempted to \
                      construct a null CppBox\")",
                     source_expr
                 );
@@ -727,8 +727,8 @@ impl Generator<'_> {
             RustToFfiTypeConversion::UtilsPtrToPtr { .. }
             | RustToFfiTypeConversion::UtilsRefToPtr { .. } => {
                 let api_type_path = &type1.api_type().as_common()?.path;
-                let api_is_const = api_type_path == &RustPath::from_good_str("cpp_utils::Ptr")
-                    || api_type_path == &RustPath::from_good_str("cpp_utils::Ref");
+                let api_is_const = api_type_path == &RustPath::from_good_str("cpp_core::Ptr")
+                    || api_type_path == &RustPath::from_good_str("cpp_core::Ref");
                 let ffi_is_const = type1.ffi_type().is_const_pointer_like()?;
                 let call = if !api_is_const && !ffi_is_const {
                     format!("{}.as_mut_raw_ptr()", expr)
@@ -764,7 +764,7 @@ impl Generator<'_> {
                     RustFinalType::new(type1.ffi_type().clone(), (**conversion).clone())?;
 
                 let intermediate_expr = format!(
-                    "::cpp_utils::CastInto::<{}>::cast_into({})",
+                    "::cpp_core::CastInto::<{}>::cast_into({})",
                     self.rust_type_to_code(&intermediate.api_type()),
                     expr
                 );
@@ -959,7 +959,7 @@ impl Generator<'_> {
             RustFunctionKind::SignalOrSlotGetter(getter) => {
                 let path = &func.item.return_type.api_type().as_common()?.path;
                 let call = format!(
-                    "{}::new(::cpp_utils::Ref::from_raw_ref(self), \
+                    "{}::new(::cpp_core::Ref::from_raw_ref(self), \
                      ::std::ffi::CStr::from_bytes_with_nul_unchecked(b\"{}\\0\"))",
                     self.rust_path_to_string(&path),
                     getter.receiver_id

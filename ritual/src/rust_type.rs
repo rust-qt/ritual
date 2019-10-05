@@ -207,9 +207,9 @@ fn utils_ptr(ffi_type: &RustType, force_api_is_const: Option<bool>) -> Result<Ru
         ffi_type.is_const_pointer_like()?
     };
     let name = if is_const {
-        "cpp_utils::Ptr"
+        "cpp_core::Ptr"
     } else {
-        "cpp_utils::MutPtr"
+        "cpp_core::MutPtr"
     };
 
     let target = ffi_type.pointer_like_to_target()?.clone();
@@ -226,9 +226,9 @@ fn utils_ref(ffi_type: &RustType, force_api_is_const: Option<bool>) -> Result<Ru
         ffi_type.is_const_pointer_like()?
     };
     let name = if is_const {
-        "cpp_utils::Ref"
+        "cpp_core::Ref"
     } else {
-        "cpp_utils::MutRef"
+        "cpp_core::MutRef"
     };
 
     let target = ffi_type.pointer_like_to_target()?.clone();
@@ -275,7 +275,7 @@ impl RustFinalType {
             RustToFfiTypeConversion::CppBoxToPtr => {
                 let target = ffi_type.pointer_like_to_target()?;
                 RustType::Common(RustCommonType {
-                    path: RustPath::from_good_str("cpp_utils::CppBox"),
+                    path: RustPath::from_good_str("cpp_core::CppBox"),
                     generic_arguments: Some(vec![target.clone()]),
                 })
             }
@@ -288,7 +288,7 @@ impl RustFinalType {
             RustToFfiTypeConversion::ImplCastInto(conversion) => {
                 let intermediate = RustFinalType::new(ffi_type.clone(), (**conversion).clone())?;
                 let trait_type = RustCommonType {
-                    path: RustPath::from_good_str("cpp_utils::CastInto"),
+                    path: RustPath::from_good_str("cpp_core::CastInto"),
                     generic_arguments: Some(vec![intermediate.api_type]),
                 };
                 RustType::ImplTrait(trait_type)
@@ -533,11 +533,11 @@ impl RustType {
                 path,
                 generic_arguments,
             }) => {
-                if path == &RustPath::from_good_str("cpp_utils::MutPtr")
-                    || path == &RustPath::from_good_str("cpp_utils::Ptr")
-                    || path == &RustPath::from_good_str("cpp_utils::Ref")
-                    || path == &RustPath::from_good_str("cpp_utils::MutRef")
-                    || path == &RustPath::from_good_str("cpp_utils::CppBox")
+                if path == &RustPath::from_good_str("cpp_core::MutPtr")
+                    || path == &RustPath::from_good_str("cpp_core::Ptr")
+                    || path == &RustPath::from_good_str("cpp_core::Ref")
+                    || path == &RustPath::from_good_str("cpp_core::MutRef")
+                    || path == &RustPath::from_good_str("cpp_core::CppBox")
                 {
                     let arg = &generic_arguments.as_ref().unwrap()[0];
                     return arg.caption(context, strategy);
@@ -589,7 +589,7 @@ impl RustType {
             }
             RustType::FunctionPointer { .. } => "fn".to_string(),
             RustType::ImplTrait(trait_type) => {
-                if trait_type.path == RustPath::from_good_str("cpp_utils::CastInto") {
+                if trait_type.path == RustPath::from_good_str("cpp_core::CastInto") {
                     trait_type
                         .generic_arguments
                         .iter()

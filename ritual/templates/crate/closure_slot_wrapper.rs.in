@@ -1,6 +1,6 @@
 {condition_attribute}
 pub struct {pub_type_name}<'a> {{
-    raw_slot: ::cpp_utils::CppBox<{type_name}>,
+    raw_slot: ::cpp_core::CppBox<{type_name}>,
     func: ::std::option::Option<Box<Box<dyn FnMut({args}) + 'a>>>,
 }}
 
@@ -26,7 +26,7 @@ impl<'a> {pub_type_name}<'a> {{
         unsafe {{
             self.raw_slot.set(
                 Some(callback),
-                ::cpp_utils::MutPtr::from_raw(&mut*func_box as *mut Box<_> as *mut ::std::ffi::c_void)
+                ::cpp_core::MutPtr::from_raw(&mut*func_box as *mut Box<_> as *mut ::std::ffi::c_void)
             );
         }}
         self.func = Some(func_box);
@@ -37,13 +37,13 @@ impl<'a> {pub_type_name}<'a> {{
     pub fn clear(&mut self) {{
         if self.func.is_some() {{
             unsafe {{
-                self.raw_slot.set(None, ::cpp_utils::NullPtr);
+                self.raw_slot.set(None, ::cpp_core::NullPtr);
             }}
             self.func = None;
         }}
     }}
 
-    pub unsafe fn as_raw(&mut self) -> ::cpp_utils::MutRef<{type_name}> {{
+    pub unsafe fn as_raw(&mut self) -> ::cpp_core::MutRef<{type_name}> {{
         self.raw_slot.as_mut_ref()
     }}
 }}

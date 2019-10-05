@@ -178,6 +178,7 @@ fn create_config() -> Result<Config> {
                 CppType::BuiltInNumeric(CppBuiltInNumericType::Char) => "String",
                 CppType::BuiltInNumeric(CppBuiltInNumericType::Char16) => "U16String",
                 CppType::BuiltInNumeric(CppBuiltInNumericType::Char32) => "U32String",
+                CppType::BuiltInNumeric(CppBuiltInNumericType::WChar) => "WString",
                 _ => {
                     return Ok(None);
                 }

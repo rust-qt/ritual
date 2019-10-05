@@ -1,4 +1,4 @@
-use cpp_utils::MutPtr;
+use cpp_core::MutPtr;
 use qt_core::{QCoreApplication, QTimer, RawSlot};
 use std::ffi::c_void;
 

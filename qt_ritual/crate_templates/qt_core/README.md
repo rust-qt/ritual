@@ -91,7 +91,7 @@ other functions keep ownership and may delete the object at any time. As in C++,
 needs to refer to the function's documentation and handle ownership manually.
 
 When it's determined that the ownership of the object belongs to the caller
-(e.g. in a constructor), the raw pointer `*mut T` is wrapped into `cpp_utils::CppBox<T>`.
+(e.g. in a constructor), the raw pointer `*mut T` is wrapped into `cpp_core::CppBox<T>`.
 This struct owns the object and will delete it when dropped. It allows to move the raw pointer
 out in case you need to transfer the ownership back to C++ side.
 

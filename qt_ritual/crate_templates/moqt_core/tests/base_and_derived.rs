@@ -1,4 +1,4 @@
-use cpp_utils::{CppBox, MutRef, NullPtr, Ref};
+use cpp_core::{CppBox, MutRef, NullPtr, Ref};
 use moqt_core::{
     AbstractBaseClass1, BaseClass1, DerivedClass1, DerivedClass2, DerivedClass3, DerivedSubClass1,
 };

@@ -9,5 +9,5 @@
 /// Version of `ritual_build` crate.
 pub const RITUAL_BUILD_VERSION: &str = "0.1.1";
 
-/// Version of `cpp_utils` crate.
-pub const CPP_UTILS_VERSION: &str = "0.3.0";
+/// Version of `cpp_core` crate.
+pub const CPP_CORE_VERSION: &str = "0.3.0";

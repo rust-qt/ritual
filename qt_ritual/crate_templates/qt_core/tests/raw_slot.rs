@@ -1,4 +1,4 @@
-use cpp_utils::NullPtr;
+use cpp_core::NullPtr;
 use qt_core::{QCoreApplication, QVariant, QVariantAnimation, RawSlotOfQVariant};
 use std::ffi::c_void;
 

@@ -1,5 +1,5 @@
 use crate::QString;
-use cpp_utils::{CppBox, Ptr};
+use cpp_core::{CppBox, Ptr};
 use std::os::raw::{c_char, c_int};
 
 /// Allows to convert Qt strings to `std` strings
