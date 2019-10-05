@@ -66,5 +66,5 @@ fn cpp_ffi_type_void() {
     let t = CppFfiType::void();
     assert!(t.original_type().is_void());
     assert!(t.ffi_type().is_void());
-    assert_eq!(t.conversion(), CppToFfiTypeConversion::NoChange);
+    assert_eq!(t.conversion(), &CppToFfiTypeConversion::NoChange);
 }

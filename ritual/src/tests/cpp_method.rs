@@ -216,11 +216,14 @@ fn c_signature_simple_func() {
     );
     assert_eq!(
         r.arguments[0].argument_type.conversion(),
-        CppToFfiTypeConversion::NoChange
+        &CppToFfiTypeConversion::NoChange
     );
     assert_eq!(r.arguments[0].meaning, CppFfiArgumentMeaning::Argument(0));
     assert_eq!(r.return_type.ffi_type(), &method1.return_type);
-    assert_eq!(r.return_type.conversion(), CppToFfiTypeConversion::NoChange);
+    assert_eq!(
+        r.return_type.conversion(),
+        &CppToFfiTypeConversion::NoChange
+    );
 }
 
 #[test]
@@ -252,7 +255,7 @@ fn c_signature_method_with_this() {
     );
     assert_eq!(
         r.arguments[0].argument_type.conversion(),
-        CppToFfiTypeConversion::NoChange
+        &CppToFfiTypeConversion::NoChange
     );
     assert_eq!(r.arguments[0].meaning, CppFfiArgumentMeaning::This);
 
@@ -263,7 +266,7 @@ fn c_signature_method_with_this() {
     );
     assert_eq!(
         r.arguments[1].argument_type.conversion(),
-        CppToFfiTypeConversion::ValueToPointer { is_ffi_const: true }
+        &CppToFfiTypeConversion::ValueToPointer { is_ffi_const: true }
     );
     assert_eq!(r.arguments[1].meaning, CppFfiArgumentMeaning::Argument(0));
     assert_eq!(r.return_type.ffi_type(), &method1.return_type);
@@ -295,7 +298,7 @@ fn c_signature_static_method() {
     );
     assert_eq!(
         r.arguments[0].argument_type.conversion(),
-        CppToFfiTypeConversion::NoChange
+        &CppToFfiTypeConversion::NoChange
     );
     assert_eq!(r.arguments[0].meaning, CppFfiArgumentMeaning::Argument(0));
     assert_eq!(r.return_type.ffi_type(), &method1.return_type);
@@ -344,7 +347,7 @@ fn c_signature_constructor() {
     );
     assert_eq!(
         r_stack.arguments[0].argument_type.conversion(),
-        CppToFfiTypeConversion::ReferenceToPointer
+        &CppToFfiTypeConversion::ReferenceToPointer
     );
     assert_eq!(
         r_stack.arguments[0].meaning,
@@ -358,7 +361,7 @@ fn c_signature_constructor() {
     );
     assert_eq!(
         r_stack.arguments[1].argument_type.conversion(),
-        CppToFfiTypeConversion::ValueToPointer {
+        &CppToFfiTypeConversion::ValueToPointer {
             is_ffi_const: false
         }
     );
@@ -383,7 +386,7 @@ fn c_signature_constructor() {
     );
     assert_eq!(
         r_heap.arguments[0].argument_type.conversion(),
-        CppToFfiTypeConversion::ReferenceToPointer
+        &CppToFfiTypeConversion::ReferenceToPointer
     );
     assert_eq!(
         r_heap.arguments[0].meaning,
@@ -395,7 +398,7 @@ fn c_signature_constructor() {
     );
     assert_eq!(
         r_heap.return_type.conversion(),
-        CppToFfiTypeConversion::ValueToPointer {
+        &CppToFfiTypeConversion::ValueToPointer {
             is_ffi_const: false
         }
     );
@@ -428,7 +431,7 @@ fn c_signature_destructor() {
     );
     assert_eq!(
         r_stack.arguments[0].argument_type.conversion(),
-        CppToFfiTypeConversion::NoChange
+        &CppToFfiTypeConversion::NoChange
     );
     assert_eq!(r_stack.arguments[0].meaning, CppFfiArgumentMeaning::This);
 
@@ -443,7 +446,7 @@ fn c_signature_destructor() {
     );
     assert_eq!(
         r_heap.arguments[0].argument_type.conversion(),
-        CppToFfiTypeConversion::NoChange
+        &CppToFfiTypeConversion::NoChange
     );
     assert_eq!(r_heap.arguments[0].meaning, CppFfiArgumentMeaning::This);
 
@@ -470,7 +473,7 @@ fn c_signature_method_returning_class() {
     );
     assert_eq!(
         r_stack.arguments[0].argument_type.conversion(),
-        CppToFfiTypeConversion::NoChange
+        &CppToFfiTypeConversion::NoChange
     );
     assert_eq!(r_stack.arguments[0].meaning, CppFfiArgumentMeaning::This);
 
@@ -481,7 +484,7 @@ fn c_signature_method_returning_class() {
     );
     assert_eq!(
         r_stack.arguments[1].argument_type.conversion(),
-        CppToFfiTypeConversion::ValueToPointer { is_ffi_const: true }
+        &CppToFfiTypeConversion::ValueToPointer { is_ffi_const: true }
     );
     assert_eq!(
         r_stack.arguments[1].meaning,
@@ -495,7 +498,7 @@ fn c_signature_method_returning_class() {
     );
     assert_eq!(
         r_stack.arguments[2].argument_type.conversion(),
-        CppToFfiTypeConversion::ValueToPointer {
+        &CppToFfiTypeConversion::ValueToPointer {
             is_ffi_const: false
         }
     );
@@ -515,7 +518,7 @@ fn c_signature_method_returning_class() {
     );
     assert_eq!(
         r_heap.arguments[0].argument_type.conversion(),
-        CppToFfiTypeConversion::NoChange
+        &CppToFfiTypeConversion::NoChange
     );
     assert_eq!(r_heap.arguments[0].meaning, CppFfiArgumentMeaning::This);
 
@@ -526,7 +529,7 @@ fn c_signature_method_returning_class() {
     );
     assert_eq!(
         r_heap.arguments[1].argument_type.conversion(),
-        CppToFfiTypeConversion::ValueToPointer { is_ffi_const: true }
+        &CppToFfiTypeConversion::ValueToPointer { is_ffi_const: true }
     );
     assert_eq!(
         r_heap.arguments[1].meaning,
@@ -539,7 +542,7 @@ fn c_signature_method_returning_class() {
     );
     assert_eq!(
         r_heap.return_type.conversion(),
-        CppToFfiTypeConversion::ValueToPointer {
+        &CppToFfiTypeConversion::ValueToPointer {
             is_ffi_const: false
         }
     );

@@ -6,6 +6,7 @@ use ritual::rust_info::{NameType, RustPathScope};
 use ritual::rust_type::RustPath;
 use ritual_common::cpp_build_config::{CppBuildConfigData, CppLibraryType};
 use ritual_common::errors::{bail, err_msg, FancyUnwrap, Result, ResultExt};
+use ritual_common::string_utils::CaseOperations;
 use ritual_common::{target, toml};
 use std::env;
 use std::path::PathBuf;
@@ -172,18 +173,22 @@ fn create_config() -> Result<Config> {
             let arg = args
                 .get(0)
                 .ok_or_else(|| err_msg("std::basic_string: first argument is missing"))?;
-            match arg {
-                CppType::BuiltInNumeric(CppBuiltInNumericType::Char) => {
-                    let name = match name_type {
-                        NameType::Type => "cpp_std::String",
-                        NameType::Module => "cpp_std::string",
-                        _ => bail!("unexpected name type for std::basic_string"),
-                    };
-                    return Ok(Some(RustPath::from_good_str(name)));
+
+            let rust_name = match arg {
+                CppType::BuiltInNumeric(CppBuiltInNumericType::Char) => "String",
+                CppType::BuiltInNumeric(CppBuiltInNumericType::Char16) => "U16String",
+                CppType::BuiltInNumeric(CppBuiltInNumericType::Char32) => "U32String",
+                _ => {
+                    return Ok(None);
                 }
-                CppType::BuiltInNumeric(CppBuiltInNumericType::Char16) => unimplemented!(),
-                _ => {}
-            }
+            };
+
+            let name = match name_type {
+                NameType::Type => format!("cpp_std::{}", rust_name),
+                NameType::Module => format!("cpp_std::{}", rust_name.to_snake_case()),
+                _ => bail!("unexpected name type for std::basic_string"),
+            };
+            return Ok(Some(RustPath::from_good_str(&name)));
         }
         Ok(None)
     });

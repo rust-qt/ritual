@@ -73,9 +73,9 @@ pub enum CppFfiFunctionKind {
 
 /// Relation between original C++ method's argument value
 /// and corresponding FFI function's argument value
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum CppToFfiTypeConversion {
-    /// Argument types are identical
+    /// Argument types are identical.
     NoChange,
     /// C++ argument is a class value (like QPoint)
     /// and FFI argument is a pointer (like QPoint*)
@@ -86,6 +86,8 @@ pub enum CppToFfiTypeConversion {
     /// C++ argument is QFlags<T>
     /// and FFI argument is uint
     QFlagsToInt,
+    /// Implicit conversion is used.
+    ImplicitCast { ffi_type: CppType },
 }
 
 /// Information that indicates how an FFI function argument
@@ -214,7 +216,7 @@ pub struct CppFfiType {
 
 impl CppFfiType {
     pub fn new(original_type: CppType, conversion: CppToFfiTypeConversion) -> Result<Self> {
-        match conversion {
+        match conversion.clone() {
             CppToFfiTypeConversion::NoChange => Ok(CppFfiType {
                 ffi_type: original_type.clone(),
                 original_type,
@@ -239,6 +241,11 @@ impl CppFfiType {
                 original_type,
                 conversion,
             }),
+            CppToFfiTypeConversion::ImplicitCast { ffi_type } => Ok(CppFfiType {
+                ffi_type,
+                original_type,
+                conversion,
+            }),
         }
     }
 
@@ -259,8 +266,8 @@ impl CppFfiType {
         &self.ffi_type
     }
 
-    pub fn conversion(&self) -> CppToFfiTypeConversion {
-        self.conversion
+    pub fn conversion(&self) -> &CppToFfiTypeConversion {
+        &self.conversion
     }
 }
 

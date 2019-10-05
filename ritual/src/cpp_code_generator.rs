@@ -77,7 +77,9 @@ impl Generator<'_> {
     /// converts it to type `type1.ffi_type`
     fn convert_type_to_ffi(&self, type1: &CppFfiType, expression: String) -> Result<String> {
         Ok(match type1.conversion() {
-            CppToFfiTypeConversion::NoChange => expression,
+            CppToFfiTypeConversion::NoChange | CppToFfiTypeConversion::ImplicitCast { .. } => {
+                expression
+            }
             CppToFfiTypeConversion::ValueToPointer { .. } => format!(
                 "new {}({})",
                 type1.original_type().to_cpp_code(None)?,
@@ -107,7 +109,7 @@ impl Generator<'_> {
         let method = item.item;
         let mut result = expression;
         match method.return_type.conversion() {
-            CppToFfiTypeConversion::NoChange => {}
+            CppToFfiTypeConversion::NoChange | CppToFfiTypeConversion::ImplicitCast { .. } => {}
             CppToFfiTypeConversion::ValueToPointer { .. } => {
                 match method.allocation_place {
                     ReturnValueAllocationPlace::Stack => {
@@ -162,7 +164,8 @@ impl Generator<'_> {
                 match argument.argument_type.conversion() {
                     CppToFfiTypeConversion::ValueToPointer { .. }
                     | CppToFfiTypeConversion::ReferenceToPointer => result = format!("*{}", result),
-                    CppToFfiTypeConversion::NoChange => {}
+                    CppToFfiTypeConversion::NoChange
+                    | CppToFfiTypeConversion::ImplicitCast { .. } => {}
                     CppToFfiTypeConversion::QFlagsToInt => {
                         let type_text = if let CppType::PointerLike {
                             kind,

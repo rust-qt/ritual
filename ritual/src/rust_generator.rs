@@ -418,7 +418,6 @@ impl State<'_, '_> {
                 }
             }
             CppType::Void => RustType::unit(),
-
             CppType::BuiltInNumeric(numeric) => {
                 if numeric == &CppBuiltInNumericType::Bool {
                     // TODO: bool may not be safe for FFI
@@ -656,7 +655,7 @@ impl State<'_, '_> {
                 }
             }
         }
-        if cpp_ffi_type.conversion() == CppToFfiTypeConversion::QFlagsToInt {
+        if cpp_ffi_type.conversion() == &CppToFfiTypeConversion::QFlagsToInt {
             let qflags_type = match cpp_ffi_type.original_type() {
                 CppType::PointerLike {
                     kind,

@@ -9,10 +9,10 @@ use crate::cpp_ffi_data::{CppFfiFunction, CppFfiFunctionKind, CppFieldAccessorTy
 use crate::cpp_ffi_data::{CppFfiFunctionArgument, CppFfiItem};
 use crate::cpp_function::ReturnValueAllocationPlace;
 use crate::cpp_function::{CppFunction, CppFunctionArgument, CppFunctionKind};
-use crate::cpp_type::CppPointerLikeTypeKind;
-use crate::cpp_type::CppType;
 use crate::cpp_type::CppTypeRole;
 use crate::cpp_type::{is_qflags, CppFunctionPointerType};
+use crate::cpp_type::{CppBuiltInNumericType, CppPointerLikeTypeKind, CppSpecificNumericType};
+use crate::cpp_type::{CppSpecificNumericTypeKind, CppType};
 use crate::processor::ProcessorData;
 use itertools::Itertools;
 use log::{debug, trace};
@@ -89,6 +89,24 @@ pub fn ffi_type(original_type: &CppType, role: CppTypeRole) -> Result<CppFfiType
                     CppPointerLikeTypeKind::RValueReference => {
                         bail!("rvalue references are not supported");
                     }
+                }
+            }
+            CppType::BuiltInNumeric(CppBuiltInNumericType::Char16) => {
+                CppToFfiTypeConversion::ImplicitCast {
+                    ffi_type: CppType::SpecificNumeric(CppSpecificNumericType {
+                        path: CppPath::from_good_str("uint16_t"),
+                        bits: 16,
+                        kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
+                    }),
+                }
+            }
+            CppType::BuiltInNumeric(CppBuiltInNumericType::Char32) => {
+                CppToFfiTypeConversion::ImplicitCast {
+                    ffi_type: CppType::SpecificNumeric(CppSpecificNumericType {
+                        path: CppPath::from_good_str("uint32_t"),
+                        bits: 32,
+                        kind: CppSpecificNumericTypeKind::Integer { is_signed: false },
+                    }),
                 }
             }
             _ => CppToFfiTypeConversion::NoChange,

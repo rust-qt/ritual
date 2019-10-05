@@ -11,7 +11,7 @@ fn assert_type_to_ffi_unchanged(t: &CppType) {
         let ffi1 = ffi_type(t, *role).unwrap();
         assert_eq!(ffi1.original_type(), t);
         assert_eq!(ffi1.ffi_type(), t);
-        assert_eq!(ffi1.conversion(), CppToFfiTypeConversion::NoChange);
+        assert_eq!(ffi1.conversion(), &CppToFfiTypeConversion::NoChange);
     }
 }
 
@@ -136,7 +136,7 @@ fn class_value() {
     );
     assert_eq!(
         ffi_return_type.conversion(),
-        CppToFfiTypeConversion::ValueToPointer {
+        &CppToFfiTypeConversion::ValueToPointer {
             is_ffi_const: false
         }
     );
@@ -153,7 +153,7 @@ fn class_value() {
     );
     assert_eq!(
         ffi_arg.conversion(),
-        CppToFfiTypeConversion::ValueToPointer { is_ffi_const: true }
+        &CppToFfiTypeConversion::ValueToPointer { is_ffi_const: true }
     );
 }
 
@@ -176,7 +176,7 @@ fn class_const_ref() {
         assert_eq!(ffi1.ffi_type().to_cpp_code(None).unwrap(), "const QRectF*");
         assert_eq!(
             ffi1.conversion(),
-            CppToFfiTypeConversion::ReferenceToPointer
+            &CppToFfiTypeConversion::ReferenceToPointer
         );
     }
 }
@@ -200,7 +200,7 @@ fn class_mut_ref() {
         assert_eq!(ffi1.ffi_type().to_cpp_code(None).unwrap(), "QRectF*");
         assert_eq!(
             ffi1.conversion(),
-            CppToFfiTypeConversion::ReferenceToPointer
+            &CppToFfiTypeConversion::ReferenceToPointer
         );
     }
 }
@@ -247,7 +247,7 @@ fn class_with_template_args() {
     );
     assert_eq!(
         ffi_return_type.conversion(),
-        CppToFfiTypeConversion::ValueToPointer {
+        &CppToFfiTypeConversion::ValueToPointer {
             is_ffi_const: false
         }
     );
@@ -270,7 +270,7 @@ fn class_with_template_args() {
     );
     assert_eq!(
         ffi_arg.conversion(),
-        CppToFfiTypeConversion::ValueToPointer { is_ffi_const: true }
+        &CppToFfiTypeConversion::ValueToPointer { is_ffi_const: true }
     );
 }
 
@@ -320,7 +320,7 @@ fn qflags() {
             &CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
         );
         assert_eq!(ffi_type.ffi_type().to_cpp_code(None).unwrap(), "int");
-        assert_eq!(ffi_type.conversion(), CppToFfiTypeConversion::QFlagsToInt);
+        assert_eq!(ffi_type.conversion(), &CppToFfiTypeConversion::QFlagsToInt);
     }
 }
 
