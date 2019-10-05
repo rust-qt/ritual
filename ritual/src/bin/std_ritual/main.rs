@@ -11,6 +11,8 @@ use ritual_common::{target, toml};
 use std::env;
 use std::path::PathBuf;
 
+mod after_cpp_parser;
+
 pub const CPP_STD_VERSION: &str = "0.0.0";
 pub const STD_HEADERS_PATH_ENV_VAR_NAME: &str = "RITUAL_STD_HEADERS";
 
@@ -58,58 +60,14 @@ fn create_config() -> Result<Config> {
     let mut config = Config::new(crate_properties);
     config.set_cpp_lib_version("11");
 
-    /*let headers = [
-        "array",
-        "bitset",
-        "deque",
-        "forward_list",
-        "list",
-        "map",
-        "queue",
-        "set",
-        "stack",
-        "unordered_map",
-        "unordered_set",
-        "vector",
-        "ios",
-        "istream",
-        "iostream",
-        "fstream",
-        "sstream",
-        "atomic",
-        "condition_variable",
-        "future",
-        "mutex",
-        "thread",
-        "algorithm",
-        "chrono",
-        "codecvt",
-        "complex",
-        "exception",
-        "functional",
-        "initializer_list",
-        "iterator",
-        "limits",
-        "locale",
-        "memory",
-        "new",
-        "numeric",
-        "random",
-        "ratio",
-        "regex",
-        "stdexcept",
-        "string",
-        "system_error",
-        "tuple",
-        "typeindex",
-        "typeinfo",
-        "type_traits",
-        "utility",
-        "valarray",
-    ];*/
-
-    //let headers = ["memory", "string"];
-    let headers = ["string"];
+    /* TODO:  "array", "bitset", "deque", "forward_list", "list", "map", "queue", "set", "stack",
+        "unordered_map", "unordered_set", "ios", "istream", "iostream", "fstream", "sstream",
+        "atomic", "condition_variable", "future", "mutex", "thread", "algorithm", "chrono",
+        "codecvt", "complex", "exception", "functional", "initializer_list", "iterator", "limits",
+         "locale", "memory", "new", "numeric", "random", "ratio", "regex", "stdexcept",
+         "system_error", "tuple", "typeindex", "typeinfo", "type_traits", "utility", "valarray",
+    */
+    let headers = ["string", "vector"];
 
     for header in &headers[..] {
         config.add_include_directive(header);
@@ -125,32 +83,25 @@ fn create_config() -> Result<Config> {
     config.add_target_include_path(include_path);
 
     config.set_cpp_parser_path_hook(|path| {
-        //        if path.last().name.starts_with("__throw_") {
-        //            // `__throw_bad_exception`, etc.
-        //            return Ok(false);
-        //        }
-
         if path.items().iter().any(|item| item.name.starts_with('_')) {
-            //println!("skipping {}", path.to_cpp_pseudo_code());
             return Ok(false);
         }
 
-        let string = path.to_templateless_string();
-        let blocked = &[
-            // not in C++ standard
-            "__gnu_cxx",
-        ];
-        if blocked.contains(&string.as_str()) {
-            return Ok(false);
-        }
+        /*
+                let string = path.to_templateless_string();
+                let blocked = &[
+                    // not in C++ standard
+                    "__gnu_cxx",
+                ];
+                if blocked.contains(&string.as_str()) {
+                    return Ok(false);
+                }
+        */
 
         Ok(true)
     });
 
-    config.add_after_cpp_parser_hook(|_data, _output| {
-        // TODO: add u16string, u32string, wstring
-        Ok(())
-    });
+    config.add_after_cpp_parser_hook(after_cpp_parser::hook);
 
     let namespace = CppPath::from_good_str("std");
     config.set_rust_path_scope_hook(move |path| {

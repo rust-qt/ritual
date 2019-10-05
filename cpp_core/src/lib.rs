@@ -70,3 +70,15 @@ pub mod ops;
 mod ops_impls;
 mod ptr;
 mod ref_;
+
+// C++ doesn't guarantee these types to be exactly u16 and u32,
+// but they are on all supported platforms.
+
+/// Type for UTF-16 character representation, required to be large enough to represent
+/// any UTF-16 code unit (16 bits). Same as C++'s `char16_6` type.
+#[allow(non_camel_case_types)]
+pub type char16_t = u16;
+/// Type for UTF-32 character representation, required to be large enough to represent
+/// any UTF-32 code unit (32 bits). Same as C++'s `char32_t` type.
+#[allow(non_camel_case_types)]
+pub type char32_t = u32;

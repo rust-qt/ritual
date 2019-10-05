@@ -885,12 +885,12 @@ impl CppParser<'_, '_> {
                 path: CppPath::from_good_str(name),
                 is_signed: false,
             }),
-            "std::initializer_list::size_type" | "std::__cxx11::basic_string::size_type" => {
-                Some(CppType::PointerSizedInteger {
-                    path: CppPath::from_good_str("size_t"),
-                    is_signed: false,
-                })
-            }
+            "std::initializer_list::size_type"
+            | "std::__cxx11::basic_string::size_type"
+            | "std::vector::size_type" => Some(CppType::PointerSizedInteger {
+                path: CppPath::from_good_str("size_t"),
+                is_signed: false,
+            }),
             _ => None,
         }
     }

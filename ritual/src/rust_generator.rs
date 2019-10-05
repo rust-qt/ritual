@@ -444,6 +444,18 @@ impl State<'_, '_> {
                                 generic_arguments: None,
                             }));
                         }
+                        CppBuiltInNumericType::Char16 => {
+                            return Ok(RustType::Common(RustCommonType {
+                                path: RustPath::from_good_str("cpp_core::char16_t"),
+                                generic_arguments: None,
+                            }));
+                        }
+                        CppBuiltInNumericType::Char32 => {
+                            return Ok(RustType::Common(RustCommonType {
+                                path: RustPath::from_good_str("cpp_core::char32_t"),
+                                generic_arguments: None,
+                            }));
+                        }
                         _ => bail!("unsupported numeric type: {:?}", numeric),
                     };
                     let path = RustPath::from_good_str("std::os::raw").join(own_name);
