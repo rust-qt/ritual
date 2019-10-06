@@ -1568,9 +1568,20 @@ impl State<'_, '_> {
                     RustQtReceiverType::Slot => format!("slot_{}", name),
                 }
             }
-            NameType::Type | NameType::EnumValue => self
-                .cpp_path_item_to_name(&cpp_path.last(), &scope.path, &name_type)?
-                .to_class_case(),
+            NameType::Type | NameType::EnumValue => {
+                if cpp_path.to_templateless_string() == "std::vector" {
+                    // remove allocator template argument
+                    let mut path_item = cpp_path.last().clone();
+                    if let Some(args) = &mut path_item.template_arguments {
+                        args.pop();
+                    }
+                    self.cpp_path_item_to_name(&path_item, &scope.path, &name_type)?
+                        .to_class_case()
+                } else {
+                    self.cpp_path_item_to_name(&cpp_path.last(), &scope.path, &name_type)?
+                        .to_class_case()
+                }
+            }
             NameType::Module => self
                 .cpp_path_item_to_name(&cpp_path.last(), &scope.path, &name_type)?
                 .to_snake_case(),
