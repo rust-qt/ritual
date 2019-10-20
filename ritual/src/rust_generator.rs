@@ -80,31 +80,415 @@ enum ProcessedFfiItem {
     Function(FunctionWithDesiredPath),
 }
 
-#[derive(Debug, PartialEq, Eq)]
-enum OperatorKind {
-    Normal,
-    NormalUnary,
-    MutableUnary,
-    WithAssign,
-    Comparison,
+#[derive(Debug, Clone, Copy)]
+enum ReturnTypeConstraint {
+    Bool,
+    Unit,
+    Any,
 }
 
-enum SpecialFunction {
-    Begin,
-    BeginMut,
-    End,
-    EndMut,
+#[derive(Debug, Clone, Copy)]
+struct TraitImplInfo {
+    trait_path: &'static str,
+    function_name: &'static str,
+    is_unsafe: bool,
+    is_inherent: bool,
+    has_output_associated_type: bool,
+    trait_arg_is_second_arg_type: bool,
+    second_arg_is_reference: bool,
+    return_type_constraint: ReturnTypeConstraint,
+    self_arg_kind: RustFunctionSelfArgKind,
+    target_is_reference: bool,
 }
 
-enum OperatorOrSpecialFunction<'a> {
-    Operator(&'a CppOperator),
-    SpecialFunction(SpecialFunction),
-}
+impl TraitImplInfo {
+    fn from_operator(operator: &CppOperator) -> Option<TraitImplInfo> {
+        Some(match operator {
+            CppOperator::Addition => TraitImplInfo {
+                trait_path: "std::ops::Add",
+                function_name: "add",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::Value,
+                has_output_associated_type: true,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Any,
+                target_is_reference: true,
+            },
+            CppOperator::Subtraction => TraitImplInfo {
+                trait_path: "std::ops::Sub",
+                function_name: "sub",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::Value,
+                has_output_associated_type: true,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Any,
+                target_is_reference: true,
+            },
+            CppOperator::Multiplication => TraitImplInfo {
+                trait_path: "std::ops::Mul",
+                function_name: "mul",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::Value,
+                has_output_associated_type: true,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Any,
+                target_is_reference: true,
+            },
+            CppOperator::Division => TraitImplInfo {
+                trait_path: "std::ops::Div",
+                function_name: "div",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::Value,
+                has_output_associated_type: true,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Any,
+                target_is_reference: true,
+            },
+            CppOperator::Modulo => TraitImplInfo {
+                trait_path: "std::ops::Rem",
+                function_name: "rem",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::Value,
+                has_output_associated_type: true,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Any,
+                target_is_reference: true,
+            },
+            CppOperator::BitwiseAnd => TraitImplInfo {
+                trait_path: "std::ops::BitAnd",
+                function_name: "bitand",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::Value,
+                has_output_associated_type: true,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Any,
+                target_is_reference: true,
+            },
+            CppOperator::BitwiseOr => TraitImplInfo {
+                trait_path: "std::ops::BitOr",
+                function_name: "bitor",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::Value,
+                has_output_associated_type: true,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Any,
+                target_is_reference: true,
+            },
+            CppOperator::BitwiseXor => TraitImplInfo {
+                trait_path: "std::ops::BitXor",
+                function_name: "bitxor",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::Value,
+                has_output_associated_type: true,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Any,
+                target_is_reference: true,
+            },
+            CppOperator::BitwiseLeftShift => TraitImplInfo {
+                trait_path: "std::ops::Shl",
+                function_name: "shl",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::Value,
+                has_output_associated_type: true,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Any,
+                target_is_reference: true,
+            },
+            CppOperator::BitwiseRightShift => TraitImplInfo {
+                trait_path: "std::ops::Shr",
+                function_name: "shr",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::Value,
+                has_output_associated_type: true,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Any,
+                target_is_reference: true,
+            },
+            CppOperator::EqualTo => TraitImplInfo {
+                trait_path: "std::cmp::PartialEq",
+                function_name: "eq",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::ConstRef,
+                has_output_associated_type: false,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: true,
+                return_type_constraint: ReturnTypeConstraint::Bool,
+                target_is_reference: false,
+            },
+            CppOperator::GreaterThan => TraitImplInfo {
+                trait_path: "cpp_core::cmp::Gt",
+                function_name: "gt",
+                is_unsafe: true,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::ConstRef,
+                second_arg_is_reference: true,
+                return_type_constraint: ReturnTypeConstraint::Bool,
+                has_output_associated_type: false,
+                trait_arg_is_second_arg_type: true,
+                target_is_reference: false,
+            },
+            CppOperator::LessThan => TraitImplInfo {
+                trait_path: "cpp_core::cmp::Lt",
+                function_name: "lt",
+                is_unsafe: true,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::ConstRef,
+                second_arg_is_reference: true,
+                return_type_constraint: ReturnTypeConstraint::Bool,
+                has_output_associated_type: false,
+                trait_arg_is_second_arg_type: true,
+                target_is_reference: false,
+            },
+            CppOperator::GreaterThanOrEqualTo => TraitImplInfo {
+                trait_path: "cpp_core::cmp::Ge",
+                function_name: "ge",
+                is_unsafe: true,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::ConstRef,
+                second_arg_is_reference: true,
+                return_type_constraint: ReturnTypeConstraint::Bool,
+                has_output_associated_type: false,
+                trait_arg_is_second_arg_type: true,
+                target_is_reference: false,
+            },
+            CppOperator::LessThanOrEqualTo => TraitImplInfo {
+                trait_path: "cpp_core::cmp::Le",
+                function_name: "le",
+                is_unsafe: true,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::ConstRef,
+                second_arg_is_reference: true,
+                return_type_constraint: ReturnTypeConstraint::Bool,
+                has_output_associated_type: false,
+                trait_arg_is_second_arg_type: true,
+                target_is_reference: false,
+            },
+            CppOperator::LogicalNot => TraitImplInfo {
+                trait_path: "std::ops::Not",
+                function_name: "not",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::Value,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Any,
+                has_output_associated_type: true,
+                trait_arg_is_second_arg_type: false,
+                target_is_reference: true,
+            },
+            CppOperator::UnaryMinus => TraitImplInfo {
+                trait_path: "std::ops::Neg",
+                function_name: "neg",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::Value,
+                has_output_associated_type: true,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Any,
+                target_is_reference: true,
+            },
+            CppOperator::AdditionAssignment => TraitImplInfo {
+                trait_path: "std::ops::AddAssign",
+                function_name: "add_assign",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::MutRef,
+                has_output_associated_type: false,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Unit,
+                target_is_reference: false,
+            },
+            CppOperator::SubtractionAssignment => TraitImplInfo {
+                trait_path: "std::ops::SubAssign",
+                function_name: "sub_assign",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::MutRef,
+                has_output_associated_type: false,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Unit,
+                target_is_reference: false,
+            },
+            CppOperator::MultiplicationAssignment => TraitImplInfo {
+                trait_path: "std::ops::MulAssign",
+                function_name: "mul_assign",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::MutRef,
+                has_output_associated_type: false,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Unit,
+                target_is_reference: false,
+            },
+            CppOperator::DivisionAssignment => TraitImplInfo {
+                trait_path: "std::ops::DivAssign",
+                function_name: "div_assign",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::MutRef,
+                has_output_associated_type: false,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Unit,
+                target_is_reference: false,
+            },
+            CppOperator::ModuloAssignment => TraitImplInfo {
+                trait_path: "std::ops::RemAssign",
+                function_name: "rem_assign",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::MutRef,
+                has_output_associated_type: false,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Unit,
+                target_is_reference: false,
+            },
+            CppOperator::BitwiseAndAssignment => TraitImplInfo {
+                trait_path: "std::ops::BitAndAssign",
+                function_name: "bitand_assign",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::MutRef,
+                has_output_associated_type: false,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Unit,
+                target_is_reference: false,
+            },
+            CppOperator::BitwiseOrAssignment => TraitImplInfo {
+                trait_path: "std::ops::BitOrAssign",
+                function_name: "bitor_assign",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::MutRef,
+                has_output_associated_type: false,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Unit,
+                target_is_reference: false,
+            },
+            CppOperator::BitwiseXorAssignment => TraitImplInfo {
+                trait_path: "std::ops::BitXorAssign",
+                function_name: "bitxor_assign",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::MutRef,
+                has_output_associated_type: false,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Unit,
+                target_is_reference: false,
+            },
+            CppOperator::BitwiseLeftShiftAssignment => TraitImplInfo {
+                trait_path: "std::ops::ShlAssign",
+                function_name: "shl_assign",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::MutRef,
+                has_output_associated_type: false,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Unit,
+                target_is_reference: false,
+            },
+            CppOperator::BitwiseRightShiftAssignment => TraitImplInfo {
+                trait_path: "std::ops::ShrAssign",
+                function_name: "shr_assign",
+                is_unsafe: false,
+                is_inherent: false,
+                self_arg_kind: RustFunctionSelfArgKind::MutRef,
+                has_output_associated_type: false,
+                trait_arg_is_second_arg_type: true,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Unit,
+                target_is_reference: false,
+            },
+            CppOperator::PrefixIncrement => TraitImplInfo {
+                trait_path: "cpp_core::ops::Increment",
+                function_name: "inc",
+                is_unsafe: true,
+                is_inherent: true,
+                self_arg_kind: RustFunctionSelfArgKind::MutRef,
+                has_output_associated_type: true,
+                trait_arg_is_second_arg_type: false,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Any,
+                target_is_reference: false,
+            },
+            CppOperator::PrefixDecrement => TraitImplInfo {
+                trait_path: "cpp_core::ops::Decrement",
+                function_name: "dec",
+                is_unsafe: true,
+                is_inherent: true,
+                self_arg_kind: RustFunctionSelfArgKind::MutRef,
+                has_output_associated_type: true,
+                trait_arg_is_second_arg_type: false,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Any,
+                target_is_reference: false,
+            },
+            CppOperator::Indirection => TraitImplInfo {
+                trait_path: "cpp_core::ops::Indirection",
+                function_name: "indirection",
+                is_unsafe: true,
+                is_inherent: true,
+                self_arg_kind: RustFunctionSelfArgKind::Value,
+                has_output_associated_type: true,
+                trait_arg_is_second_arg_type: false,
+                second_arg_is_reference: false,
+                return_type_constraint: ReturnTypeConstraint::Any,
+                target_is_reference: false,
+            },
+            CppOperator::Conversion(_)
+            | CppOperator::Assignment
+            | CppOperator::UnaryPlus
+            | CppOperator::PostfixIncrement
+            | CppOperator::PostfixDecrement
+            | CppOperator::NotEqualTo
+            | CppOperator::LogicalAnd
+            | CppOperator::LogicalOr
+            | CppOperator::BitwiseNot
+            | CppOperator::Subscript
+            | CppOperator::AddressOf
+            | CppOperator::StructureDereference
+            | CppOperator::PointerToMember
+            | CppOperator::FunctionCall
+            | CppOperator::Comma
+            | CppOperator::New
+            | CppOperator::NewArray
+            | CppOperator::Delete
+            | CppOperator::DeleteArray => return None,
+        })
+    }
 
-impl<'a> OperatorOrSpecialFunction<'a> {
-    fn get(function: &'a CppFunction) -> Option<OperatorOrSpecialFunction<'a>> {
+    fn new(function: &CppFunction) -> Option<TraitImplInfo> {
         if let Some(operator) = &function.operator {
-            return Some(OperatorOrSpecialFunction::Operator(operator));
+            return Self::from_operator(operator);
         }
         if let Some(member) = &function.member {
             if !member.is_static
@@ -113,234 +497,115 @@ impl<'a> OperatorOrSpecialFunction<'a> {
             {
                 match function.path.last().name.as_str() {
                     "begin" => {
-                        let func = if member.is_const {
-                            SpecialFunction::Begin
+                        let info = if member.is_const {
+                            TraitImplInfo {
+                                trait_path: "cpp_core::ops::Begin",
+                                function_name: "begin",
+                                is_unsafe: true,
+                                is_inherent: true,
+                                self_arg_kind: RustFunctionSelfArgKind::ConstRef,
+                                has_output_associated_type: true,
+                                trait_arg_is_second_arg_type: false,
+                                second_arg_is_reference: false,
+                                return_type_constraint: ReturnTypeConstraint::Any,
+                                target_is_reference: false,
+                            }
                         } else {
-                            SpecialFunction::BeginMut
+                            TraitImplInfo {
+                                trait_path: "cpp_core::ops::BeginMut",
+                                function_name: "begin_mut",
+                                is_unsafe: true,
+                                is_inherent: true,
+                                self_arg_kind: RustFunctionSelfArgKind::MutRef,
+                                has_output_associated_type: true,
+                                trait_arg_is_second_arg_type: false,
+                                second_arg_is_reference: false,
+                                return_type_constraint: ReturnTypeConstraint::Any,
+                                target_is_reference: false,
+                            }
                         };
-                        return Some(OperatorOrSpecialFunction::SpecialFunction(func));
+                        return Some(info);
                     }
                     "end" => {
-                        let func = if member.is_const {
-                            SpecialFunction::End
+                        let info = if member.is_const {
+                            TraitImplInfo {
+                                trait_path: "cpp_core::ops::End",
+                                function_name: "end",
+                                is_unsafe: true,
+                                is_inherent: true,
+                                self_arg_kind: RustFunctionSelfArgKind::ConstRef,
+                                has_output_associated_type: true,
+                                trait_arg_is_second_arg_type: false,
+                                second_arg_is_reference: false,
+                                return_type_constraint: ReturnTypeConstraint::Any,
+                                target_is_reference: false,
+                            }
                         } else {
-                            SpecialFunction::EndMut
+                            TraitImplInfo {
+                                trait_path: "cpp_core::ops::EndMut",
+                                function_name: "end_mut",
+                                is_unsafe: true,
+                                is_inherent: true,
+                                self_arg_kind: RustFunctionSelfArgKind::MutRef,
+                                has_output_associated_type: true,
+                                trait_arg_is_second_arg_type: false,
+                                second_arg_is_reference: false,
+                                return_type_constraint: ReturnTypeConstraint::Any,
+                                target_is_reference: false,
+                            }
                         };
-                        return Some(OperatorOrSpecialFunction::SpecialFunction(func));
+                        return Some(info);
                     }
                     _ => {}
                 }
             }
+
+            let templateless_path = function.path.to_templateless_string();
+            if templateless_path == "std::vector::data" {
+                let info = if member.is_const {
+                    TraitImplInfo {
+                        trait_path: "cpp_std::vector_ops::Data",
+                        function_name: "data",
+                        is_unsafe: true,
+                        is_inherent: true,
+                        self_arg_kind: RustFunctionSelfArgKind::ConstRef,
+                        has_output_associated_type: true,
+                        trait_arg_is_second_arg_type: false,
+                        second_arg_is_reference: false,
+                        return_type_constraint: ReturnTypeConstraint::Any,
+                        target_is_reference: false,
+                    }
+                } else {
+                    TraitImplInfo {
+                        trait_path: "cpp_std::vector_ops::DataMut",
+                        function_name: "data_mut",
+                        is_unsafe: true,
+                        is_inherent: true,
+                        self_arg_kind: RustFunctionSelfArgKind::MutRef,
+                        has_output_associated_type: true,
+                        trait_arg_is_second_arg_type: false,
+                        second_arg_is_reference: false,
+                        return_type_constraint: ReturnTypeConstraint::Any,
+                        target_is_reference: false,
+                    }
+                };
+                return Some(info);
+            } else if templateless_path == "std::vector::size" {
+                return Some(TraitImplInfo {
+                    trait_path: "cpp_std::vector_ops::Size",
+                    function_name: "size",
+                    is_unsafe: true,
+                    is_inherent: true,
+                    self_arg_kind: RustFunctionSelfArgKind::ConstRef,
+                    has_output_associated_type: false,
+                    trait_arg_is_second_arg_type: false,
+                    second_arg_is_reference: false,
+                    return_type_constraint: ReturnTypeConstraint::Any,
+                    target_is_reference: false,
+                });
+            }
         }
         None
-    }
-}
-
-#[derive(Debug)]
-struct OperatorInfo {
-    trait_path: &'static str,
-    function_name: &'static str,
-    kind: OperatorKind,
-}
-
-impl OperatorInfo {
-    fn new(operator: OperatorOrSpecialFunction<'_>) -> Result<OperatorInfo> {
-        let info = match operator {
-            OperatorOrSpecialFunction::Operator(operator) => match operator {
-                CppOperator::Addition => OperatorInfo {
-                    trait_path: "std::ops::Add",
-                    function_name: "add",
-                    kind: OperatorKind::Normal,
-                },
-                CppOperator::Subtraction => OperatorInfo {
-                    trait_path: "std::ops::Sub",
-                    function_name: "sub",
-                    kind: OperatorKind::Normal,
-                },
-                CppOperator::UnaryMinus => OperatorInfo {
-                    trait_path: "std::ops::Neg",
-                    function_name: "neg",
-                    kind: OperatorKind::NormalUnary,
-                },
-                CppOperator::Multiplication => OperatorInfo {
-                    trait_path: "std::ops::Mul",
-                    function_name: "mul",
-                    kind: OperatorKind::Normal,
-                },
-                CppOperator::Division => OperatorInfo {
-                    trait_path: "std::ops::Div",
-                    function_name: "div",
-                    kind: OperatorKind::Normal,
-                },
-                CppOperator::Modulo => OperatorInfo {
-                    trait_path: "std::ops::Rem",
-                    function_name: "rem",
-                    kind: OperatorKind::Normal,
-                },
-                CppOperator::EqualTo => OperatorInfo {
-                    trait_path: "std::cmp::PartialEq",
-                    function_name: "eq",
-                    kind: OperatorKind::Comparison,
-                },
-                CppOperator::GreaterThan => OperatorInfo {
-                    trait_path: "cpp_core::cmp::Gt",
-                    function_name: "gt",
-                    kind: OperatorKind::Comparison,
-                },
-                CppOperator::LessThan => OperatorInfo {
-                    trait_path: "cpp_core::cmp::Lt",
-                    function_name: "lt",
-                    kind: OperatorKind::Comparison,
-                },
-                CppOperator::GreaterThanOrEqualTo => OperatorInfo {
-                    trait_path: "cpp_core::cmp::Ge",
-                    function_name: "ge",
-                    kind: OperatorKind::Comparison,
-                },
-                CppOperator::LessThanOrEqualTo => OperatorInfo {
-                    trait_path: "cpp_core::cmp::Le",
-                    function_name: "le",
-                    kind: OperatorKind::Comparison,
-                },
-                CppOperator::LogicalNot => OperatorInfo {
-                    trait_path: "std::ops::Not",
-                    function_name: "not",
-                    kind: OperatorKind::NormalUnary,
-                },
-                CppOperator::BitwiseAnd => OperatorInfo {
-                    trait_path: "std::ops::BitAnd",
-                    function_name: "bitand",
-                    kind: OperatorKind::Normal,
-                },
-                CppOperator::BitwiseOr => OperatorInfo {
-                    trait_path: "std::ops::BitOr",
-                    function_name: "bitor",
-                    kind: OperatorKind::Normal,
-                },
-                CppOperator::BitwiseXor => OperatorInfo {
-                    trait_path: "std::ops::BitXor",
-                    function_name: "bitxor",
-                    kind: OperatorKind::Normal,
-                },
-                CppOperator::BitwiseLeftShift => OperatorInfo {
-                    trait_path: "std::ops::Shl",
-                    function_name: "shl",
-                    kind: OperatorKind::Normal,
-                },
-                CppOperator::BitwiseRightShift => OperatorInfo {
-                    trait_path: "std::ops::Shr",
-                    function_name: "shr",
-                    kind: OperatorKind::Normal,
-                },
-                CppOperator::AdditionAssignment => OperatorInfo {
-                    trait_path: "std::ops::AddAssign",
-                    function_name: "add_assign",
-                    kind: OperatorKind::WithAssign,
-                },
-                CppOperator::SubtractionAssignment => OperatorInfo {
-                    trait_path: "std::ops::SubAssign",
-                    function_name: "sub_assign",
-                    kind: OperatorKind::WithAssign,
-                },
-                CppOperator::MultiplicationAssignment => OperatorInfo {
-                    trait_path: "std::ops::MulAssign",
-                    function_name: "mul_assign",
-                    kind: OperatorKind::WithAssign,
-                },
-                CppOperator::DivisionAssignment => OperatorInfo {
-                    trait_path: "std::ops::DivAssign",
-                    function_name: "div_assign",
-                    kind: OperatorKind::WithAssign,
-                },
-                CppOperator::ModuloAssignment => OperatorInfo {
-                    trait_path: "std::ops::RemAssign",
-                    function_name: "rem_assign",
-                    kind: OperatorKind::WithAssign,
-                },
-                CppOperator::BitwiseAndAssignment => OperatorInfo {
-                    trait_path: "std::ops::BitAndAssign",
-                    function_name: "bitand_assign",
-                    kind: OperatorKind::WithAssign,
-                },
-                CppOperator::BitwiseOrAssignment => OperatorInfo {
-                    trait_path: "std::ops::BitOrAssign",
-                    function_name: "bitor_assign",
-                    kind: OperatorKind::WithAssign,
-                },
-                CppOperator::BitwiseXorAssignment => OperatorInfo {
-                    trait_path: "std::ops::BitXorAssign",
-                    function_name: "bitxor_assign",
-                    kind: OperatorKind::WithAssign,
-                },
-                CppOperator::BitwiseLeftShiftAssignment => OperatorInfo {
-                    trait_path: "std::ops::ShlAssign",
-                    function_name: "shl_assign",
-                    kind: OperatorKind::WithAssign,
-                },
-                CppOperator::BitwiseRightShiftAssignment => OperatorInfo {
-                    trait_path: "std::ops::ShrAssign",
-                    function_name: "shr_assign",
-                    kind: OperatorKind::WithAssign,
-                },
-                CppOperator::PrefixIncrement => OperatorInfo {
-                    trait_path: "cpp_core::ops::Increment",
-                    function_name: "inc",
-                    kind: OperatorKind::MutableUnary,
-                },
-                CppOperator::PrefixDecrement => OperatorInfo {
-                    trait_path: "cpp_core::ops::Decrement",
-                    function_name: "dec",
-                    kind: OperatorKind::MutableUnary,
-                },
-                CppOperator::Indirection => OperatorInfo {
-                    trait_path: "cpp_core::ops::Indirection",
-                    function_name: "indirection",
-                    kind: OperatorKind::NormalUnary,
-                },
-                CppOperator::Conversion(_)
-                | CppOperator::Assignment
-                | CppOperator::UnaryPlus
-                | CppOperator::PostfixIncrement
-                | CppOperator::PostfixDecrement
-                | CppOperator::NotEqualTo
-                | CppOperator::LogicalAnd
-                | CppOperator::LogicalOr
-                | CppOperator::BitwiseNot
-                | CppOperator::Subscript
-                | CppOperator::AddressOf
-                | CppOperator::StructureDereference
-                | CppOperator::PointerToMember
-                | CppOperator::FunctionCall
-                | CppOperator::Comma
-                | CppOperator::New
-                | CppOperator::NewArray
-                | CppOperator::Delete
-                | CppOperator::DeleteArray => bail!("unsupported operator: {:?}", operator),
-            },
-            OperatorOrSpecialFunction::SpecialFunction(func) => match func {
-                SpecialFunction::Begin => OperatorInfo {
-                    trait_path: "cpp_core::ops::Begin",
-                    function_name: "begin",
-                    kind: OperatorKind::NormalUnary,
-                },
-                SpecialFunction::BeginMut => OperatorInfo {
-                    trait_path: "cpp_core::ops::BeginMut",
-                    function_name: "begin_mut",
-                    kind: OperatorKind::MutableUnary,
-                },
-                SpecialFunction::End => OperatorInfo {
-                    trait_path: "cpp_core::ops::End",
-                    function_name: "end",
-                    kind: OperatorKind::NormalUnary,
-                },
-                SpecialFunction::EndMut => OperatorInfo {
-                    trait_path: "cpp_core::ops::EndMut",
-                    function_name: "end_mut",
-                    kind: OperatorKind::MutableUnary,
-                },
-            },
-        };
-        Ok(info)
     }
 }
 
@@ -780,12 +1045,10 @@ impl State<'_, '_> {
 
     fn process_operator_as_trait_impl(
         unnamed_function: UnnamedRustFunction,
-        operator: OperatorOrSpecialFunction<'_>,
+        operator_info: TraitImplInfo,
         crate_name: &str,
         trait_types: &[TraitTypes],
     ) -> Result<RustTraitImpl> {
-        let operator_info = OperatorInfo::new(operator)?;
-
         let trait_path = RustPath::from_good_str(operator_info.trait_path);
 
         let self_type = unnamed_function
@@ -798,26 +1061,22 @@ impl State<'_, '_> {
 
         let self_value_type = self_type.pointer_like_to_target()?;
 
-        let is_self_const = match operator_info.kind {
-            OperatorKind::Normal | OperatorKind::NormalUnary | OperatorKind::Comparison => true,
-            OperatorKind::WithAssign | OperatorKind::MutableUnary => false,
+        let is_self_const = match operator_info.self_arg_kind {
+            RustFunctionSelfArgKind::ConstRef | RustFunctionSelfArgKind::Value => true,
+            RustFunctionSelfArgKind::MutRef => false,
+            RustFunctionSelfArgKind::None => unreachable!(),
         };
 
-        let target_type = match operator_info.kind {
-            OperatorKind::Normal | OperatorKind::NormalUnary | OperatorKind::MutableUnary => {
-                RustType::new_reference(is_self_const, self_value_type.clone())
-            }
-            OperatorKind::WithAssign | OperatorKind::Comparison => self_value_type.clone(),
+        let target_type = if operator_info.target_is_reference {
+            RustType::new_reference(true, self_value_type.clone())
+        } else {
+            self_value_type.clone()
         };
 
         let trait_args;
-        let mut other_type;
-        if operator_info.kind == OperatorKind::NormalUnary
-            || operator_info.kind == OperatorKind::MutableUnary
-        {
-            trait_args = None;
-            other_type = None;
-        } else {
+        let other_type;
+
+        if operator_info.trait_arg_is_second_arg_type {
             let mut other_type1 = unnamed_function
                 .arguments
                 .get(1)
@@ -831,7 +1090,10 @@ impl State<'_, '_> {
             }
             trait_args = Some(vec![other_type1.api_type().clone()]);
             other_type = Some(other_type1);
-        };
+        } else {
+            other_type = None;
+            trait_args = None;
+        }
 
         let trait_type = RustCommonType {
             path: trait_path.clone(),
@@ -852,20 +1114,18 @@ impl State<'_, '_> {
             bail!("self type is not Common");
         };
 
-        let associated_types = match operator_info.kind {
-            OperatorKind::Normal | OperatorKind::NormalUnary | OperatorKind::MutableUnary => {
-                let output = RustTraitAssociatedType {
-                    name: "Output".into(),
-                    value: unnamed_function.return_type.api_type().clone(),
-                };
-
-                vec![output]
-            }
-            OperatorKind::WithAssign | OperatorKind::Comparison => Vec::new(),
+        let associated_types = if operator_info.has_output_associated_type {
+            let output = RustTraitAssociatedType {
+                name: "Output".into(),
+                value: unnamed_function.return_type.api_type().clone(),
+            };
+            vec![output]
+        } else {
+            Vec::new()
         };
 
         let mut function = unnamed_function.with_path(trait_path.join(operator_info.function_name));
-        function.is_unsafe = false;
+        function.is_unsafe = operator_info.is_unsafe;
         function.arguments[0].argument_type = RustFinalType::new(
             function.arguments[0].argument_type.ffi_type().clone(),
             RustToFfiTypeConversion::RefToPtr {
@@ -878,7 +1138,7 @@ impl State<'_, '_> {
             function.arguments[1].argument_type = other_type;
         }
 
-        if operator_info.kind == OperatorKind::Comparison {
+        if operator_info.second_arg_is_reference {
             let other_arg = &mut function.arguments[1].argument_type;
             *other_arg = RustFinalType::new(
                 other_arg.ffi_type().clone(),
@@ -886,9 +1146,9 @@ impl State<'_, '_> {
             )?;
         }
 
-        match operator_info.kind {
-            OperatorKind::Normal | OperatorKind::NormalUnary | OperatorKind::MutableUnary => {}
-            OperatorKind::WithAssign => {
+        match operator_info.return_type_constraint {
+            ReturnTypeConstraint::Any => {}
+            ReturnTypeConstraint::Unit => {
                 if function.return_type.api_type() != &RustType::unit() {
                     function.return_type = RustFinalType::new(
                         function.return_type.ffi_type().clone(),
@@ -896,7 +1156,7 @@ impl State<'_, '_> {
                     )?;
                 }
             }
-            OperatorKind::Comparison => {
+            ReturnTypeConstraint::Bool => {
                 if function.return_type.api_type() != &RustType::bool() {
                     bail!("return type is not bool");
                 }
@@ -1241,16 +1501,18 @@ impl State<'_, '_> {
             if cpp_function.operator.as_ref() == Some(&CppOperator::NotEqualTo) {
                 bail!("NotEqualTo is not needed in public API because PartialEq is used");
             }
-            if let Some(operator) = OperatorOrSpecialFunction::get(cpp_function) {
+            if let Some(operator_info) = TraitImplInfo::new(cpp_function) {
                 match State::process_operator_as_trait_impl(
                     unnamed_function.clone(),
-                    operator,
+                    operator_info,
                     self.data.db.crate_name(),
                     trait_types,
                 ) {
                     Ok(item) => {
                         results.push(ProcessedFfiItem::Item(RustItem::TraitImpl(item)));
-                        return Ok(results);
+                        if !operator_info.is_inherent {
+                            return Ok(results);
+                        }
                     }
                     Err(err) => {
                         debug!("failed to convert operator to trait: {}", err);

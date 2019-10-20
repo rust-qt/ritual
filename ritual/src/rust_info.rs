@@ -335,7 +335,7 @@ pub struct RustFunction {
 }
 
 /// Information about type of `self` argument of the function.
-#[derive(Debug, PartialEq, Eq, Clone, Hash, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash, Serialize, Deserialize)]
 pub enum RustFunctionSelfArgKind {
     /// No `self` argument (static function or a free function).
     None,
@@ -684,17 +684,13 @@ impl RustItem {
                     false
                 }
             }
-            RustItem::TraitImpl(data) => match other {
-                RustItem::TraitImpl(other) => data.extra_kind == other.extra_kind,
-                RustItem::Function(other) => {
-                    if let RustFunctionKind::FfiWrapper(_) = &other.kind {
-                        data.extra_kind == RustTraitImplExtraKind::Normal
-                    } else {
-                        false
-                    }
+            RustItem::TraitImpl(data) => {
+                if let RustItem::TraitImpl(other) = other {
+                    data.extra_kind == other.extra_kind
+                } else {
+                    false
                 }
-                _ => false,
-            },
+            }
             RustItem::ExtraImpl(data) => {
                 if let RustItem::ExtraImpl(other) = other {
                     data.kind.has_same_kind(&other.kind)
@@ -703,19 +699,17 @@ impl RustItem {
                 }
             }
             RustItem::Function(data) => match &data.kind {
-                RustFunctionKind::FfiWrapper(_) => match other {
-                    RustItem::TraitImpl(other) => {
-                        other.extra_kind == RustTraitImplExtraKind::Normal
-                    }
-                    RustItem::Function(other) => {
+                RustFunctionKind::FfiWrapper(_) => {
+                    if let RustItem::Function(other) = other {
                         if let RustFunctionKind::FfiWrapper(_) = &other.kind {
                             true
                         } else {
                             false
                         }
+                    } else {
+                        false
                     }
-                    _ => false,
-                },
+                }
                 RustFunctionKind::SignalOrSlotGetter(_) => {
                     if let RustItem::Function(other) = other {
                         if let RustFunctionKind::SignalOrSlotGetter(_) = &other.kind {

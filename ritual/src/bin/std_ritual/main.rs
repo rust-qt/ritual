@@ -6,6 +6,7 @@ use ritual::rust_info::{NameType, RustPathScope};
 use ritual::rust_type::RustPath;
 use ritual_common::cpp_build_config::{CppBuildConfigData, CppLibraryType};
 use ritual_common::errors::{bail, err_msg, FancyUnwrap, Result, ResultExt};
+use ritual_common::file_utils::repo_dir_path;
 use ritual_common::string_utils::CaseOperations;
 use ritual_common::{target, toml};
 use std::env;
@@ -59,6 +60,8 @@ fn create_config() -> Result<Config> {
 
     let mut config = Config::new(crate_properties);
     config.set_cpp_lib_version("11");
+
+    config.set_crate_template_path(repo_dir_path("ritual/src/bin/std_ritual/crate_template")?);
 
     /* TODO:  "array", "bitset", "deque", "forward_list", "list", "map", "queue", "set", "stack",
         "unordered_map", "unordered_set", "ios", "istream", "iostream", "fstream", "sstream",

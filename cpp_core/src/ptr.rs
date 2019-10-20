@@ -200,82 +200,6 @@ impl<T> MutPtr<T> {
         DynamicCast::dynamic_cast_mut(self)
     }
 
-    /// Returns a C++ const iterator object pointing to the beginning of the collection.
-    ///
-    /// It's recommended to iterate directly on a `MutPtr<T>` when possible, using automatic
-    /// `IntoIterator` implementation.
-    ///
-    /// ### Safety
-    ///
-    /// `self` must be valid. It's not possible to make any guarantees about safety, since
-    /// this function calls arbitrary C++ library code.
-    pub unsafe fn begin(self) -> <&'static T as Begin>::Output
-    where
-        &'static T: Begin,
-    {
-        if self.0.is_null() {
-            panic!("attempted to deref a null MutPtr<T>");
-        }
-        (*self.as_raw_ptr()).begin()
-    }
-
-    /// Returns a C++ mutable iterator object pointing to the beginning of the collection.
-    ///
-    /// It's recommended to iterate directly on a `MutPtr<T>` when possible, using automatic
-    /// `IntoIterator` implementation.
-    ///
-    /// ### Safety
-    ///
-    /// `self` must be valid. It's not possible to make any guarantees about safety, since
-    /// this function calls arbitrary C++ library code.
-    pub unsafe fn begin_mut(self) -> <&'static mut T as BeginMut>::Output
-    where
-        &'static mut T: BeginMut,
-    {
-        if self.0.is_null() {
-            panic!("attempted to deref a null MutPtr<T>");
-        }
-        (*self.as_mut_raw_ptr()).begin_mut()
-    }
-
-    /// Returns a C++ const iterator object pointing to the end of the collection.
-    ///
-    /// It's recommended to iterate directly on a `MutPtr<T>` when possible, using automatic
-    /// `IntoIterator` implementation.
-    ///
-    /// ### Safety
-    ///
-    /// `self` must be valid. It's not possible to make any guarantees about safety, since
-    /// this function calls arbitrary C++ library code.
-    pub unsafe fn end(self) -> <&'static T as End>::Output
-    where
-        &'static T: End,
-    {
-        if self.0.is_null() {
-            panic!("attempted to deref a null MutPtr<T>");
-        }
-        (*self.as_raw_ptr()).end()
-    }
-
-    /// Returns a C++ mutable iterator object pointing to the end of the collection.
-    ///
-    /// It's recommended to iterate directly on a `MutPtr<T>` when possible, using automatic
-    /// `IntoIterator` implementation.
-    ///
-    /// ### Safety
-    ///
-    /// `self` must be valid. It's not possible to make any guarantees about safety, since
-    /// this function calls arbitrary C++ library code.
-    pub unsafe fn end_mut(self) -> <&'static mut T as EndMut>::Output
-    where
-        &'static mut T: EndMut,
-    {
-        if self.0.is_null() {
-            panic!("attempted to deref a null MutPtr<T>");
-        }
-        (*self.as_mut_raw_ptr()).end_mut()
-    }
-
     /// Returns a slice corresponding to the object. This function is available when `begin()` and
     /// `end()` functions of the object return pointers.
     ///
@@ -286,8 +210,7 @@ impl<T> MutPtr<T> {
     /// because it may be modified by the C++ library, which would violate Rust's aliasing rules.
     pub unsafe fn as_slice<'a, T1>(self) -> &'a [T1]
     where
-        T: 'static,
-        &'static T: Begin<Output = Ptr<T1>> + End<Output = Ptr<T1>>,
+        T: Begin<Output = Ptr<T1>> + End<Output = Ptr<T1>>,
     {
         let begin = self.begin().as_raw_ptr();
         let end = self.end().as_raw_ptr();
@@ -304,10 +227,9 @@ impl<T> MutPtr<T> {
     /// `self` must be valid. It's not possible to make any guarantees about safety, since
     /// this function calls arbitrary C++ library code. It's not recommended to store the slice
     /// because it may be modified by the C++ library, which would violate Rust's aliasing rules.
-    pub unsafe fn as_mut_slice<'a, T1>(self) -> &'a mut [T1]
+    pub unsafe fn as_mut_slice<'a, T1>(mut self) -> &'a mut [T1]
     where
-        T: 'static,
-        &'static mut T: BeginMut<Output = MutPtr<T1>> + EndMut<Output = MutPtr<T1>>,
+        T: BeginMut<Output = MutPtr<T1>> + EndMut<Output = MutPtr<T1>>,
     {
         let begin = self.begin_mut().as_mut_raw_ptr();
         let end = self.end_mut().as_mut_raw_ptr();
@@ -508,44 +430,6 @@ impl<T> Ptr<T> {
         DynamicCast::dynamic_cast(self)
     }
 
-    /// Returns a C++ const iterator object pointing to the beginning of the collection.
-    ///
-    /// It's recommended to iterate directly on a `Ptr<T>` when possible, using automatic
-    /// `IntoIterator` implementation.
-    ///
-    /// ### Safety
-    ///
-    /// `self` must be valid. It's not possible to make any guarantees about safety, since
-    /// this function calls arbitrary C++ library code.
-    pub unsafe fn begin(self) -> <&'static T as Begin>::Output
-    where
-        &'static T: Begin,
-    {
-        if self.0.is_null() {
-            panic!("attempted to deref a null Ptr<T>");
-        }
-        (*self.as_raw_ptr()).begin()
-    }
-
-    /// Returns a C++ const iterator object pointing to the end of the collection.
-    ///
-    /// It's recommended to iterate directly on a `Ptr<T>` when possible, using automatic
-    /// `IntoIterator` implementation.
-    ///
-    /// ### Safety
-    ///
-    /// `self` must be valid. It's not possible to make any guarantees about safety, since
-    /// this function calls arbitrary C++ library code.
-    pub unsafe fn end(self) -> <&'static T as End>::Output
-    where
-        &'static T: End,
-    {
-        if self.0.is_null() {
-            panic!("attempted to deref a null Ptr<T>");
-        }
-        (*self.as_raw_ptr()).end()
-    }
-
     /// Returns a slice corresponding to the object. This function is available when `begin()` and
     /// `end()` functions of the object return pointers.
     ///
@@ -556,8 +440,7 @@ impl<T> Ptr<T> {
     /// because it may be modified by the C++ library, which would violate Rust's aliasing rules.
     pub unsafe fn as_slice<'a, T1>(self) -> &'a [T1]
     where
-        T: 'static,
-        &'static T: Begin<Output = Ptr<T1>> + End<Output = Ptr<T1>>,
+        T: Begin<Output = Ptr<T1>> + End<Output = Ptr<T1>>,
     {
         let begin = self.begin().as_raw_ptr();
         let end = self.end().as_raw_ptr();

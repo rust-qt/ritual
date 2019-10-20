@@ -136,31 +136,33 @@ macro_rules! define_comparison_op {
             T: Lt<U> + Le<U> + Gt<U> + Ge<U> + PartialEq<U>,
         {
             fn partial_cmp(&self, other: &U) -> Option<Ordering> {
-                if &**self == other {
-                    Some(Ordering::Equal)
-                } else if (**self).lt(other) {
-                    Some(Ordering::Less)
-                } else if (**self).gt(other) {
-                    Some(Ordering::Greater)
-                } else {
-                    None
+                unsafe {
+                    if &**self == other {
+                        Some(Ordering::Equal)
+                    } else if (**self).lt(other) {
+                        Some(Ordering::Less)
+                    } else if (**self).gt(other) {
+                        Some(Ordering::Greater)
+                    } else {
+                        None
+                    }
                 }
             }
 
             fn lt(&self, other: &U) -> bool {
-                (**self).lt(other)
+                unsafe { (**self).lt(other) }
             }
 
             fn le(&self, other: &U) -> bool {
-                (**self).le(other)
+                unsafe { (**self).le(other) }
             }
 
             fn gt(&self, other: &U) -> bool {
-                (**self).gt(other)
+                unsafe { (**self).gt(other) }
             }
 
             fn ge(&self, other: &U) -> bool {
-                (**self).ge(other)
+                unsafe { (**self).ge(other) }
             }
         }
     };
@@ -185,30 +187,32 @@ where
     T: Lt<U> + Le<U> + Gt<U> + Ge<U> + PartialEq<U>,
 {
     fn partial_cmp(&self, other: &U) -> Option<Ordering> {
-        if &**self == other {
-            Some(Ordering::Equal)
-        } else if (**self).lt(other) {
-            Some(Ordering::Less)
-        } else if (**self).gt(other) {
-            Some(Ordering::Greater)
-        } else {
-            None
+        unsafe {
+            if &**self == other {
+                Some(Ordering::Equal)
+            } else if (**self).lt(other) {
+                Some(Ordering::Less)
+            } else if (**self).gt(other) {
+                Some(Ordering::Greater)
+            } else {
+                None
+            }
         }
     }
 
     fn lt(&self, other: &U) -> bool {
-        (**self).lt(other)
+        unsafe { (**self).lt(other) }
     }
 
     fn le(&self, other: &U) -> bool {
-        (**self).le(other)
+        unsafe { (**self).le(other) }
     }
 
     fn gt(&self, other: &U) -> bool {
-        (**self).gt(other)
+        unsafe { (**self).gt(other) }
     }
 
     fn ge(&self, other: &U) -> bool {
-        (**self).ge(other)
+        unsafe { (**self).ge(other) }
     }
 }
