@@ -242,6 +242,14 @@ impl CppType {
             _ => false,
         }
     }
+
+    pub fn is_pointer(&self) -> bool {
+        match self {
+            CppType::PointerLike { kind, .. } => *kind == CppPointerLikeTypeKind::Pointer,
+            _ => false,
+        }
+    }
+
     /// Returns true if this is a template parameter or a type that
     /// contains any template parameters.
     pub fn is_or_contains_template_parameter(&self) -> bool {
