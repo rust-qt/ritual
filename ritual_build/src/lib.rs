@@ -228,7 +228,6 @@ impl Config {
         if let Some(version) = self.current_cpp_library_version {
             println!("cargo:rustc-cfg=cpp_lib_version={:?}", version);
         }
-        println!("cargo:rustc-cfg=ritual_true");
         if env::var(env_var_names::RUSTDOC).is_ok() {
             println!("cargo:rustc-cfg=ritual_rustdoc");
         }

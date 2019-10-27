@@ -191,8 +191,8 @@ fn condition_expression(condition: &Condition) -> String {
             format!("any({})", list)
         }
         Condition::Not(condition) => format!("not({})", condition_expression(condition)),
-        Condition::True => "ritual_true".to_string(),
-        Condition::False => "ritual_false".to_string(),
+        Condition::True => "not(false)".to_string(),
+        Condition::False => "false".to_string(),
     }
 }
 
