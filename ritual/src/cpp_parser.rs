@@ -20,7 +20,7 @@ use itertools::Itertools;
 use log::{debug, trace, warn};
 use regex::Regex;
 use ritual_common::env_var_names;
-use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
+use ritual_common::errors::{bail, err_msg, format_err, print_trace, Result, ResultExt};
 use ritual_common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
 use ritual_common::target::{current_target, LibraryTarget};
 use std::io::Write;
@@ -415,6 +415,9 @@ impl CppParser<'_, '_> {
             if is_const_in_name {
                 name = name[6..].to_string();
             }
+            if name.starts_with("typename ") {
+                name = name[9..].to_string();
+            }
             if let Some(declaration) = type1.get_declaration() {
                 if declaration.get_kind() == EntityKind::ClassDecl
                     || declaration.get_kind() == EntityKind::ClassTemplate
@@ -441,7 +444,7 @@ impl CppParser<'_, '_> {
                                 Ok(arg_type) => arg_types.push(arg_type),
                                 Err(msg) => {
                                     bail!("(1) Template argument of unexposed type is not parsed: {}: {}",                        arg, msg
-                  );
+                                    );
                                 }
                             }
                         }
@@ -1517,6 +1520,7 @@ impl CppParser<'_, '_> {
                         get_full_name_display(entity),
                         error
                     );
+                    print_trace(&error, Some(log::Level::Trace));
                     trace!("entity: {:?}", entity);
                 }
             }

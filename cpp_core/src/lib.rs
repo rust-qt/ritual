@@ -70,6 +70,7 @@ pub mod ops;
 mod ops_impls;
 mod ptr;
 mod ref_;
+mod vector_ops;
 
 // C++ doesn't guarantee these types to be exactly u16 and u32,
 // but they are on all supported platforms.
