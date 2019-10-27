@@ -1,7 +1,6 @@
-use crate::ops::{Begin, BeginMut, End, EndMut};
 use crate::{DynamicCast, MutPtr, Ptr, StaticDowncast, StaticUpcast};
 use std::ops::{Deref, DerefMut};
-use std::{fmt, mem, ptr, slice};
+use std::{fmt, ptr};
 
 /// A non-null, mutable pointer to a C++ object (similar to a C++ reference).
 ///
@@ -198,43 +197,6 @@ impl<T> MutRef<T> {
     {
         DynamicCast::dynamic_cast_mut(self.as_mut_ptr()).as_mut_ref()
     }
-
-    /// Returns a slice corresponding to the object. This function is available when `begin()` and
-    /// `end()` functions of the object return pointers.
-    ///
-    /// ### Safety
-    ///
-    /// `self` must be valid. It's not possible to make any guarantees about safety, since
-    /// this function calls arbitrary C++ library code. It's not recommended to store the slice
-    /// because it may be modified by the C++ library, which would violate Rust's aliasing rules.
-    pub unsafe fn as_slice<'a, T1>(self) -> &'a [T1]
-    where
-        T: Begin<Output = Ptr<T1>> + End<Output = Ptr<T1>>,
-    {
-        let begin = self.begin().as_raw_ptr();
-        let end = self.end().as_raw_ptr();
-        let count = (end as usize).saturating_sub(begin as usize) / mem::size_of::<T1>();
-        slice::from_raw_parts(begin, count)
-    }
-
-    /// Returns a mutable slice corresponding to the object.
-    /// This function is available when `begin()` and
-    /// `end()` functions of the object return pointers.
-    ///
-    /// ### Safety
-    ///
-    /// `self` must be valid. It's not possible to make any guarantees about safety, since
-    /// this function calls arbitrary C++ library code. It's not recommended to store the slice
-    /// because it may be modified by the C++ library, which would violate Rust's aliasing rules.
-    pub unsafe fn as_mut_slice<'a, T1>(mut self) -> &'a mut [T1]
-    where
-        T: BeginMut<Output = MutPtr<T1>> + EndMut<Output = MutPtr<T1>>,
-    {
-        let begin = self.begin_mut().as_mut_raw_ptr();
-        let end = self.end_mut().as_mut_raw_ptr();
-        let count = (end as usize).saturating_sub(begin as usize) / mem::size_of::<T1>();
-        slice::from_raw_parts_mut(begin, count)
-    }
 }
 
 /// Allows to call member functions of `T` and its base classes directly on the pointer.
@@ -390,24 +352,6 @@ impl<T> Ref<T> {
         T: DynamicCast<U>,
     {
         DynamicCast::dynamic_cast(self.as_ptr()).as_ref()
-    }
-
-    /// Returns a slice corresponding to the object. This function is available when `begin()` and
-    /// `end()` functions of the object return pointers.
-    ///
-    /// ### Safety
-    ///
-    /// `self` must be valid. It's not possible to make any guarantees about safety, since
-    /// this function calls arbitrary C++ library code. It's not recommended to store the slice
-    /// because it may be modified by the C++ library, which would violate Rust's aliasing rules.
-    pub unsafe fn as_slice<'a, T1>(self) -> &'a [T1]
-    where
-        T: Begin<Output = Ptr<T1>> + End<Output = Ptr<T1>>,
-    {
-        let begin = self.begin().as_raw_ptr();
-        let end = self.end().as_raw_ptr();
-        let count = (end as usize).saturating_sub(begin as usize) / mem::size_of::<T1>();
-        slice::from_raw_parts(begin, count)
     }
 }
 

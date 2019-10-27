@@ -1,9 +1,8 @@
-use crate::ops::{Begin, BeginMut, End, EndMut};
 use crate::{CppBox, CppDeletable, DynamicCast, MutRef, Ref, StaticDowncast, StaticUpcast};
 use std::ffi::CStr;
+use std::fmt;
 use std::ops::{Deref, DerefMut};
 use std::os::raw::c_char;
-use std::{fmt, mem, slice};
 
 /// A mutable pointer to a C++ object (similar to a C++ pointer).
 ///
@@ -199,43 +198,6 @@ impl<T> MutPtr<T> {
     {
         DynamicCast::dynamic_cast_mut(self)
     }
-
-    /// Returns a slice corresponding to the object. This function is available when `begin()` and
-    /// `end()` functions of the object return pointers.
-    ///
-    /// ### Safety
-    ///
-    /// `self` must be valid. It's not possible to make any guarantees about safety, since
-    /// this function calls arbitrary C++ library code. It's not recommended to store the slice
-    /// because it may be modified by the C++ library, which would violate Rust's aliasing rules.
-    pub unsafe fn as_slice<'a, T1>(self) -> &'a [T1]
-    where
-        T: Begin<Output = Ptr<T1>> + End<Output = Ptr<T1>>,
-    {
-        let begin = self.begin().as_raw_ptr();
-        let end = self.end().as_raw_ptr();
-        let count = (end as usize).saturating_sub(begin as usize) / mem::size_of::<T1>();
-        slice::from_raw_parts(begin, count)
-    }
-
-    /// Returns a mutable slice corresponding to the object.
-    /// This function is available when `begin()` and
-    /// `end()` functions of the object return pointers.
-    ///
-    /// ### Safety
-    ///
-    /// `self` must be valid. It's not possible to make any guarantees about safety, since
-    /// this function calls arbitrary C++ library code. It's not recommended to store the slice
-    /// because it may be modified by the C++ library, which would violate Rust's aliasing rules.
-    pub unsafe fn as_mut_slice<'a, T1>(mut self) -> &'a mut [T1]
-    where
-        T: BeginMut<Output = MutPtr<T1>> + EndMut<Output = MutPtr<T1>>,
-    {
-        let begin = self.begin_mut().as_mut_raw_ptr();
-        let end = self.end_mut().as_mut_raw_ptr();
-        let count = (end as usize).saturating_sub(begin as usize) / mem::size_of::<T1>();
-        slice::from_raw_parts_mut(begin, count)
-    }
 }
 
 impl<T: CppDeletable> MutPtr<T> {
@@ -428,24 +390,6 @@ impl<T> Ptr<T> {
         T: DynamicCast<U>,
     {
         DynamicCast::dynamic_cast(self)
-    }
-
-    /// Returns a slice corresponding to the object. This function is available when `begin()` and
-    /// `end()` functions of the object return pointers.
-    ///
-    /// ### Safety
-    ///
-    /// `self` must be valid. It's not possible to make any guarantees about safety, since
-    /// this function calls arbitrary C++ library code. It's not recommended to store the slice
-    /// because it may be modified by the C++ library, which would violate Rust's aliasing rules.
-    pub unsafe fn as_slice<'a, T1>(self) -> &'a [T1]
-    where
-        T: Begin<Output = Ptr<T1>> + End<Output = Ptr<T1>>,
-    {
-        let begin = self.begin().as_raw_ptr();
-        let end = self.end().as_raw_ptr();
-        let count = (end as usize).saturating_sub(begin as usize) / mem::size_of::<T1>();
-        slice::from_raw_parts(begin, count)
     }
 }
 
