@@ -8,6 +8,8 @@ public:
     QByteArray(int, char) {}
     QByteArray(const char*, int) {}
     QByteArray() {}
+    char* data();
+    const char * data() const;
     const char *constData() const;
     int size() const;
     const char* begin() const;

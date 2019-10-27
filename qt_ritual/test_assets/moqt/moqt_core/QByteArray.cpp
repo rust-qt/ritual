@@ -1,5 +1,13 @@
 #include "QByteArray.h"
 
+char* QByteArray::data() {
+    return nullptr;
+}
+
+const char * QByteArray::data() const {
+    return nullptr;
+}
+
 const char *QByteArray::constData() const {
     return nullptr;
 }
