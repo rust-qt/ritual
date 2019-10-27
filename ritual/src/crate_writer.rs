@@ -46,6 +46,12 @@ fn recursive_merge_toml(a: toml::Value, b: toml::Value) -> toml::Value {
     }
 }
 
+fn toml_table_with_single_item(key: &str, value: impl Into<toml::Value>) -> toml::Value {
+    let mut table = toml::value::Table::new();
+    table.insert(key.into(), value.into());
+    toml::Value::Table(table)
+}
+
 /// Generates `Cargo.toml` file and skeleton of the crate.
 /// If a crate template was supplied, files from it are
 /// copied to the output location.
@@ -73,139 +79,102 @@ fn generate_crate_template(data: &mut ProcessorData<'_>, output_path: &Path) -> 
             include_str!("../templates/crate/build.rs")
         )?;
     }
-    let cargo_toml_data = {
-        let package = toml::value::Value::Table({
-            let mut table = toml::value::Table::new();
-            table.insert(
-                "name".to_string(),
-                toml::Value::String(data.config.crate_properties().name().into()),
-            );
-            table.insert(
-                "version".to_string(),
-                toml::Value::String(data.config.crate_properties().version().into()),
-            );
-            table.insert(
-                "build".to_string(),
-                toml::Value::String("build.rs".to_string()),
-            );
-            table.insert(
-                "edition".to_string(),
-                toml::Value::String("2018".to_string()),
-            );
-            table
-        });
-        let dep_value = |version: &str, local_path: Option<PathBuf>| -> Result<toml::Value> {
-            Ok(
-                if local_path.is_none() || !data.config.write_dependencies_local_paths() {
-                    toml::Value::String(version.to_string())
-                } else {
-                    let path = diff_paths(&local_path.expect("checked above"), &output_path)?;
 
-                    toml::Value::Table({
-                        let mut value = toml::value::Table::new();
-                        value.insert(
-                            "version".to_string(),
-                            toml::Value::String(version.to_string()),
-                        );
-                        value.insert(
-                            "path".to_string(),
-                            toml::Value::String(path_to_str(&path)?.to_string()),
-                        );
-                        value
-                    })
-                },
-            )
-        };
-        let dependencies = toml::Value::Table({
-            let mut table = toml::value::Table::new();
-            if !data
-                .config
-                .crate_properties()
-                .should_remove_default_dependencies()
-            {
-                table.insert(
-                    "cpp_core".to_string(),
-                    dep_value(
-                        versions::CPP_CORE_VERSION,
-                        if data.config.write_dependencies_local_paths() {
-                            Some(repo_dir_path("cpp_core")?)
-                        } else {
-                            None
-                        },
-                    )?,
-                );
-                for dep in data.config.dependent_cpp_crates() {
-                    table.insert(
-                        dep.to_string(),
-                        dep_value(
-                            data.db.dependency_version(dep)?,
-                            Some(data.workspace.crate_path(dep)),
-                        )?,
-                    );
-                }
-            }
-            for dep in data.config.crate_properties().dependencies() {
-                table.insert(
-                    dep.name().to_string(),
-                    dep_value(dep.version(), dep.local_path().map(PathBuf::from))?,
-                );
-            }
-            table
-        });
-        let build_dependencies = toml::Value::Table({
-            let mut table = toml::value::Table::new();
-            if !data
-                .config
-                .crate_properties()
-                .should_remove_default_build_dependencies()
-            {
-                table.insert(
-                    "ritual_build".to_string(),
-                    dep_value(
-                        versions::RITUAL_BUILD_VERSION,
-                        if data.config.write_dependencies_local_paths() {
-                            Some(repo_dir_path("ritual_build")?)
-                        } else {
-                            None
-                        },
-                    )?,
-                );
-            }
-            for dep in data.config.crate_properties().build_dependencies() {
-                table.insert(
-                    dep.name().to_string(),
-                    dep_value(dep.version(), dep.local_path().map(PathBuf::from))?,
-                );
-            }
-            table
-        });
-        let features = toml::Value::Table({
-            let mut table = toml::value::Table::new();
-            table.insert(
-                "ritual_rustdoc".to_string(),
-                toml::value::Array::new().into(),
+    let mut package = toml::value::Table::new();
+    package.insert(
+        "name".into(),
+        toml::Value::String(data.config.crate_properties().name().into()),
+    );
+    package.insert(
+        "version".into(),
+        toml::Value::String(data.config.crate_properties().version().into()),
+    );
+    package.insert("build".into(), toml::Value::String("build.rs".into()));
+    package.insert("edition".into(), toml::Value::String("2018".into()));
+
+    let docs_rs_metadata = toml_table_with_single_item(
+        "features",
+        vec![toml::Value::String("ritual_rustdoc".into())],
+    );
+    package.insert(
+        "metadata".into(),
+        toml_table_with_single_item("docs", toml_table_with_single_item("rs", docs_rs_metadata)),
+    );
+
+    let dep_value = |version: &str, local_path: Option<PathBuf>| -> Result<toml::Value> {
+        if local_path.is_none() || !data.config.write_dependencies_local_paths() {
+            Ok(toml::Value::String(version.into()))
+        } else {
+            let path = diff_paths(&local_path.expect("checked above"), &output_path)?;
+            let mut value = toml::value::Table::new();
+            value.insert("version".into(), toml::Value::String(version.into()));
+            value.insert(
+                "path".into(),
+                toml::Value::String(path_to_str(&path)?.into()),
             );
-            table
-        });
-        let docs_rs_metadata = toml::Value::Table({
-            let mut table = toml::value::Table::new();
-            table.insert(
-                "features".to_string(),
-                vec![toml::Value::String("ritual_rustdoc".into())].into(),
-            );
-            table
-        });
-        let mut table = toml::value::Table::new();
-        table.insert("package".to_string(), package);
-        table.insert("dependencies".to_string(), dependencies);
-        table.insert("build-dependencies".to_string(), build_dependencies);
-        table.insert("features".to_string(), features);
-        table.insert("package.metadata.docs.rs".to_string(), docs_rs_metadata);
-        recursive_merge_toml(
-            toml::Value::Table(table),
-            toml::Value::Table(data.config.crate_properties().custom_fields().clone()),
-        )
+            Ok(value.into())
+        }
     };
+
+    let mut dependencies = toml::value::Table::new();
+    if !data
+        .config
+        .crate_properties()
+        .should_remove_default_dependencies()
+    {
+        dependencies.insert(
+            "cpp_core".into(),
+            dep_value(versions::CPP_CORE_VERSION, Some(repo_dir_path("cpp_core")?))?,
+        );
+        for dep in data.config.dependent_cpp_crates() {
+            dependencies.insert(
+                dep.into(),
+                dep_value(
+                    data.db.dependency_version(dep)?,
+                    Some(data.workspace.crate_path(dep)),
+                )?,
+            );
+        }
+    }
+    for dep in data.config.crate_properties().dependencies() {
+        dependencies.insert(
+            dep.name().into(),
+            dep_value(dep.version(), dep.local_path().map(PathBuf::from))?,
+        );
+    }
+    let mut build_dependencies = toml::value::Table::new();
+    if !data
+        .config
+        .crate_properties()
+        .should_remove_default_build_dependencies()
+    {
+        build_dependencies.insert(
+            "ritual_build".into(),
+            dep_value(
+                versions::RITUAL_BUILD_VERSION,
+                Some(repo_dir_path("ritual_build")?),
+            )?,
+        );
+    }
+    for dep in data.config.crate_properties().build_dependencies() {
+        build_dependencies.insert(
+            dep.name().into(),
+            dep_value(dep.version(), dep.local_path().map(PathBuf::from))?,
+        );
+    }
+    let mut features = toml::value::Table::new();
+    features.insert("ritual_rustdoc".into(), toml::value::Array::new().into());
+
+    let mut table = toml::value::Table::new();
+    table.insert("package".into(), package.into());
+    table.insert("dependencies".into(), dependencies.into());
+    table.insert("build-dependencies".into(), build_dependencies.into());
+    table.insert("features".into(), features.into());
+
+    let cargo_toml_data = recursive_merge_toml(
+        toml::Value::Table(table),
+        toml::Value::Table(data.config.crate_properties().custom_fields().clone()),
+    );
     save_toml_table(output_path.join("Cargo.toml"), &cargo_toml_data)?;
 
     if let Some(template_path) = &data.config.crate_template_path() {
