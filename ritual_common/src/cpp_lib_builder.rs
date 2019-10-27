@@ -3,10 +3,11 @@
 use crate::cpp_build_config::{CppBuildConfigData, CppBuildPaths, CppLibraryType};
 use crate::errors::{err_msg, Result};
 use crate::file_utils::{create_dir_all, file_to_string, path_to_str};
-use crate::target;
 use crate::utils::{run_command, run_command_and_capture_output, CommandOutput, MapIfOk};
+use crate::{env_var_names, target};
 use itertools::Itertools;
 use serde_derive::{Deserialize, Serialize};
+use std::env;
 use std::fmt::Display;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -154,6 +155,10 @@ impl CppLibBuilder {
             for var in actual_cmake_vars {
                 cmake_command.arg(format!("-D{}={}", var.name, var.value));
             }
+            if let Ok(args) = env::var(env_var_names::CMAKE_ARGS) {
+                cmake_command.args(shell_words::split(&args)?);
+            }
+
             if self.capture_output {
                 let output = run_command_and_capture_output(&mut cmake_command)?;
                 if !output.is_success() {
