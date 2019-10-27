@@ -41,7 +41,7 @@ fn detect_closest_version(known: &[&str], current: &str) -> Result<Option<String
 }
 
 /// Runs the build script.
-pub fn run_and_return(crate_name: &str) -> Result<()> {
+pub fn try_run(crate_name: &str) -> Result<()> {
     env_logger::init();
 
     let qt_config = get_full_build_config(crate_name, None)?;
@@ -95,12 +95,12 @@ pub fn run_and_return(crate_name: &str) -> Result<()> {
 
     config.set_cpp_build_config(qt_config.cpp_build_config);
     config.set_cpp_build_paths(qt_config.cpp_build_paths);
-    config.run_and_return()
+    config.try_run()
 }
 
 /// Runs the build script and exits the process with an appropriate exit code.
 pub fn run(crate_name: &str) -> ! {
-    run_and_return(crate_name).fancy_unwrap();
+    try_run(crate_name).fancy_unwrap();
     std::process::exit(0);
 }
 

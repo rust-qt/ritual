@@ -109,7 +109,7 @@ impl Config {
     }
 
     /// Same as `run()`, but result of the operation is returned to the caller.
-    pub fn run_and_return(mut self) -> Result<()> {
+    pub fn try_run(mut self) -> Result<()> {
         let current_target = LibraryTarget {
             target: current_target(),
             cpp_library_version: self.current_cpp_library_version.clone(),
@@ -250,14 +250,14 @@ impl Config {
     /// This function ends the process with the appropriate error code and never
     /// returns to the caller.
     pub fn run(self) -> ! {
-        self.run_and_return().fancy_unwrap();
+        self.try_run().fancy_unwrap();
         process::exit(0)
     }
 }
 
 /// Same as `run()`, but result of the operation is returned to the caller.
-pub fn run_and_return() -> Result<()> {
-    Config::new()?.run_and_return()
+pub fn try_run() -> Result<()> {
+    Config::new()?.try_run()
 }
 
 /// Runs the build script with default configuration.
