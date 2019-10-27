@@ -179,10 +179,28 @@ fn generate_crate_template(data: &mut ProcessorData<'_>, output_path: &Path) -> 
             }
             table
         });
+        let features = toml::Value::Table({
+            let mut table = toml::value::Table::new();
+            table.insert(
+                "ritual_rustdoc".to_string(),
+                toml::value::Array::new().into(),
+            );
+            table
+        });
+        let docs_rs_metadata = toml::Value::Table({
+            let mut table = toml::value::Table::new();
+            table.insert(
+                "features".to_string(),
+                vec![toml::Value::String("ritual_rustdoc".into())].into(),
+            );
+            table
+        });
         let mut table = toml::value::Table::new();
         table.insert("package".to_string(), package);
         table.insert("dependencies".to_string(), dependencies);
         table.insert("build-dependencies".to_string(), build_dependencies);
+        table.insert("features".to_string(), features);
+        table.insert("package.metadata.docs.rs".to_string(), docs_rs_metadata);
         recursive_merge_toml(
             toml::Value::Table(table),
             toml::Value::Table(data.config.crate_properties().custom_fields().clone()),

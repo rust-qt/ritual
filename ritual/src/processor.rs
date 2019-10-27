@@ -8,7 +8,6 @@ use crate::{
 use itertools::Itertools;
 use log::{error, info, trace};
 use regex::Regex;
-use ritual_common::env_var_names;
 use ritual_common::env_var_names::WORKSPACE_TARGET_DIR;
 use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
 use ritual_common::utils::{run_command, MapIfOk};
@@ -209,11 +208,7 @@ fn build_crate(data: &mut ProcessorData<'_>) -> Result<()> {
 
     for cargo_cmd in &["build", "doc", "test"] {
         let mut command = Command::new("cargo");
-        command
-            .arg(cargo_cmd)
-            .arg("-p")
-            .arg(crate_name)
-            .current_dir(path);
+        command.arg(cargo_cmd).arg("-p").arg(crate_name);
 
         if let Ok(dir) = env::var(WORKSPACE_TARGET_DIR) {
             command.env("CARGO_TARGET_DIR", dir);
@@ -222,7 +217,15 @@ fn build_crate(data: &mut ProcessorData<'_>) -> Result<()> {
         }
 
         if cargo_cmd == &"doc" {
-            command.env(env_var_names::RUSTDOC, "1");
+            command.arg("--features").arg("ritual_rustdoc");
+            // --features can't be used in workspace:
+            // https://github.com/rust-lang/cargo/issues/5015
+            command.current_dir(
+                data.workspace
+                    .crate_path(data.config.crate_properties().name()),
+            );
+        } else {
+            command.current_dir(path);
         }
         // if cargo_cmd == &"build" {
         //     command.arg("-vv");
