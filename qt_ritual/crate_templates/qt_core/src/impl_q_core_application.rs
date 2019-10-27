@@ -1,5 +1,5 @@
 use crate::{QCoreApplication, QString};
-use cpp_core::{MutPtr, MutRef};
+use cpp_core::{vector_ops::VectorAsSlice, MutPtr, MutRef};
 use std::iter::once;
 use std::os::raw::{c_char, c_int};
 use std::process;
@@ -33,7 +33,7 @@ impl QCoreApplicationArgs {
             .map(|arg| unsafe {
                 QString::from_std_str(&arg)
                     .to_local8_bit()
-                    .as_slice()
+                    .vector_as_slice()
                     .iter()
                     .map(|&c| c as u8)
                     .chain(once(0))

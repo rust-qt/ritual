@@ -1,15 +1,17 @@
+use cpp_core::vector_ops::{VectorAsMutSlice, VectorAsSlice};
+
 #[test]
 fn qrect() {
     unsafe {
         let mut array = qt_core::QByteArray::new();
 
-        assert!(array.as_slice().is_empty());
+        assert!(array.vector_as_slice().is_empty());
         array.append_char(42);
         array.append_char(46);
 
-        assert_eq!(array.as_slice(), &[42, 46]);
+        assert_eq!(array.vector_as_slice(), &[42, 46]);
 
-        let slice = array.as_mut_slice();
+        let slice = array.vector_as_mut_slice();
         slice[1] = 47;
         drop(slice);
 
