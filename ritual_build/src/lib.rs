@@ -29,12 +29,11 @@ use ritual_common::cpp_lib_builder::{BuildType, CMakeConfigData, CppLibBuilder};
 use ritual_common::errors::{bail, err_msg, FancyUnwrap, Result, ResultExt};
 use ritual_common::file_utils::{create_file, file_to_string, load_json, path_to_str};
 use ritual_common::target::{current_target, LibraryTarget, OS};
-use ritual_common::utils::{exe_suffix, get_command_output};
 use ritual_common::{env_var_names, BuildScriptData};
 use std::env;
 use std::io::Write;
 use std::path::PathBuf;
-use std::process::{self, Command};
+use std::process;
 
 /// Configuration of the build script.
 #[derive(Debug)]
@@ -191,13 +190,6 @@ impl Config {
                 "{}",
                 file_to_string(manifest_dir.join("src").join("ffi.in.rs"))?
             )?;
-        }
-        {
-            info!("Requesting type sizes");
-            let mut command =
-                Command::new(c_lib_install_dir.join(format!("sized_types{}", exe_suffix())));
-            let mut file = create_file(out_dir.join("sized_types.rs"))?;
-            write!(file, "{}", get_command_output(&mut command)?)?;
         }
 
         for name in cpp_build_config_data.linked_libs() {

@@ -82,21 +82,8 @@ if(RITUAL_COMPILER_FLAGS)
     set (CMAKE_CXX_FLAGS "${{CMAKE_CXX_FLAGS}} ${{RITUAL_COMPILER_FLAGS}}")
 endif()
 
-add_executable(sized_types sized_types.cxx)
-
-if(RITUAL_LINKED_FRAMEWORKS)
-    foreach(framework ${{RITUAL_LINKED_FRAMEWORKS}})
-        ADD_OSX_FRAMEWORK(${{framework}} sized_types)
-    endforeach()
-endif()
-
-
-# disable qt verision tagging to allow compiling sized_types without
-# linking to the libraries
-target_compile_definitions(sized_types PRIVATE QT_NO_VERSION_TAGGING)
-
 install(
-    TARGETS {lib_name_lowercase} sized_types
+    TARGETS {lib_name_lowercase}
     LIBRARY DESTINATION .
     ARCHIVE DESTINATION .
     RUNTIME DESTINATION .
