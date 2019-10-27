@@ -83,6 +83,7 @@ enum ProcessedFfiItem {
 #[derive(Debug, Clone, Copy)]
 enum ReturnTypeConstraint {
     Bool,
+    Usize,
     Unit,
     Any,
 }
@@ -556,53 +557,54 @@ impl TraitImplInfo {
                         };
                         return Some(info);
                     }
+                    "data" => {
+                        if function.return_type.is_pointer() {
+                            let info = if member.is_const {
+                                TraitImplInfo {
+                                    trait_path: "cpp_core::vector_ops::Data",
+                                    function_name: "data",
+                                    is_unsafe: true,
+                                    is_inherent: true,
+                                    self_arg_kind: RustFunctionSelfArgKind::ConstRef,
+                                    has_output_associated_type: true,
+                                    trait_arg_is_second_arg_type: false,
+                                    second_arg_is_reference: false,
+                                    return_type_constraint: ReturnTypeConstraint::Any,
+                                    target_is_reference: false,
+                                }
+                            } else {
+                                TraitImplInfo {
+                                    trait_path: "cpp_core::vector_ops::DataMut",
+                                    function_name: "data_mut",
+                                    is_unsafe: true,
+                                    is_inherent: true,
+                                    self_arg_kind: RustFunctionSelfArgKind::MutRef,
+                                    has_output_associated_type: true,
+                                    trait_arg_is_second_arg_type: false,
+                                    second_arg_is_reference: false,
+                                    return_type_constraint: ReturnTypeConstraint::Any,
+                                    target_is_reference: false,
+                                }
+                            };
+                            return Some(info);
+                        }
+                    }
+                    "size" => {
+                        return Some(TraitImplInfo {
+                            trait_path: "cpp_core::vector_ops::Size",
+                            function_name: "size",
+                            is_unsafe: true,
+                            is_inherent: true,
+                            self_arg_kind: RustFunctionSelfArgKind::ConstRef,
+                            has_output_associated_type: false,
+                            trait_arg_is_second_arg_type: false,
+                            second_arg_is_reference: false,
+                            return_type_constraint: ReturnTypeConstraint::Usize,
+                            target_is_reference: false,
+                        });
+                    }
                     _ => {}
                 }
-            }
-
-            let templateless_path = function.path.to_templateless_string();
-            if templateless_path == "std::vector::data" {
-                let info = if member.is_const {
-                    TraitImplInfo {
-                        trait_path: "cpp_std::vector_ops::Data",
-                        function_name: "data",
-                        is_unsafe: true,
-                        is_inherent: true,
-                        self_arg_kind: RustFunctionSelfArgKind::ConstRef,
-                        has_output_associated_type: true,
-                        trait_arg_is_second_arg_type: false,
-                        second_arg_is_reference: false,
-                        return_type_constraint: ReturnTypeConstraint::Any,
-                        target_is_reference: false,
-                    }
-                } else {
-                    TraitImplInfo {
-                        trait_path: "cpp_std::vector_ops::DataMut",
-                        function_name: "data_mut",
-                        is_unsafe: true,
-                        is_inherent: true,
-                        self_arg_kind: RustFunctionSelfArgKind::MutRef,
-                        has_output_associated_type: true,
-                        trait_arg_is_second_arg_type: false,
-                        second_arg_is_reference: false,
-                        return_type_constraint: ReturnTypeConstraint::Any,
-                        target_is_reference: false,
-                    }
-                };
-                return Some(info);
-            } else if templateless_path == "std::vector::size" {
-                return Some(TraitImplInfo {
-                    trait_path: "cpp_std::vector_ops::Size",
-                    function_name: "size",
-                    is_unsafe: true,
-                    is_inherent: true,
-                    self_arg_kind: RustFunctionSelfArgKind::ConstRef,
-                    has_output_associated_type: false,
-                    trait_arg_is_second_arg_type: false,
-                    second_arg_is_reference: false,
-                    return_type_constraint: ReturnTypeConstraint::Any,
-                    target_is_reference: false,
-                });
             }
         }
         None
@@ -1153,6 +1155,16 @@ impl State<'_, '_> {
                     function.return_type = RustFinalType::new(
                         function.return_type.ffi_type().clone(),
                         RustToFfiTypeConversion::UnitToAnything,
+                    )?;
+                }
+            }
+            ReturnTypeConstraint::Usize => {
+                if function.return_type.api_type() != &RustType::Primitive("usize".into()) {
+                    function.return_type = RustFinalType::new(
+                        function.return_type.ffi_type().clone(),
+                        RustToFfiTypeConversion::AsCast {
+                            api_type: RustType::Primitive("usize".into()),
+                        },
                     )?;
                 }
             }

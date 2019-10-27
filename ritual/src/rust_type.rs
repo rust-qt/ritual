@@ -164,6 +164,10 @@ pub enum RustToFfiTypeConversion {
     },
     /// `()` to any type
     UnitToAnything,
+    /// Primitive to another primitive using `as`
+    AsCast {
+        api_type: RustType,
+    },
     /// Rust public type has an additional reference (`&`)
     RefTo(Box<RustToFfiTypeConversion>),
     ImplCastInto(Box<RustToFfiTypeConversion>),
@@ -279,7 +283,8 @@ impl RustFinalType {
                     generic_arguments: Some(vec![target.clone()]),
                 })
             }
-            RustToFfiTypeConversion::QFlagsToUInt { api_type } => api_type.clone(),
+            RustToFfiTypeConversion::QFlagsToUInt { api_type }
+            | RustToFfiTypeConversion::AsCast { api_type } => api_type.clone(),
             RustToFfiTypeConversion::UnitToAnything => RustType::unit(),
             RustToFfiTypeConversion::RefTo(conversion) => {
                 let intermediate = RustFinalType::new(ffi_type.clone(), (**conversion).clone())?;

@@ -291,8 +291,10 @@ impl Generator<'_> {
                 .condition(self.current_database.environments());
             if condition != Condition::True {
                 let expression = condition_expression(&condition);
-                condition_texts.attribute =
-                    format!("#[cfg(any({}, ritual_rustdoc))]\n", expression);
+                condition_texts.attribute = format!(
+                    "#[cfg(any({}, feature = \"ritual_rustdoc\"))]\n",
+                    expression
+                );
                 condition_texts.doc_text =
                     format!("\n\nThis item is available if `{}`.", expression);
             }
@@ -677,6 +679,9 @@ impl Generator<'_> {
                 )
             }
             RustToFfiTypeConversion::UnitToAnything => format!("let _ = {};", source_expr),
+            RustToFfiTypeConversion::AsCast { api_type } => {
+                format!("{} as {}", source_expr, self.rust_type_to_code(api_type))
+            }
             RustToFfiTypeConversion::RefTo(conversion) => {
                 let intermediate =
                     RustFinalType::new(type1.ffi_type().clone(), (**conversion).clone())?;
@@ -748,6 +753,9 @@ impl Generator<'_> {
             RustToFfiTypeConversion::QFlagsToUInt { .. } => format!("{}.to_int()", expr),
             RustToFfiTypeConversion::UnitToAnything => {
                 bail!("UnitToAnything is not possible to use in argument position");
+            }
+            RustToFfiTypeConversion::AsCast { .. } => {
+                format!("{} as {}", expr, self.rust_type_to_code(type1.ffi_type()))
             }
             RustToFfiTypeConversion::RefTo(conversion) => {
                 let intermediate =
