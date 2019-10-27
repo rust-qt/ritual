@@ -1,5 +1,6 @@
 use crate::ops::{Begin, BeginMut, Decrement, End, EndMut, Increment, Indirection};
 use crate::{CppBox, CppDeletable, MutPtr, MutRef, Ptr, Ref};
+use std::os::raw::c_char;
 
 /// `Iterator` and `DoubleEndedIterator` backed by C++ iterators.
 ///
@@ -153,5 +154,31 @@ where
 
     fn into_iter(self) -> Self::IntoIter {
         unsafe { cpp_iter(self.begin_mut(), self.end_mut()) }
+    }
+}
+
+pub trait SliceAsBeginEnd {
+    type Item;
+    fn begin_ptr(&self) -> Ptr<Self::Item>;
+    fn end_ptr(&self) -> Ptr<Self::Item>;
+}
+
+impl<'a, T> SliceAsBeginEnd for &'a [T] {
+    type Item = T;
+    fn begin_ptr(&self) -> Ptr<T> {
+        unsafe { Ptr::from_raw(self.as_ptr()) }
+    }
+    fn end_ptr(&self) -> Ptr<T> {
+        unsafe { Ptr::from_raw(self.as_ptr().add(self.len())) }
+    }
+}
+
+impl<'a> SliceAsBeginEnd for &'a str {
+    type Item = c_char;
+    fn begin_ptr(&self) -> Ptr<c_char> {
+        unsafe { Ptr::from_raw(self.as_ptr() as *const c_char) }
+    }
+    fn end_ptr(&self) -> Ptr<c_char> {
+        unsafe { Ptr::from_raw(self.as_ptr().add(self.len()) as *const c_char) }
     }
 }

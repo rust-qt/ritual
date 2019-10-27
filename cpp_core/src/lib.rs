@@ -51,12 +51,12 @@
 //! pass a null pointer object (`NullPtr`) if you don't have a value
 //! (`Ptr::null()` is also an option but it can cause type inference issues).
 
-#![deny(missing_docs)]
+//#![deny(missing_docs)]
 
 pub use crate::casts::{DynamicCast, StaticDowncast, StaticUpcast};
 pub use crate::convert::{CastFrom, CastInto};
 pub use crate::cpp_box::{CppBox, CppDeletable};
-pub use crate::iterator::{cpp_iter, CppIterator};
+pub use crate::iterator::{cpp_iter, CppIterator, SliceAsBeginEnd};
 pub use crate::ptr::{MutPtr, NullPtr, Ptr};
 pub use crate::ref_::{MutRef, Ref};
 pub use libc::wchar_t;
@@ -70,7 +70,7 @@ pub mod ops;
 mod ops_impls;
 mod ptr;
 mod ref_;
-mod vector_ops;
+pub mod vector_ops;
 
 // C++ doesn't guarantee these types to be exactly u16 and u32,
 // but they are on all supported platforms.
