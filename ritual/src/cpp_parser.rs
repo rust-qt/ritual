@@ -593,11 +593,35 @@ impl CppParser<'_, '_> {
             bail!("Volatile type");
         }
         let display_name = type1.get_display_name();
-        if &display_name == "std::list<T>" {
+        if display_name == "std::list<T>" {
             bail!(
                 "Type blacklisted because it causes crash on Windows: {}",
                 display_name
             );
+        }
+        if display_name == "std::__cxx11::basic_string::const_reference"
+            || display_name == "std::vector::const_reference"
+        {
+            return Ok(CppType::new_reference(
+                true,
+                CppType::TemplateParameter(CppTemplateParameter {
+                    name: "T".into(),
+                    nested_level: 0,
+                    index: 0,
+                }),
+            ));
+        }
+        if display_name == "std::__cxx11::basic_string::reference"
+            || display_name == "std::vector::reference"
+        {
+            return Ok(CppType::new_reference(
+                false,
+                CppType::TemplateParameter(CppTemplateParameter {
+                    name: "T".into(),
+                    nested_level: 0,
+                    index: 0,
+                }),
+            ));
         }
         match type1.get_kind() {
             TypeKind::Typedef => {
