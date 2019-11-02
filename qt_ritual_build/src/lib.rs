@@ -34,9 +34,9 @@ fn detect_closest_version(known: &[&str], current: &str) -> Result<Option<String
     }
 
     if let Some(version) = known.iter().filter(|&v| v < &current).max() {
-        return Ok(Some(version.to_string()));
+        Ok(Some(version.to_string()))
     } else {
-        return Ok(None);
+        Ok(None)
     }
 }
 
