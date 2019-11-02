@@ -9,8 +9,8 @@ public:
     QByteArray(const char*, int) {}
     QByteArray() {}
     char* data();
-    const char * data() const;
-    const char *constData() const;
+    const char* data() const;
+    const char* constData() const;
     int size() const;
     const char* begin() const;
     const char* end() const;

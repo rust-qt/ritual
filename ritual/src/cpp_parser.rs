@@ -15,13 +15,14 @@ use crate::database::ItemId;
 use crate::processor::ProcessorData;
 use clang::diagnostic::{Diagnostic, Severity};
 use clang::*;
-use dunce::canonicalize;
 use itertools::Itertools;
 use log::{debug, trace, warn};
 use regex::Regex;
 use ritual_common::env_var_names;
 use ritual_common::errors::{bail, err_msg, format_err, print_trace, Result, ResultExt};
-use ritual_common::file_utils::{create_file, open_file, os_str_to_str, path_to_str, remove_file};
+use ritual_common::file_utils::{
+    canonicalize, create_file, open_file, os_str_to_str, path_to_str, remove_file,
+};
 use ritual_common::target::{current_target, LibraryTarget};
 use std::io::Write;
 use std::mem;
@@ -443,7 +444,10 @@ impl CppParser<'_, '_> {
                             ) {
                                 Ok(arg_type) => arg_types.push(arg_type),
                                 Err(msg) => {
-                                    bail!("(1) Template argument of unexposed type is not parsed: {}: {}",                        arg, msg
+                                    bail!(
+                                        "Template argument of unexposed type is not parsed: {}: {}",
+                                        arg,
+                                        msg
                                     );
                                 }
                             }
@@ -567,7 +571,7 @@ impl CppParser<'_, '_> {
                         Ok(arg_type) => arg_types.push(arg_type),
                         Err(msg) => {
                             bail!(
-                                "(2) Template argument of unexposed type is not parsed: {}: {}",
+                                "Template argument of unexposed type is not parsed: {}: {}",
                                 arg,
                                 msg
                             );

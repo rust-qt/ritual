@@ -371,15 +371,8 @@ impl Iterator for ReadDir {
 /// adds this prefix, but many tools don't process it correctly, including
 /// CMake and compilers.
 pub fn canonicalize<P: AsRef<Path>>(path: P) -> Result<PathBuf> {
-    let r = fs::canonicalize(path.as_ref())
-        .with_context(|_| format!("failed to canonicalize {}", path.as_ref().display()))?;
-    {
-        let str = path_to_str(&r)?;
-        if str.starts_with(r"\\?\") {
-            return Ok(PathBuf::from(&str[4..]));
-        }
-    }
-    Ok(r)
+    Ok(dunce::canonicalize(path.as_ref())
+        .with_context(|_| format!("failed to canonicalize {}", path.as_ref().display()))?)
 }
 
 /// A wrapper over `Path::to_str` with better error reporting
