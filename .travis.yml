@@ -1,6 +1,6 @@
 __common: &common
     language: rust
-    rust: 1.36.0
+    rust: 1.38.0
     script: scripts/travis/run.bash
     cache:
         directories:
