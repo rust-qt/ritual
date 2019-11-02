@@ -14,7 +14,7 @@ use std::path::PathBuf;
 
 mod after_cpp_parser;
 
-pub const CPP_STD_VERSION: &str = "0.0.0";
+pub const CPP_STD_VERSION: &str = "0.1.0";
 pub const STD_HEADERS_PATH_ENV_VAR_NAME: &str = "RITUAL_STD_HEADERS";
 
 fn create_config() -> Result<Config> {
