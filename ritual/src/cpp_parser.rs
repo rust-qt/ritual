@@ -69,7 +69,7 @@ pub struct CppParserOutput(pub Vec<CppParserOutputItem>);
 
 /// Implementation of the C++ parser that extracts information
 /// about the C++ library's API from its headers.
-struct CppParser<'b, 'a: 'b> {
+struct CppParser<'b, 'a> {
     data: &'b mut ProcessorData<'a>,
     current_target_paths: Vec<PathBuf>,
     source_id: Option<ItemId>,
@@ -943,7 +943,7 @@ impl CppParser<'_, '_> {
                     }
                 }
                 EntityKind::ClassTemplatePartialSpecialization => {
-                    bail!("this function is part of a template partial specialization");;
+                    bail!("this function is part of a template partial specialization");
                 }
                 _ => None,
             },

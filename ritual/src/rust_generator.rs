@@ -650,7 +650,7 @@ fn check_trait_impl_uniqueness(
     Ok(())
 }
 
-struct State<'b, 'a: 'b> {
+struct State<'b, 'a> {
     data: &'b mut ProcessorData<'a>,
     special_module_paths: HashMap<RustSpecialModuleKind, RustPath>,
 }

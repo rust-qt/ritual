@@ -194,7 +194,7 @@ impl CppCheckerInstance {
     }
 }
 
-struct CppChecker<'b, 'a: 'b> {
+struct CppChecker<'b, 'a> {
     data: &'b mut ProcessorData<'a>,
 }
 

@@ -22,7 +22,7 @@ impl<'a> {pub_type_name}<'a> {{
 
         self.clear();
         // TODO: avoid second Box
-        let mut func_box: Box<Box<FnMut({args}) + 'a>> = Box::new(Box::new(f));
+        let mut func_box: Box<Box<dyn FnMut({args}) + 'a>> = Box::new(Box::new(f));
         unsafe {{
             self.raw_slot.set(
                 Some(callback),
