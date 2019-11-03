@@ -4,6 +4,8 @@
 //! (https://github.com/rust-qt/ritual)
 //! for more information.
 
+pub use ritual_common as common;
+
 pub mod cli;
 pub mod cluster_api;
 pub mod config;
