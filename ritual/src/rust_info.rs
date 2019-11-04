@@ -827,9 +827,13 @@ impl RustPathScope {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NameType<'a> {
-    Type,
+    Type {
+        is_from_other_crate: bool,
+    },
     EnumValue,
-    Module,
+    Module {
+        is_from_other_crate: bool,
+    },
     FfiFunction,
     ApiFunction(DbItem<&'a CppFfiFunction>),
     ReceiverFunction {
@@ -846,6 +850,13 @@ impl NameType<'_> {
     pub fn is_api_function(&self) -> bool {
         match self {
             NameType::ApiFunction(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_module(&self) -> bool {
+        match self {
+            NameType::Module { .. } => true,
             _ => false,
         }
     }

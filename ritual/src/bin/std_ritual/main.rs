@@ -139,8 +139,8 @@ fn create_config() -> Result<Config> {
             };
 
             let name = match name_type {
-                NameType::Type => format!("cpp_std::{}", rust_name),
-                NameType::Module => format!("cpp_std::{}", rust_name.to_snake_case()),
+                NameType::Type { .. } => format!("cpp_std::{}", rust_name),
+                NameType::Module { .. } => format!("cpp_std::{}", rust_name.to_snake_case()),
                 _ => bail!("unexpected name type for std::basic_string"),
             };
             return Ok(Some(RustPath::from_good_str(&name)));

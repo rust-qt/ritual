@@ -88,6 +88,10 @@ impl ItemId {
             id,
         }
     }
+
+    pub fn crate_name(&self) -> &str {
+        &self.crate_name
+    }
 }
 
 impl fmt::Display for ItemId {
