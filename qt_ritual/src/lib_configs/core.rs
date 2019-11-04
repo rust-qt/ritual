@@ -306,6 +306,18 @@ pub fn core_config(config: &mut Config) -> Result<()> {
     config.add_cpp_checker_tests(tests);
 
     config.add_after_cpp_parser_hook(add_find_child_methods);
+
+    // for moqt_core
+    let namespace = CppPath::from_good_str("ignored_ns");
+    config.set_rust_path_scope_hook(move |path| {
+        if path == &namespace {
+            return Ok(Some(RustPathScope {
+                path: RustPath::from_good_str("moqt_core"),
+                prefix: None,
+            }));
+        }
+        Ok(None)
+    });
     Ok(())
 }
 

@@ -32,4 +32,34 @@ namespace ns1 {
         }
     }
 
+    template<class T>
+    MOQT_CORE_EXPORT class Templated1 {
+    public:
+        T x() { return 0; }
+    };
+
+    MOQT_CORE_EXPORT class ClassNs {
+    public:
+        MOQT_CORE_EXPORT class Class1 {};
+
+        template<class T>
+        MOQT_CORE_EXPORT class Templated2 {
+        public:
+            T y() { return 0; }
+        };
+    };
 }
+
+namespace ignored_ns {
+    MOQT_CORE_EXPORT class Class3 {};
+
+    template<class T>
+    MOQT_CORE_EXPORT class Templated3 {
+    public:
+        T get() { return 0; }
+    };
+};
+
+MOQT_CORE_EXPORT ns1::Templated1<int> func1();
+MOQT_CORE_EXPORT ns1::ClassNs::Templated2<bool> func2();
+MOQT_CORE_EXPORT ignored_ns::Templated3<int> func3();
