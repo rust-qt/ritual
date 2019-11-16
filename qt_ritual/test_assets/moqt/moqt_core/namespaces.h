@@ -33,17 +33,17 @@ namespace ns1 {
     }
 
     template<class T>
-    MOQT_CORE_EXPORT class Templated1 {
+    class MOQT_CORE_EXPORT Templated1 {
     public:
         T x() { return 0; }
     };
 
-    MOQT_CORE_EXPORT class ClassNs {
+    class MOQT_CORE_EXPORT ClassNs {
     public:
-        MOQT_CORE_EXPORT class Class1 {};
+        class MOQT_CORE_EXPORT Class1 {};
 
         template<class T>
-        MOQT_CORE_EXPORT class Templated2 {
+        class MOQT_CORE_EXPORT Templated2 {
         public:
             T y() { return 0; }
         };
@@ -51,10 +51,10 @@ namespace ns1 {
 }
 
 namespace ignored_ns {
-    MOQT_CORE_EXPORT class Class3 {};
+    class MOQT_CORE_EXPORT Class3 {};
 
     template<class T>
-    MOQT_CORE_EXPORT class Templated3 {
+    class MOQT_CORE_EXPORT Templated3 {
     public:
         T get() { return 0; }
     };
