@@ -3,18 +3,68 @@ use crate::cpp_data::{CppItem, CppPath};
 use crate::cpp_ffi_data::CppFfiItem;
 use crate::rust_info::RustItem;
 use crate::rust_type::RustPath;
-use log::{debug, error, info, trace};
+use log::{debug, error, info, trace, warn};
+use once_cell::sync::OnceCell;
 use ritual_common::errors::{bail, err_msg, format_err, Result};
+use ritual_common::file_utils::load_json;
 use ritual_common::string_utils::ends_with_digit;
 use ritual_common::target::LibraryTarget;
 use ritual_common::ReadOnly;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::fmt;
 use std::iter::once;
-use std::sync::Arc;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+use std::{fmt, mem};
 
 pub const CRATE_DB_FILE_NAME: &str = "ritual_db_v1.json";
+
+pub struct DatabaseCache(HashMap<PathBuf, IndexedDatabase>);
+
+impl DatabaseCache {
+    pub fn global() -> &'static Mutex<Self> {
+        static INSTANCE: OnceCell<Mutex<DatabaseCache>> = OnceCell::new();
+        INSTANCE.get_or_init(|| Mutex::new(DatabaseCache(HashMap::new())))
+    }
+
+    pub fn get(
+        &mut self,
+        path: impl AsRef<Path>,
+        crate_name: &str,
+        allow_load: bool,
+        allow_create: bool,
+    ) -> Result<IndexedDatabase> {
+        let path = PathBuf::from(path.as_ref());
+        if allow_load {
+            if let Some(r) = self.0.remove(&path) {
+                return Ok(r);
+            }
+            if path.exists() {
+                info!("Loading database for {}", crate_name);
+                let db = load_json(&path)?;
+                return Ok(IndexedDatabase::new(db, path));
+            }
+        }
+        if allow_create {
+            let db = Database::empty(crate_name.into());
+            return Ok(IndexedDatabase::new(db, path));
+        }
+        bail!("can't get database for {}", crate_name);
+    }
+
+    pub fn put(&mut self, db: IndexedDatabase) {
+        let path = db.path.clone();
+        let r = self.0.insert(path, db);
+        if r.is_some() {
+            warn!("duplicate db put in cache");
+        }
+    }
+
+    pub fn remove_if_exists(&mut self, path: impl AsRef<Path>) {
+        let path = PathBuf::from(path.as_ref());
+        self.0.remove(&path);
+    }
+}
 
 pub struct ItemWithSource<T> {
     pub source_id: ItemId,
@@ -251,10 +301,6 @@ impl Database {
         }
     }
 
-    pub(crate) fn crate_name(&self) -> &str {
-        &self.crate_name
-    }
-
     fn items(&self) -> impl Iterator<Item = DbItem<&DatabaseItemData>> {
         self.items.iter().map(|item| item.as_ref())
     }
@@ -286,15 +332,17 @@ impl Database {
 #[derive(Debug)]
 pub struct IndexedDatabase {
     db: Database,
+    path: PathBuf,
     source_id_to_index: HashMap<Option<ItemId>, Vec<usize>>,
     cpp_path_to_index: HashMap<CppPath, Vec<usize>>,
     rust_path_to_index: HashMap<RustPath, usize>,
 }
 
 impl IndexedDatabase {
-    pub fn new(db: Database) -> Self {
+    pub fn new(db: Database, path: PathBuf) -> Self {
         let mut value = Self {
             db,
+            path,
             source_id_to_index: HashMap::new(),
             cpp_path_to_index: HashMap::new(),
             rust_path_to_index: HashMap::new(),
@@ -394,6 +442,22 @@ pub struct DatabaseClient {
     counters: Counters,
 }
 
+impl Drop for DatabaseClient {
+    fn drop(&mut self) {
+        let current_database = mem::replace(
+            &mut self.current_database,
+            IndexedDatabase::new(Database::empty(String::new()), PathBuf::new()),
+        );
+        let dependencies = mem::replace(&mut self.dependencies, ReadOnly::new(Vec::new()));
+
+        let mut cache = DatabaseCache::global().lock().unwrap();
+        cache.put(current_database);
+        for dependency in dependencies.into_inner() {
+            cache.put(dependency);
+        }
+    }
+}
+
 impl DatabaseClient {
     pub fn new(
         current_database: IndexedDatabase,
@@ -405,10 +469,6 @@ impl DatabaseClient {
             is_modified: false,
             counters: Counters::default(),
         }
-    }
-
-    pub fn into_inner(self) -> (IndexedDatabase, ReadOnly<Vec<IndexedDatabase>>) {
-        (self.current_database, self.dependencies)
     }
 
     pub fn data(&self) -> &Database {
