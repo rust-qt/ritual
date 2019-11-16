@@ -1,13 +1,8 @@
 [package]
 name = "ritual_build"
 edition = "2018"
-
-# Don't forget to update `ritual/src/versions.rs`
-# when changing this version.
 version = "0.3.0"
-
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
-
 description = "Build script implementation for C++ library wrappers"
 repository = "https://github.com/rust-qt/ritual"
 license = "MIT OR Apache-2.0"

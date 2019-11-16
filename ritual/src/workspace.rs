@@ -1,4 +1,6 @@
-use crate::database::{Database, DatabaseClient, IndexedDatabase};
+use crate::config::{CrateDependency, CrateDependencyKind, CrateDependencySource};
+use crate::database::{DatabaseCache, DatabaseClient, CRATE_DB_FILE_NAME};
+use crate::download_db::download_db;
 use log::info;
 use ritual_common::errors::{bail, Result};
 use ritual_common::file_utils::{
@@ -22,7 +24,6 @@ pub struct WorkspaceConfig {}
 pub struct Workspace {
     path: PathBuf,
     config: WorkspaceConfig,
-    databases: Vec<IndexedDatabase>,
 }
 
 fn config_path(path: &Path) -> PathBuf {
@@ -41,7 +42,7 @@ impl Workspace {
             bail!("No such directory: {}", path.display());
         }
         let config_path = config_path(&path);
-        for &dir in &["tmp", "out", "log", "backup", "db"] {
+        for &dir in &["tmp", "out", "log", "backup", "db", "external_db"] {
             create_dir_all(path.join(dir))?;
         }
         let w = Workspace {
@@ -51,7 +52,6 @@ impl Workspace {
             } else {
                 WorkspaceConfig::default()
             },
-            databases: Vec::new(),
         };
         Ok(w)
     }
@@ -80,79 +80,51 @@ impl Workspace {
         self.path.join("out").join(crate_name)
     }
 
-    // TODO: import published crates
-
-    fn take_loaded_crate(&mut self, crate_name: &str) -> Option<IndexedDatabase> {
-        self.databases
-            .iter()
-            .position(|d| d.database().crate_name() == crate_name)
-            .and_then(|i| Some(self.databases.swap_remove(i)))
-    }
-    /*
-    pub fn crate_exists(&self, crate_name: &str) -> bool {
-      database_path(&self.path, crate_name).exists()
-    }
-
-    pub fn create_crate(&mut self, crate_name: &str) -> Result<()> {
-      create_dir(self.path.join(crate_name))?;
-      save_json(database_path(&self.path, data.crate_name()), &Database::empty(crate_name))?;
-      Ok(())
-    }*/
-
     pub fn delete_database_if_exists(&mut self, crate_name: &str) -> Result<()> {
-        self.databases
-            .retain(|d| d.database().crate_name() != crate_name);
         let path = database_path(&self.path, crate_name);
+        let mut cache = DatabaseCache::global().lock().unwrap();
+        cache.remove_if_exists(&path);
         if path.exists() {
             remove_file(path)?;
         }
         Ok(())
     }
 
-    fn get_database(
+    pub fn get_database_client(
         &mut self,
         crate_name: &str,
-        allow_load: bool,
-        allow_create: bool,
-    ) -> Result<IndexedDatabase> {
-        if allow_load {
-            if let Some(r) = self.take_loaded_crate(crate_name) {
-                return Ok(r);
-            }
-            let path = database_path(&self.path, crate_name);
-            if path.exists() {
-                info!("Loading database for {}", crate_name);
-                let db = load_json(path)?;
-                return Ok(IndexedDatabase::new(db));
-            }
-        }
-        if allow_create {
-            let db = Database::empty(crate_name.into());
-            return Ok(IndexedDatabase::new(db));
-        }
-        bail!("can't get database");
-    }
-
-    pub fn get_database_client<'a>(
-        &mut self,
-        crate_name: &str,
-        dependency_names: impl Iterator<Item = &'a str>,
+        dependencies: &[CrateDependency],
         allow_load: bool,
         allow_create: bool,
     ) -> Result<DatabaseClient> {
-        let current_database = self.get_database(crate_name, allow_load, allow_create)?;
-        let dependencies =
-            dependency_names.map_if_ok(|name| self.get_database(name, true, false))?;
+        let mut cache = DatabaseCache::global().lock().unwrap();
+
+        let current_database = cache.get(
+            self.database_path(crate_name),
+            crate_name,
+            allow_load,
+            allow_create,
+        )?;
+        let dependencies = dependencies
+            .iter()
+            .filter(|dep| dep.kind() == CrateDependencyKind::Ritual)
+            .map_if_ok(|dependency| {
+                let path = match dependency.source() {
+                    CrateDependencySource::CratesIo { version } => {
+                        self.external_db_path(dependency.name(), version)?
+                    }
+                    CrateDependencySource::Local { path } => path.join(CRATE_DB_FILE_NAME),
+                    CrateDependencySource::CurrentWorkspace => {
+                        self.database_path(dependency.name())
+                    }
+                };
+
+                cache.get(path, dependency.name(), true, false)
+            })?;
         Ok(DatabaseClient::new(
             current_database,
             ReadOnly::new(dependencies),
         ))
-    }
-
-    pub fn put_database_client(&mut self, client: DatabaseClient) {
-        let (db, dependencies) = client.into_inner();
-        self.databases.push(db);
-        self.databases.extend(dependencies.into_inner());
     }
 
     fn database_backup_path(&self, crate_name: &str) -> PathBuf {
@@ -200,5 +172,15 @@ impl Workspace {
             &toml::Value::Table(cargo_toml),
         )?;
         Ok(())
+    }
+
+    fn external_db_path(&mut self, crate_name: &str, crate_version: &str) -> Result<PathBuf> {
+        let path = self
+            .path
+            .join(format!("external_db/{}_{}.json", crate_name, crate_version));
+        if !path.exists() {
+            download_db(crate_name, crate_version, &path)?;
+        }
+        Ok(path)
     }
 }

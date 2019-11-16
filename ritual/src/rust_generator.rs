@@ -1,3 +1,4 @@
+use crate::config::CrateDependencyKind;
 use crate::cpp_checks::CppChecks;
 use crate::cpp_data::{CppItem, CppPath, CppPathItem, CppTypeDeclaration, CppTypeDeclarationKind};
 use crate::cpp_ffi_data::{
@@ -1601,6 +1602,7 @@ impl State<'_, '_> {
         parent_path: &CppPath,
         name_type: NameType<'_>,
     ) -> Result<RustPathScope> {
+        trace!("get_path_scope({:?}, {:?})", parent_path, name_type);
         if let Some(hook) = self.data.config.rust_path_scope_hook() {
             if let Some(strategy) = hook(parent_path)? {
                 return Ok(strategy);
@@ -1610,7 +1612,7 @@ impl State<'_, '_> {
         let allow_module_for_nested;
         let allow_wrapper_type;
         match name_type {
-            NameType::Type | NameType::Module => {
+            NameType::Type { .. } | NameType::Module { .. } => {
                 allow_module_for_nested = true;
                 allow_wrapper_type = false;
             }
@@ -1620,10 +1622,26 @@ impl State<'_, '_> {
             }
         };
 
-        let rust_item = self
+        let mut rust_items = match self
             .data
             .db
-            .find_rust_items_for_cpp_path(parent_path, false)?
+            .find_rust_items_for_cpp_path(parent_path, false)
+        {
+            Ok(r) => r,
+            Err(err) => match name_type {
+                NameType::Type {
+                    is_from_other_crate,
+                }
+                | NameType::Module {
+                    is_from_other_crate,
+                } if is_from_other_crate => {
+                    return Ok(self.default_path_scope());
+                }
+                _ => return Err(err),
+            },
+        };
+
+        let rust_item = rust_items
             .find(|item| {
                 (allow_wrapper_type && item.item.is_wrapper_type())
                     || (item.item.is_module() && !item.item.is_module_for_nested())
@@ -1784,8 +1802,8 @@ impl State<'_, '_> {
                 // crate root
                 self.default_path_scope()
             }
-            NameType::Type
-            | NameType::Module
+            NameType::Type { .. }
+            | NameType::Module { .. }
             | NameType::EnumValue
             | NameType::ApiFunction { .. }
             | NameType::ReceiverFunction { .. } => {
@@ -1842,7 +1860,7 @@ impl State<'_, '_> {
                     RustQtReceiverType::Slot => format!("slot_{}", name),
                 }
             }
-            NameType::Type | NameType::EnumValue => {
+            NameType::Type { .. } | NameType::EnumValue => {
                 if cpp_path.to_templateless_string() == "std::vector" {
                     // remove allocator template argument
                     let mut path_item = cpp_path.last().clone();
@@ -1856,7 +1874,7 @@ impl State<'_, '_> {
                         .to_class_case()
                 }
             }
-            NameType::Module => self
+            NameType::Module { .. } => self
                 .cpp_path_item_to_name(&cpp_path.last(), &scope.path, &name_type)?
                 .to_snake_case(),
             NameType::FfiFunction => cpp_path.last().name.clone(),
@@ -1882,8 +1900,7 @@ impl State<'_, '_> {
             return Ok(rust_path);
         }
 
-        let sanitized_name =
-            sanitize_rust_identifier(&full_last_name, name_type == NameType::Module);
+        let sanitized_name = sanitize_rust_identifier(&full_last_name, name_type.is_module());
         let rust_path = scope.apply(&sanitized_name);
 
         if name_type.is_api_function() {
@@ -1913,6 +1930,7 @@ impl State<'_, '_> {
 
     #[allow(clippy::useless_let_if_seq)]
     fn process_cpp_class(&self, item: DbItem<&CppTypeDeclaration>) -> Result<Vec<RustItem>> {
+        trace!("process_cpp_class: {:?}", item);
         let data = item.item;
 
         // TODO: do something about `QUrlTwoFlags<T1, T2>`
@@ -1943,13 +1961,19 @@ impl State<'_, '_> {
             }
         }
 
+        let is_from_other_crate = item
+            .source_id
+            .map_or(false, |id| id.crate_name() != self.data.db.crate_name());
+
         let public_name_type = if let Some(wrapper) = &qt_slot_wrapper {
             NameType::QtSlotWrapper {
                 signal_arguments: &wrapper.item.signal_arguments,
                 is_public: false,
             }
         } else {
-            NameType::Type
+            NameType::Type {
+                is_from_other_crate,
+            }
         };
 
         let public_path = self.generate_rust_path(&data.path, public_name_type)?;
@@ -1987,7 +2011,12 @@ impl State<'_, '_> {
             wrapper_kind = RustWrapperTypeKind::ImmovableClassWrapper;
         }
 
-        let nested_types_path = self.generate_rust_path(&data.path, NameType::Module)?;
+        let nested_types_path = self.generate_rust_path(
+            &data.path,
+            NameType::Module {
+                is_from_other_crate,
+            },
+        )?;
 
         let nested_types_rust_item = RustItem::Module(RustModule {
             is_public: true,
@@ -2078,7 +2107,12 @@ impl State<'_, '_> {
 
         match &cpp_item.item {
             CppItem::Namespace(namespace) => {
-                let rust_path = self.generate_rust_path(&namespace.path, NameType::Module)?;
+                let rust_path = self.generate_rust_path(
+                    &namespace.path,
+                    NameType::Module {
+                        is_from_other_crate: false,
+                    },
+                )?;
                 let rust_item = RustItem::Module(RustModule {
                     is_public: true,
                     path: rust_path,
@@ -2091,7 +2125,12 @@ impl State<'_, '_> {
                     self.process_cpp_class(cpp_item.map(|v| v.as_type_ref().unwrap()))
                 }
                 CppTypeDeclarationKind::Enum => {
-                    let rust_path = self.generate_rust_path(&data.path, NameType::Type)?;
+                    let rust_path = self.generate_rust_path(
+                        &data.path,
+                        NameType::Type {
+                            is_from_other_crate: false,
+                        },
+                    )?;
                     let rust_item = RustItem::Struct(RustStruct {
                         path: rust_path,
                         kind: RustStructKind::WrapperType(RustWrapperTypeKind::EnumWrapper),
@@ -2459,9 +2498,15 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     }
 
     state.generate_crate_reexport("cpp_core")?;
-    let dependencies = state.data.config.dependent_cpp_crates().to_vec();
-    for crate_name in dependencies {
-        state.generate_crate_reexport(&crate_name)?;
+    let dependencies = state
+        .data
+        .config
+        .crate_properties()
+        .dependencies()
+        .iter()
+        .filter(|dep| dep.kind() == CrateDependencyKind::Ritual);
+    for dependency in dependencies {
+        state.generate_crate_reexport(dependency.name())?;
     }
 
     state.process_cpp_items()?;

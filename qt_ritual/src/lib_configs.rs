@@ -3,11 +3,10 @@
 use crate::detect_signals_and_slots::detect_signals_and_slots;
 use crate::doc_parser::{parse_docs, set_crate_root_doc};
 use crate::slot_wrappers::add_slot_wrappers;
-use crate::versions;
 use log::info;
 use qt_ritual_common::{all_crate_names, get_full_build_config, lib_dependencies, lib_folder_name};
-use ritual::config::CrateProperties;
-use ritual::config::{Config, GlobalConfig};
+use ritual::config::{Config, CrateDependencyKind, GlobalConfig};
+use ritual::config::{CrateDependencySource, CrateProperties};
 use ritual_common::cpp_build_config::CppLibraryType;
 use ritual_common::cpp_build_config::{CppBuildConfigData, CppBuildPaths};
 use ritual_common::errors::{bail, format_err, Result, ResultExt};
@@ -31,6 +30,9 @@ use std::env;
 pub const MOQT_INSTALL_DIR_ENV_VAR_NAME: &str = "MOQT_INSTALL_DIR";
 pub const MOQT_TEMPLATE_DIR_ENV_VAR_NAME: &str = "MOQT_TEMPLATE_DIR";
 
+/// Version of all generated Qt crates
+const QT_OUTPUT_CRATES_VERSION: &str = "0.4.0";
+
 fn empty_config(_config: &mut Config) -> Result<()> {
     Ok(())
 }
@@ -38,7 +40,7 @@ fn empty_config(_config: &mut Config) -> Result<()> {
 /// Executes the generator for a single Qt module with given configuration.
 pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Config> {
     info!("Preparing generator config for crate: {}", crate_name);
-    let mut crate_properties = CrateProperties::new(crate_name, versions::QT_OUTPUT_CRATES_VERSION);
+    let mut crate_properties = CrateProperties::new(crate_name, QT_OUTPUT_CRATES_VERSION);
     let mut custom_fields = toml::value::Table::new();
     let mut package_data = toml::value::Table::new();
     package_data.insert(
@@ -78,6 +80,15 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
 
     custom_fields.insert("package".to_string(), toml::Value::Table(package_data));
     crate_properties.set_custom_fields(custom_fields);
+
+    for &dependency in lib_dependencies(crate_name)? {
+        crate_properties.add_dependency(
+            dependency,
+            CrateDependencyKind::Ritual,
+            CrateDependencySource::CurrentWorkspace,
+        )?;
+    }
+
     let mut config = if crate_name.starts_with("moqt_") {
         let mut config = Config::new(crate_properties);
         let moqt_path =
@@ -157,9 +168,10 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
         crate_properties.remove_default_build_dependencies();
         crate_properties.add_build_dependency(
             "qt_ritual_build",
-            versions::QT_RITUAL_BUILD_VERSION,
-            Some(repo_dir_path("qt_ritual_build")?),
-        );
+            CrateDependencySource::Local {
+                path: repo_dir_path("qt_ritual_build")?,
+            },
+        )?;
 
         let mut config = Config::new(crate_properties);
 
@@ -228,12 +240,6 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
     };
     lib_config(&mut config)?;
 
-    config.set_dependent_cpp_crates(
-        lib_dependencies(crate_name)?
-            .iter()
-            .map(|s| s.to_string())
-            .collect(),
-    );
     Ok(config)
 }
 

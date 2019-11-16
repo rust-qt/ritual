@@ -250,7 +250,9 @@ fn run_clang<R, F: FnMut(Entity<'_>) -> Result<R>>(
         "-detailed-preprocessing-record".to_string(),
     ];
     args.extend_from_slice(config.cpp_parser_arguments());
-    for dir in config.cpp_build_paths().include_paths() {
+    let mut cpp_build_paths = config.cpp_build_paths().clone();
+    cpp_build_paths.apply_env();
+    for dir in cpp_build_paths.include_paths() {
         let str = path_to_str(dir)?;
         args.push("-I".to_string());
         args.push(str.to_string());

@@ -308,19 +308,19 @@ pub fn process(
         allow_load = true;
     }
 
-    let mut current_database = workspace
+    let mut db_client = workspace
         .get_database_client(
             config.crate_properties().name(),
-            config.dependent_cpp_crates().iter().map(|s| s.as_str()),
+            config.crate_properties().dependencies(),
             allow_load,
             true,
         )
         .with_context(|_| "failed to load current crate data")?;
 
-    current_database.set_crate_version(config.crate_properties().version().to_string());
+    db_client.set_crate_version(config.crate_properties().version().to_string());
 
     if let Some(trace_item_id) = trace_item_id {
-        current_database.print_item_trace(trace_item_id)?;
+        db_client.print_item_trace(trace_item_id)?;
         return Ok(());
     }
 
@@ -381,11 +381,15 @@ pub fn process(
                 .find(|item| item.name == step_name)
                 .expect("step name must be valid (checked above)");
 
+            if step.name == "crate_writer" {
+                workspace.save_database(&mut db_client)?;
+            }
+
             info!("Running processing step: {}", &step.name);
 
             let mut data = ProcessorData {
                 workspace,
-                db: &mut current_database,
+                db: &mut db_client,
                 config,
             };
 
@@ -400,16 +404,15 @@ pub fn process(
             let elapsed = started_time.elapsed();
             trace!("Step '{}' completed in {:?}", step.name, elapsed);
 
-            current_database.report_counters();
+            db_client.report_counters();
 
             if elapsed > Duration::from_secs(15) {
-                workspace.save_database(&mut current_database)?;
+                workspace.save_database(&mut db_client)?;
             }
         }
     }
 
-    workspace.save_database(&mut current_database)?;
-    workspace.put_database_client(current_database);
+    workspace.save_database(&mut db_client)?;
 
     steps_result
 }

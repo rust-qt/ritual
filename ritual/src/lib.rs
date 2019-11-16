@@ -4,6 +4,8 @@
 //! (https://github.com/rust-qt/ritual)
 //! for more information.
 
+pub use ritual_common as common;
+
 pub mod cli;
 pub mod cluster_api;
 pub mod config;
@@ -25,13 +27,13 @@ pub mod cpp_type;
 mod crate_writer;
 pub mod database;
 mod doc_formatter;
+mod download_db;
 pub mod processor;
 mod rust_code_generator;
 mod rust_generator;
 pub mod rust_info;
 pub mod rust_type;
 mod type_allocation_places;
-mod versions;
 pub mod workspace;
 
 #[cfg(test)]

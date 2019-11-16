@@ -57,3 +57,19 @@ fn reexport() {
         let _ = QPoint::new_0a();
     }
 }
+
+#[test]
+fn template_classes() {
+    unsafe {
+        let _a: CppBox<moqt_core::ns1::Templated1OfInt> = moqt_gui::get_same_template1();
+        let _b: CppBox<moqt_core::ns1::class_ns::Templated2OfBool> = moqt_gui::get_same_template2();
+        let _c: CppBox<moqt_core::Templated3OfInt> = moqt_gui::get_same_template3();
+
+        let mut d: CppBox<moqt_gui::Templated1OfFloat> = moqt_gui::get_new_template1();
+        d.x();
+        let mut e: CppBox<moqt_gui::Templated2OfFloat> = moqt_gui::get_new_template2();
+        e.y();
+        let mut f: CppBox<moqt_gui::Templated3OfFloat> = moqt_gui::get_new_template3();
+        f.get();
+    }
+}

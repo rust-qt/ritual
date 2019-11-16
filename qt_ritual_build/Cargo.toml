@@ -1,11 +1,7 @@
 [package]
 name = "qt_ritual_build"
 edition = "2018"
-
-# Don't forget to update `qt_ritual/src/versions.rs`
-# when changing this version.
 version = "0.3.0"
-
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 license = "MIT OR Apache-2.0"
 description = "Build script implementation for Rust Qt crates"

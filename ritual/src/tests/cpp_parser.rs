@@ -9,7 +9,6 @@ use ritual_common::cpp_build_config::CppBuildPaths;
 use ritual_common::file_utils::create_dir;
 use ritual_common::file_utils::create_file;
 use std::io::Write;
-use std::iter;
 
 struct ParserCppData {
     types: Vec<CppTypeDeclaration>,
@@ -44,7 +43,7 @@ fn run_parser(code: &'static str) -> ParserCppData {
     processor::process(&mut workspace, &config, &["cpp_parser".into()], None).unwrap();
 
     let database = workspace
-        .get_database_client("A", iter::empty(), true, false)
+        .get_database_client("A", &[], true, false)
         .unwrap();
 
     ParserCppData {

@@ -14,7 +14,7 @@ use std::path::PathBuf;
 
 mod after_cpp_parser;
 
-pub const CPP_STD_VERSION: &str = "0.1.0";
+pub const CPP_STD_VERSION: &str = "0.1.1";
 pub const STD_HEADERS_PATH_ENV_VAR_NAME: &str = "RITUAL_STD_HEADERS";
 
 fn create_config() -> Result<Config> {
@@ -139,8 +139,8 @@ fn create_config() -> Result<Config> {
             };
 
             let name = match name_type {
-                NameType::Type => format!("cpp_std::{}", rust_name),
-                NameType::Module => format!("cpp_std::{}", rust_name.to_snake_case()),
+                NameType::Type { .. } => format!("cpp_std::{}", rust_name),
+                NameType::Module { .. } => format!("cpp_std::{}", rust_name.to_snake_case()),
                 _ => bail!("unexpected name type for std::basic_string"),
             };
             return Ok(Some(RustPath::from_good_str(&name)));
