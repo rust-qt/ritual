@@ -27,6 +27,7 @@ pub mod cpp_type;
 mod crate_writer;
 pub mod database;
 mod doc_formatter;
+mod download_db;
 pub mod processor;
 mod rust_code_generator;
 mod rust_generator;

@@ -1,4 +1,6 @@
-use crate::database::{DatabaseCache, DatabaseClient, IndexedDatabase};
+use crate::config::{CrateDependency, CrateDependencyKind, CrateDependencySource};
+use crate::database::{DatabaseCache, DatabaseClient, CRATE_DB_FILE_NAME};
+use crate::download_db::download_db;
 use log::info;
 use ritual_common::errors::{bail, Result};
 use ritual_common::file_utils::{
@@ -40,7 +42,7 @@ impl Workspace {
             bail!("No such directory: {}", path.display());
         }
         let config_path = config_path(&path);
-        for &dir in &["tmp", "out", "log", "backup", "db"] {
+        for &dir in &["tmp", "out", "log", "backup", "db", "external_db"] {
             create_dir_all(path.join(dir))?;
         }
         let w = Workspace {
@@ -88,31 +90,37 @@ impl Workspace {
         Ok(())
     }
 
-    fn get_database(
+    pub fn get_database_client(
         &mut self,
         crate_name: &str,
+        dependencies: &[CrateDependency],
         allow_load: bool,
         allow_create: bool,
-    ) -> Result<IndexedDatabase> {
+    ) -> Result<DatabaseClient> {
         let mut cache = DatabaseCache::global().lock().unwrap();
-        cache.get(
+
+        let current_database = cache.get(
             self.database_path(crate_name),
             crate_name,
             allow_load,
             allow_create,
-        )
-    }
+        )?;
+        let dependencies = dependencies
+            .iter()
+            .filter(|dep| dep.kind() == CrateDependencyKind::Ritual)
+            .map_if_ok(|dependency| {
+                let path = match dependency.source() {
+                    CrateDependencySource::CratesIo { version } => {
+                        self.external_db_path(dependency.name(), version)?
+                    }
+                    CrateDependencySource::Local { path } => path.join(CRATE_DB_FILE_NAME),
+                    CrateDependencySource::CurrentWorkspace => {
+                        self.database_path(dependency.name())
+                    }
+                };
 
-    pub fn get_database_client<'a>(
-        &mut self,
-        crate_name: &str,
-        dependency_names: impl Iterator<Item = &'a str>,
-        allow_load: bool,
-        allow_create: bool,
-    ) -> Result<DatabaseClient> {
-        let current_database = self.get_database(crate_name, allow_load, allow_create)?;
-        let dependencies =
-            dependency_names.map_if_ok(|name| self.get_database(name, true, false))?;
+                cache.get(path, dependency.name(), true, false)
+            })?;
         Ok(DatabaseClient::new(
             current_database,
             ReadOnly::new(dependencies),
@@ -164,5 +172,15 @@ impl Workspace {
             &toml::Value::Table(cargo_toml),
         )?;
         Ok(())
+    }
+
+    fn external_db_path(&mut self, crate_name: &str, crate_version: &str) -> Result<PathBuf> {
+        let path = self
+            .path
+            .join(format!("external_db/{}_{}.json", crate_name, crate_version));
+        if !path.exists() {
+            download_db(crate_name, crate_version, &path)?;
+        }
+        Ok(path)
     }
 }

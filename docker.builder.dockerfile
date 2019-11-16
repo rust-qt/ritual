@@ -2,7 +2,7 @@ FROM debian:buster as ritual_builder
 ENV APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=DontWarn
 RUN apt-get update && \
     apt-get install -y build-essential mesa-common-dev libgl1-mesa-glx \
-                       cmake curl software-properties-common && \
+                       cmake curl software-properties-common libssl-dev pkg-config && \
     curl https://apt.llvm.org/llvm-snapshot.gpg.key -sSf | apt-key add - && \
     add-apt-repository "deb http://apt.llvm.org/buster/ llvm-toolchain-buster main" && \
     apt-get update && \
