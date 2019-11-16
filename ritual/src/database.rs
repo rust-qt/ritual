@@ -14,6 +14,8 @@ use std::fmt;
 use std::iter::once;
 use std::sync::Arc;
 
+pub const CRATE_DB_FILE_NAME: &str = "ritual_db_v1.json";
+
 pub struct ItemWithSource<T> {
     pub source_id: ItemId,
     pub item: T,

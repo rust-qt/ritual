@@ -1,5 +1,6 @@
 use crate::cpp_code_generator;
 use crate::cpp_code_generator::generate_cpp_type_size_requester;
+use crate::database::CRATE_DB_FILE_NAME;
 use crate::processor::ProcessorData;
 use crate::rust_code_generator;
 use crate::versions;
@@ -285,5 +286,11 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         },
         None,
     )?;
+
+    copy_file(
+        data.workspace.database_path(crate_name),
+        output_path.join(CRATE_DB_FILE_NAME),
+    )?;
+
     Ok(())
 }

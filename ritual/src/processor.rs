@@ -381,6 +381,10 @@ pub fn process(
                 .find(|item| item.name == step_name)
                 .expect("step name must be valid (checked above)");
 
+            if step.name == "crate_writer" {
+                workspace.save_database(&mut current_database)?;
+            }
+
             info!("Running processing step: {}", &step.name);
 
             let mut data = ProcessorData {
