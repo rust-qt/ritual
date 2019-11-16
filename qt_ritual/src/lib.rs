@@ -5,7 +5,6 @@ mod doc_parser;
 pub mod lib_configs;
 mod mock_doc_parser;
 mod slot_wrappers;
-mod versions;
 
 #[cfg(test)]
 mod test_moqt;

@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::{Config, CrateDependencyKind};
 use crate::database::{DatabaseClient, ItemId};
 use crate::workspace::Workspace;
 use crate::{
@@ -311,7 +311,12 @@ pub fn process(
     let mut current_database = workspace
         .get_database_client(
             config.crate_properties().name(),
-            config.dependent_cpp_crates().iter().map(|s| s.as_str()),
+            config
+                .crate_properties()
+                .dependencies()
+                .iter()
+                .filter(|dep| dep.kind() == CrateDependencyKind::Ritual)
+                .map(|dep| dep.name()),
             allow_load,
             true,
         )

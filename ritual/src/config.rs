@@ -7,18 +7,31 @@ use crate::processor::{ProcessingSteps, ProcessorData};
 use crate::rust_info::{NameType, RustPathScope};
 use crate::rust_type::RustPath;
 use ritual_common::cpp_build_config::{CppBuildConfig, CppBuildPaths};
-use ritual_common::errors::Result;
+use ritual_common::errors::{bail, Result};
 use ritual_common::target::Target;
 use ritual_common::toml;
 use serde_derive::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-/// Information about an extra non-`cpp_to_rust`-based dependency.
-#[derive(Default, Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CrateDependencyKind {
+    Normal,
+    Ritual,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum CrateDependencySource {
+    CratesIo { version: String },
+    Local { path: PathBuf },
+    CurrentWorkspace,
+}
+
+/// Information about a crate dependency.
+#[derive(Debug, Clone)]
 pub struct CrateDependency {
     name: String,
-    version: String,
-    local_path: Option<PathBuf>,
+    kind: CrateDependencyKind,
+    source: CrateDependencySource,
 }
 
 impl CrateDependency {
@@ -26,13 +39,13 @@ impl CrateDependency {
     pub fn name(&self) -> &str {
         &self.name
     }
-    /// Version of the crate (as in `Cargo.toml`)
-    pub fn version(&self) -> &str {
-        &self.version
+
+    pub fn kind(&self) -> CrateDependencyKind {
+        self.kind
     }
-    /// Local path to the dependency (if present).
-    pub fn local_path(&self) -> Option<&Path> {
-        self.local_path.as_ref().map(PathBuf::as_path)
+
+    pub fn source(&self) -> &CrateDependencySource {
+        &self.source
     }
 }
 
@@ -73,31 +86,40 @@ impl CrateProperties {
 
     /// Adds an extra non-`cpp_to_rust`-based dependency with
     /// `name`, `version` and optionally `local_path`.
-    pub fn add_dependency<S1: Into<String>, S2: Into<String>>(
+    pub fn add_dependency(
         &mut self,
-        name: S1,
-        version: S2,
-        local_path: Option<PathBuf>,
-    ) {
+        name: impl Into<String>,
+        kind: CrateDependencyKind,
+        source: CrateDependencySource,
+    ) -> Result<()> {
+        if kind == CrateDependencyKind::Normal && source == CrateDependencySource::CurrentWorkspace
+        {
+            bail!("cannot use CurrentWorkspace for normal dependencies");
+        }
         self.dependencies.push(CrateDependency {
             name: name.into(),
-            version: version.into(),
-            local_path,
+            kind,
+            source,
         });
+        Ok(())
     }
+
     /// Adds an extra build dependency with
     /// `name`, `version` and optionally `local_path`.
-    pub fn add_build_dependency<S1: Into<String>, S2: Into<String>>(
+    pub fn add_build_dependency(
         &mut self,
-        name: S1,
-        version: S2,
-        local_path: Option<PathBuf>,
-    ) {
+        name: impl Into<String>,
+        source: CrateDependencySource,
+    ) -> Result<()> {
+        if source == CrateDependencySource::CurrentWorkspace {
+            bail!("cannot use CurrentWorkspace for build dependencies");
+        }
         self.build_dependencies.push(CrateDependency {
             name: name.into(),
-            version: version.into(),
-            local_path,
+            kind: CrateDependencyKind::Normal,
+            source,
         });
+        Ok(())
     }
     /// Removes default dependencies from output `Cargo.toml`. Default
     /// dependencies are `libc`, `cpp_core` and crates added using
@@ -127,11 +149,11 @@ impl CrateProperties {
     }
 
     /// Extra non-`cpp_to_rust`-based dependencies of the crate
-    pub fn dependencies(&self) -> &Vec<CrateDependency> {
+    pub fn dependencies(&self) -> &[CrateDependency] {
         &self.dependencies
     }
     /// Extra build dependencies of the crate
-    pub fn build_dependencies(&self) -> &Vec<CrateDependency> {
+    pub fn build_dependencies(&self) -> &[CrateDependency] {
         &self.build_dependencies
     }
     /// Returns true if default dependencies were removed.
@@ -183,7 +205,6 @@ pub struct Config {
     crate_properties: CrateProperties,
     cpp_lib_version: Option<String>,
     crate_template_path: Option<PathBuf>,
-    dependent_cpp_crates: Vec<String>,
     include_directives: Vec<PathBuf>,
     target_include_paths: Vec<PathBuf>,
     cpp_build_config: CppBuildConfig,
@@ -215,7 +236,6 @@ impl Config {
         Config {
             crate_properties,
             crate_template_path: Default::default(),
-            dependent_cpp_crates: Default::default(),
             cpp_build_paths: Default::default(),
             target_include_paths: Default::default(),
             include_directives: Default::default(),
@@ -256,13 +276,6 @@ impl Config {
     /// Creating crate template is optional. The generator can make a crate without a template.
     pub fn set_crate_template_path<P: Into<PathBuf>>(&mut self, path: P) {
         self.crate_template_path = Some(path.into());
-    }
-
-    /// Sets list of names of crates created with `cpp_to_rust`.
-    /// The generator will integrate API of the current library with its
-    /// dependencies and re-use their types.
-    pub fn set_dependent_cpp_crates(&mut self, paths: Vec<String>) {
-        self.dependent_cpp_crates = paths;
     }
 
     /// Adds a command line argument for clang C++ parser.
@@ -349,11 +362,6 @@ impl Config {
     /// Returns value set by `Config::set_crate_template_path`.
     pub fn crate_template_path(&self) -> Option<&PathBuf> {
         self.crate_template_path.as_ref()
-    }
-
-    /// Returns value set by `Config::set_dependent_cpp_crates`.
-    pub fn dependent_cpp_crates(&self) -> &[String] {
-        &self.dependent_cpp_crates
     }
 
     /// Returns names added with `Config::add_cpp_parser_argument`

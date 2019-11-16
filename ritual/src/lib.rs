@@ -33,7 +33,6 @@ mod rust_generator;
 pub mod rust_info;
 pub mod rust_type;
 mod type_allocation_places;
-mod versions;
 pub mod workspace;
 
 #[cfg(test)]

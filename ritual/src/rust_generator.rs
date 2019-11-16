@@ -1,3 +1,4 @@
+use crate::config::CrateDependencyKind;
 use crate::cpp_checks::CppChecks;
 use crate::cpp_data::{CppItem, CppPath, CppPathItem, CppTypeDeclaration, CppTypeDeclarationKind};
 use crate::cpp_ffi_data::{
@@ -2497,9 +2498,15 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     }
 
     state.generate_crate_reexport("cpp_core")?;
-    let dependencies = state.data.config.dependent_cpp_crates().to_vec();
-    for crate_name in dependencies {
-        state.generate_crate_reexport(&crate_name)?;
+    let dependencies = state
+        .data
+        .config
+        .crate_properties()
+        .dependencies()
+        .iter()
+        .filter(|dep| dep.kind() == CrateDependencyKind::Ritual);
+    for dependency in dependencies {
+        state.generate_crate_reexport(dependency.name())?;
     }
 
     state.process_cpp_items()?;

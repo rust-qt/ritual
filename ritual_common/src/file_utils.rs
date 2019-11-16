@@ -2,7 +2,6 @@
 
 use crate::errors::{bail, err_msg, format_err, Result, ResultExt};
 use log::trace;
-use serde::de::DeserializeOwned;
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io::{self, BufRead, BufReader, BufWriter, Lines, Read, Write};
@@ -262,11 +261,22 @@ pub fn load_toml_table<P: AsRef<Path>>(path: P) -> Result<toml::value::Table> {
     }
 }
 
-pub fn load_toml<T: DeserializeOwned, P: AsRef<Path>>(path: P) -> Result<T> {
-    let data = file_to_string(path.as_ref())?;
-    let value = toml::from_str(&data)
-        .with_context(|_| format!("failed to parse TOML file: {}", path.as_ref().display()))?;
-    Ok(value)
+pub fn crate_version(path: impl AsRef<Path>) -> Result<String> {
+    let cargo_toml_path = path.as_ref().join("Cargo.toml");
+    let table = load_toml_table(cargo_toml_path)?;
+    let package = table
+        .get("package")
+        .ok_or_else(|| err_msg("Cargo.toml doesn't contain package field"))?;
+    let package = package
+        .as_table()
+        .ok_or_else(|| err_msg("invalid Cargo.toml: package is not a table"))?;
+    let version = package
+        .get("version")
+        .ok_or_else(|| err_msg("Cargo.toml doesn't contain package.version field"))?;
+    let version = version
+        .as_str()
+        .ok_or_else(|| err_msg("invalid Cargo.toml: package.version is not a string"))?;
+    Ok(version.into())
 }
 
 /// Save `data` to a TOML file

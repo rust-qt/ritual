@@ -1,13 +1,13 @@
+use crate::config::CrateDependencySource;
 use crate::cpp_code_generator;
 use crate::cpp_code_generator::generate_cpp_type_size_requester;
 use crate::database::CRATE_DB_FILE_NAME;
 use crate::processor::ProcessorData;
 use crate::rust_code_generator;
-use crate::versions;
 use ritual_common::errors::Result;
 use ritual_common::file_utils::{
-    copy_file, copy_recursively, create_dir, create_dir_all, create_file, diff_paths, path_to_str,
-    read_dir, remove_dir_all, repo_dir_path, save_json, save_toml_table,
+    copy_file, copy_recursively, crate_version, create_dir, create_dir_all, create_file,
+    diff_paths, path_to_str, read_dir, remove_dir_all, repo_dir_path, save_json, save_toml_table,
 };
 use ritual_common::toml;
 use ritual_common::utils::{run_command, MapIfOk};
@@ -102,19 +102,37 @@ fn generate_crate_template(data: &mut ProcessorData<'_>, output_path: &Path) -> 
         toml_table_with_single_item("docs", toml_table_with_single_item("rs", docs_rs_metadata)),
     );
 
-    let dep_value = |version: &str, local_path: Option<PathBuf>| -> Result<toml::Value> {
-        if local_path.is_none() || !data.config.write_dependencies_local_paths() {
-            Ok(toml::Value::String(version.into()))
+    let add_dependency = |table: &mut toml::value::Table,
+                          name: &str,
+                          source: &CrateDependencySource|
+     -> Result<()> {
+        let (version, local_path) = match source {
+            CrateDependencySource::CratesIo { version } => (version.to_string(), None),
+            CrateDependencySource::Local { path } => {
+                let version = crate_version(path)?;
+                (version, Some(path.clone()))
+            }
+            CrateDependencySource::CurrentWorkspace => {
+                let path = data.workspace.crate_path(name);
+                let version = data.db.dependency_version(name)?;
+                (version.to_string(), Some(path))
+            }
+        };
+
+        let value = if local_path.is_none() || !data.config.write_dependencies_local_paths() {
+            toml::Value::String(version)
         } else {
             let path = diff_paths(&local_path.expect("checked above"), &output_path)?;
             let mut value = toml::value::Table::new();
-            value.insert("version".into(), toml::Value::String(version.into()));
+            value.insert("version".into(), toml::Value::String(version));
             value.insert(
                 "path".into(),
                 toml::Value::String(path_to_str(&path)?.into()),
             );
-            Ok(value.into())
-        }
+            value.into()
+        };
+        table.insert(name.into(), value);
+        Ok(())
     };
 
     let mut dependencies = toml::value::Table::new();
@@ -123,25 +141,16 @@ fn generate_crate_template(data: &mut ProcessorData<'_>, output_path: &Path) -> 
         .crate_properties()
         .should_remove_default_dependencies()
     {
-        dependencies.insert(
-            "cpp_core".into(),
-            dep_value(versions::CPP_CORE_VERSION, Some(repo_dir_path("cpp_core")?))?,
-        );
-        for dep in data.config.dependent_cpp_crates() {
-            dependencies.insert(
-                dep.into(),
-                dep_value(
-                    data.db.dependency_version(dep)?,
-                    Some(data.workspace.crate_path(dep)),
-                )?,
-            );
-        }
+        add_dependency(
+            &mut dependencies,
+            "cpp_core",
+            &CrateDependencySource::Local {
+                path: repo_dir_path("cpp_core")?,
+            },
+        )?;
     }
     for dep in data.config.crate_properties().dependencies() {
-        dependencies.insert(
-            dep.name().into(),
-            dep_value(dep.version(), dep.local_path().map(PathBuf::from))?,
-        );
+        add_dependency(&mut dependencies, dep.name(), dep.source())?;
     }
     let mut build_dependencies = toml::value::Table::new();
     if !data
@@ -149,19 +158,16 @@ fn generate_crate_template(data: &mut ProcessorData<'_>, output_path: &Path) -> 
         .crate_properties()
         .should_remove_default_build_dependencies()
     {
-        build_dependencies.insert(
-            "ritual_build".into(),
-            dep_value(
-                versions::RITUAL_BUILD_VERSION,
-                Some(repo_dir_path("ritual_build")?),
-            )?,
-        );
+        add_dependency(
+            &mut build_dependencies,
+            "ritual_build",
+            &CrateDependencySource::Local {
+                path: repo_dir_path("ritual_build")?,
+            },
+        )?;
     }
     for dep in data.config.crate_properties().build_dependencies() {
-        build_dependencies.insert(
-            dep.name().into(),
-            dep_value(dep.version(), dep.local_path().map(PathBuf::from))?,
-        );
+        add_dependency(&mut build_dependencies, dep.name(), dep.source())?;
     }
     let mut features = toml::value::Table::new();
     features.insert("ritual_rustdoc".into(), toml::value::Array::new().into());
