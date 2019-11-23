@@ -2,36 +2,18 @@
 
 [![Build Status](https://travis-ci.com/rust-qt/ritual.svg?branch=master)](https://travis-ci.com/rust-qt/ritual/branches)
 
-`ritual` allows to use C++ libraries from Rust. This project provides Rust bindings to Qt.
+`ritual` allows to use C++ libraries from Rust. It analyzes the C++ API of a library and generates a fully-featured crate that provides convenient (but still unsafe) access to this API.
 
-## Using Qt from Rust
+The main motivation for this project is to provide access to Qt from Rust. Ritual provides large amount of automation, supports incremental runs, and implements compatible API evolution. This is mostly dictated by the huge size of API provided by Qt and significant API differences between Qt versions. However, ritual is designed to be universal and can also be used to easily create bindings for other C++ libraries.
 
-This project maintains the following Qt crates (more will hopefully be added in the future):
+# Examples and guides
 
-| Crate       | Version |
-| ----------- | ------- |
-| qt_core     | [![](http://meritbadge.herokuapp.com/qt_core)](https://crates.io/crates/qt_core) |
-| qt_gui      | [![](http://meritbadge.herokuapp.com/qt_gui)](https://crates.io/crates/qt_gui) |
-| qt_widgets  | [![](http://meritbadge.herokuapp.com/qt_widgets)](https://crates.io/crates/qt_widgets) |
-| qt_ui_tools | [![](http://meritbadge.herokuapp.com/qt_ui_tools)](https://crates.io/crates/qt_ui_tools) |
-| qt_3d_core | [![](http://meritbadge.herokuapp.com/qt_3d_core)](https://crates.io/crates/qt_3d_core) |
-| qt_3d_render | [![](http://meritbadge.herokuapp.com/qt_3d_render)](https://crates.io/crates/qt_3d_render) |
-| qt_3d_input | [![](http://meritbadge.herokuapp.com/qt_3d_input)](https://crates.io/crates/qt_3d_input) |
-| qt_3d_logic | [![](http://meritbadge.herokuapp.com/qt_3d_logic)](https://crates.io/crates/qt_3d_logic) |
-| qt_3d_extras | [![](http://meritbadge.herokuapp.com/qt_3d_extras)](https://crates.io/crates/qt_3d_extras) |
+- [How to use Qt from Rust](https://github.com/rust-qt/examples)
+- [How to use ritual on a C++ library of your choice](https://github.com/rust-qt/generator-example)
 
-If you just want to use these crates, add them as dependencies to your `Cargo.toml`, for example:
+The rest of this readme is focused on ritual's development.
 
-```
-[dependencies]
-qt_widgets = "0.2"
-```
-
-Each crate re-exports its depenencies, so, for example, you can access `qt_core` as `qt_widgets::qt_core` without adding an explicit dependency.
-
-[Online documentation](https://rust-qt.github.io/rustdoc/qt/qt_core) of published Qt crates (you may also run `cargo doc --open` to generate documentation for your crate's dependencies).
-
-## Repository structure
+# Repository structure
 
 - `ritual` is the main part of the generator;
 - `qt_ritual` provides Qt-specific generator features, generator configuration for the Qt crates, and a binary file for running the generator.
@@ -39,28 +21,52 @@ Each crate re-exports its depenencies, so, for example, you can access `qt_core`
 - `ritual_build` and `qt_ritual_build` provide build scripts for the generated crates;
 - `ritual_common` and `qt_ritual_common` contain common functionality for other crates.
 
-## Generating a crate for another C++ library
+# Setting up environment
 
-It's possible to use `ritual` on other C++ libraries, but the C++ standard library is not supported yet, so the options are limited at the moment.
+## Using docker (recommended)
 
-To process your library, create a binary crate that depends on `ritual`, create a `GlobalConfig` and pass it to `ritual::cli::run_from_args` function. An example will be provided in the future.
+To make sure the parsing results are consistent and reproducible, it's recommended to use a reproducible environment, such as provided by `docker`.
 
+Ritual provides `Dockerfile`s containing its dependencies:
 
+- `docker.builder.dockerfile` is the base image suitable for working on C++'s standard library. It also should be used as a base image when working on other C++ libraries.
+- `docker.qt.dockerfile` is the image used for generating Qt crates. 
 
-## Dependencies
+You can build the images with these commands:
+```
+cd ritual
+# for any libraries
+docker build . -f docker.builder.dockerfile -t ritual_builder
 
-It's recommended to use latest stable Rust version. Compatibility with older versions is not guaranteed.
+# only for Qt
+docker build . -f docker.qt.dockerfile --target qt_downloader -t ritual_qt_downloader
+docker build . -f docker.qt.dockerfile -t ritual_qt
+```
 
-Qt crates require:
+Note that the image contains only the environment. No pre-built ritual artifacts are included. This allows you to edit the source code of your generator and re-run it without the slow process of rebuilding the docker image. You can use `cargo` to run the generator, just like you would normally do it on the host system.
 
-- A C++ build toolchain, compatible with the Rust toolchain in use:
-  - On Linux: `make` and `g++`;
-  - On Windows: MSVC (Visual Studio or build tools) or MinGW environment;
-  - On OS X: the command line developer tools (full Xcode installation is not required);
-- [Qt](https://www.qt.io/download);
-- [cmake](https://cmake.org/).
+When running the container, mount `/build` to a persistent directory on the host system. This directory will contain all temporary build files, so making it persistent will allow you to recreate the container without having to recompile everything from scratch.  
 
-Note that C++ toolchain, Rust toolchain, and Qt build must be compatible. For example, MSVC and MinGW targets on Windows are not compatible. 
+In addition to the build directory, you should also mount one or more directories containing the source code of your generator and the ritual workspace directory (see below) to make it available in the container. The paths to these directories can be arbitrary.
+
+This is an example of command that runs a shell in the container:
+```
+docker run \
+    --mount type=bind,source=~/ritual/repo,destination=/repo \
+    --mount type=bind,source=~/ritual/qt_workspace,destination=/qt_workspace \
+    --mount type=bind,source=~/ritual/tmp,destination=/build \
+    --name ritual_qt \
+    --hostname ritual_qt \
+    -it \
+    ritual_qt \
+    bash
+```
+
+Use `cargo` to run the generator inside the container, just like in the host system.
+
+## Without docker
+
+In case you don't want or can't use `docker`, you can just install all required dependencies on your host system and run your generator natively with `cargo`, like any Rust project.
 
 `ritual` requires:
 
@@ -84,7 +90,7 @@ If `libsqlite3` is not installed system-wide, setting `SQLITE3_LIB_DIR` environm
 
 Run `cargo test` to make sure that dependencies are set up correctly.
 
-## Environment variables
+# Environment variables
 
 `ritual` may require `CLANG_SYSTEM_INCLUDE_PATH` environment variable set to path to `clang`'s system headers, e.g. `/usr/lib/llvm-3.8/lib/clang/3.8.0/include`. Without it, parsing may abort with an error like this:
 
@@ -100,7 +106,7 @@ Build scripts of generated crates accept `RITUAL_LIBRARY_PATH`, `RITUAL_FRAMEWOR
 
 C++ build tools and the linker may also read other environment variables, including `LIB`, `PATH`, `LIBRARY_PATH`, `LD_LIBRARY_PATH`, `DYLD_FRAMEWORK_PATH`. The generator has API for specifying library paths, passes them to `cmake` when building the C++ wrapper library, and reports the paths in build script's output, but it may not be enough for the linker to find the library, so you may need to set them manually.
 
-## Generator workflow
+# Generator workflow
 
 The generator itself (`ritual`) is a library which exposes API for configurating different aspects of the process. In order to run the generator and produce an output crate, one must use a binary crate (such as `qt_ritual`) and launch the generator using its API.
 
@@ -115,7 +121,7 @@ The generator runs in the following steps:
 1. The Rust code is saved to the output directory along with any extra files (tests, examples, etc.) provided by the caller. A build script necessary for building the crate is also attached.
 1. Internal information of the generator is written to the database file and can be used when processing the library's dependants.
 
-## C++/Rust features coverage
+# C++/Rust features coverage
 
 Supported features:
 
@@ -132,14 +138,16 @@ Supported features:
 - Methods inherited from base classes are available via `Deref` implementation (if the class has multiple bases, only the first base's methods are directly available).
 - Getter and setter methods are created for each public class field.
 - Operators are translated to Rust's operator trait implementations when possible.
+- C++ STL-style iterators are accessible from Rust via adaptors.
 
 Names of Rust identifiers are modified according to Rust's naming conventions.
 
-Not implemented yet but planned:
+Documentation is important! `ritual` generates `rustdoc` comments with information about corresponding C++ types and methods. Qt documentation is integrated in `rustdoc` comments.
+
+Not implemented yet but can be implemented in the future:
 
 - Translate C++ `typedef`s to Rust type aliases.
 - Implement `Debug` and `Display` traits for structs if applicable methods exist on C++ side.
-- Implement iterator traits for collections.
 - ([Implement subclassing API](https://github.com/rust-qt/ritual/issues/26)).
 
 Not planned to support:
@@ -147,7 +155,7 @@ Not planned to support:
 - Advanced template usage, like types with integer template arguments.
 - Template partial specializations.
 
-## Qt-specific features coverage
+# Qt-specific features coverage
 
 Implemented: 
 
@@ -158,49 +166,52 @@ Not implemented yet but planned:
 
 - Creating custom signals from Rust code.
 
-## Platform support
+# API stability and versioning
 
-Linux, OS X and Windows are supported. `ritual` and Qt crates are [continuously tested on Travis](https://travis-ci.com/rust-qt/ritual/branches).
+Ritual can analyze multiple different versions of the C++ library and generate a crate that supports all of them. Parts of the API that are common across versions are guaranteed to have the same Rust API as well. For parts of the API that are not always available, the Rust bindings will have feature attributes that only enable them if the current local version of the C++ library has them. Trying to use a feature not available in the installed version of C++ library will result in a compile-time error.
 
-## Remarks
+When a new version of the C++ library is released, ritual can preserve all existing API in the generated crate and add newly introduced API items under a feature flag. This allows to make semver-compatible changes to the generated crate to support all available versions of the C++ library. 
 
-### Expressing library dependencies
+# Managing dependencies
 
-`ritual` takes advantage of Rust's crate system. If a C++ library depends on another C++ library, generated Rust crate will also depend on the dependency's crate and reuse its types.
+C++, like most languages, allows libraries to use types from other libraries in their public API. When Rust bindings are generated, they should ideally reuse common dependencies instead of producing a copy of wrappers in each crate. Ritual supports exporting types from already processed dependencies and using them in the public API. 
 
-### Documentation generation
+If a ritual-based crate is published on `crates.io` and you want to use it as a dependency when generating your own bindings, ritual can export the information from it as well. This allows independent developers to base upon each other's work instead of repeating it. 
 
-Documentation is important! `ritual` generates `rustdoc` comments with information about corresponding C++ types and methods. Overloaded methods have detailed documentation listing all available variants. Qt documentation is integrated in `rustdoc` comments.
+In addition to Qt crates, ritual project provides the `cpp_std` crate that provides access to C++'s standard library types. It should be used when processing a library that uses STL types in its API. However, `cpp_std` is still in early development and only provides access to a small part of the standard library.
 
-### API stability
+# Platform support
 
-`ritual` is in active development, and its own API is not stable yet. That shouldn't be a big issue, because it's just a development tool, and the amount of code using the generator's API should be fairly small.
+Linux, macOS, and Windows are supported. `ritual` and Qt crates are [continuously tested on Travis](https://travis-ci.com/rust-qt/ritual/branches).
 
-`ritual` also can't provide API stability of the generated crate. It's possible (and currently highly likely) that the generated API will significantly change when upgrading to a newer `ritual` version.
+# Safety
 
-### Safety
+It's impossible to bring Rust's safety to C++ APIs automatically, so most of the generated APIs are unsafe to use and require thinking in C++ terms. Most of the generated functions are unsafe because raw pointers are not guaranteed to be valid, and most functions dereference some pointers.
 
-It's impossible to bring Rust's safety to C++ APIs automatically, so most of the generated APIs are very unsafe to use and require thinking in C++ terms. Most of the generated functions are unsafe because raw pointers are not guaranteed to be valid, and most functions dereference some pointers.
+One of intended uses of ritual is to generate a low level interface and then write a safe interface on top of it (which can only be done manually). For huge libraries like Qt, when it's not feasible to design a safe fully-featured API for the whole library, it's recommended to contain unsafe usage in a module and implement a safe interface for the parts of API required for your project. 
 
-### Executable size
+# Executable size
 
 If Rust crates and C++ wrapper libraries are all built statically, the linker only runs once for the final executable that uses the crates. It should be able to eliminate all unused wrapper functions and produce a reasonably small file that will only depend on original C++ libraries.
 
-## Generating Qt crates
+# Generating cpp_std and Qt crates
 
-If you want to generate Qt crates from scratch, clone the project and run `qt_ritual`:
+Note: as described above, it's recommended to use docker for creating a suitable environment.
 
+Qt crates can be generated like this:
 ```
-git clone https://github.com/rust-qt/ritual.git
 cd ritual
 cargo run --release --bin qt_ritual -- /path/to/workspace -c qt_core -o main
 ```
 
-The workspace directory will be used for storing databases, temporary files, and the generated crates. Use the same workspace directory for all Qt crates to make sure that `ritual` can use types from previously generated crates.
+The workspace directory will be used for storing databases, temporary files, and the generated crates. Use the same workspace directory for all Qt crates to make sure that ritual can use types from previously generated crates.
 
-`qmake` of the target Qt installation must be available in `PATH`.
+Similarly, this is how `cpp_std` can be generated:
+```
+cargo run --release --bin std_ritual -- /path/to/workspace -c cpp_std -o main
+```
 
-## License
+# License
 
 This project is licensed under either of
 
@@ -213,12 +224,11 @@ at your option.
 
 If you use Qt, you should also take into account [Qt licensing](https://www.qt.io/licensing/).
 
-## Contributing
+# Contributing
 
 Contributions are always welcome! You can contribute in different ways:
 
 - Submit a bug report, a feature request, or an improvement suggestion at the [issue tracker](https://github.com/rust-qt/ritual/issues);
-- Suggest a C++ library to adapt;
 - Write a test or an example for a Qt crate (porting examples from the official Qt documentation is a good option);
 - Pick up an issue with [help wanted](https://github.com/rust-qt/ritual/labels/help%20wanted) tag.
 
