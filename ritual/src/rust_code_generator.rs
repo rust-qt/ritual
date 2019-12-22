@@ -977,7 +977,7 @@ impl Generator<'_> {
             RustFunctionKind::FfiFunction => None,
         };
 
-        let maybe_body = match body {
+        let maybe_body = match &body {
             None => ";".to_string(),
             Some(text) => format!("{{\n{}\n}}", text),
         };
@@ -1010,10 +1010,15 @@ impl Generator<'_> {
             + &condition_texts.doc_text;
         writeln!(
             self,
-            "{doc}{condition}{maybe_pub}{maybe_unsafe} \
+            "{doc}{maybe_inline}{condition}{maybe_pub}{maybe_unsafe} \
              fn {name}{lifetimes_text}({args}){return_type} \
              {maybe_body}\n\n",
             doc = format_doc(&doc),
+            maybe_inline = if body.is_some() {
+                "#[inline(always)]\n"
+            } else {
+                ""
+            },
             condition = condition_texts.attribute,
             maybe_pub = maybe_pub,
             maybe_unsafe = maybe_unsafe,
