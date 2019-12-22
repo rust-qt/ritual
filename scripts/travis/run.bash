@@ -7,6 +7,10 @@ export RUST_BACKTRACE=1
 export RITUAL_TEMP_TEST_DIR=$HOME/ritual_temp_test_dir
 
 cd "$TRAVIS_BUILD_DIR"
+
+# Make sure the correct toolchain is used on Windows.
+echo "$TRAVIS_RUST_VERSION" > rust-toolchain
+
 rustup component add rustfmt
 cargo fmt -- --check
 
