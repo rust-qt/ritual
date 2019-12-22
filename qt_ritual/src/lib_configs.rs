@@ -132,7 +132,7 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
                 data.add_linked_lib(lib);
             }
             // TODO: why shared for moqt?
-            data.set_library_type(CppLibraryType::Shared);
+            data.set_library_type(CppLibraryType::Static);
             config
                 .cpp_build_config_mut()
                 .add(target::Condition::True, data);

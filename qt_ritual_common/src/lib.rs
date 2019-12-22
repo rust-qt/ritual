@@ -133,6 +133,7 @@ pub fn get_full_build_config(
         apply_installation_data(dep, &dep_data);
     }
 
+    cpp_build_config_data.set_library_type(CppLibraryType::Static);
     let mut cpp_build_config = CppBuildConfig::new();
     cpp_build_config.add(target::Condition::True, cpp_build_config_data);
     {
@@ -145,16 +146,6 @@ pub fn get_full_build_config(
         data.add_compiler_flag("-fPIC");
         // msvc and mingw don't need this
         cpp_build_config.add(target::Condition::OS(target::OS::Windows).negate(), data);
-    }
-    {
-        let mut data = CppBuildConfigData::new();
-        data.set_library_type(CppLibraryType::Shared);
-        cpp_build_config.add(target::Condition::Env(target::Env::Msvc), data);
-    }
-    {
-        let mut data = CppBuildConfigData::new();
-        data.set_library_type(CppLibraryType::Static);
-        cpp_build_config.add(target::Condition::Env(target::Env::Msvc).negate(), data);
     }
     Ok(FullBuildConfig {
         installation_data,
