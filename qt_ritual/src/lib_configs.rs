@@ -30,17 +30,17 @@ use std::env;
 pub const MOQT_INSTALL_DIR_ENV_VAR_NAME: &str = "MOQT_INSTALL_DIR";
 pub const MOQT_TEMPLATE_DIR_ENV_VAR_NAME: &str = "MOQT_TEMPLATE_DIR";
 
-/// Version of all generated Qt crates
-const QT_OUTPUT_CRATES_VERSION: &str = "0.4.0";
-
 fn empty_config(_config: &mut Config) -> Result<()> {
     Ok(())
 }
 
 /// Executes the generator for a single Qt module with given configuration.
-pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Config> {
+pub fn create_config(
+    mut crate_properties: CrateProperties,
+    qmake_path: Option<&str>,
+) -> Result<Config> {
+    let crate_name = crate_properties.name().to_string();
     info!("Preparing generator config for crate: {}", crate_name);
-    let mut crate_properties = CrateProperties::new(crate_name, QT_OUTPUT_CRATES_VERSION);
     let mut custom_fields = toml::value::Table::new();
     let mut package_data = toml::value::Table::new();
     package_data.insert(
@@ -49,7 +49,7 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
             "Pavel Strakhov <ri@idzaaus.org>".to_string(),
         )]),
     );
-    let description = format!("Bindings for {} C++ library", lib_folder_name(crate_name));
+    let description = format!("Bindings for {} C++ library", lib_folder_name(&crate_name));
     package_data.insert("description".to_string(), toml::Value::String(description));
     let doc_url = format!("https://rust-qt.github.io/rustdoc/qt/{}", &crate_name);
     package_data.insert("documentation".to_string(), toml::Value::String(doc_url));
@@ -81,7 +81,7 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
     custom_fields.insert("package".to_string(), toml::Value::Table(package_data));
     crate_properties.set_custom_fields(custom_fields);
 
-    for &dependency in lib_dependencies(crate_name)? {
+    for &dependency in lib_dependencies(&crate_name)? {
         crate_properties.add_dependency(
             dependency,
             CrateDependencyKind::Ritual,
@@ -105,7 +105,7 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
         if !lib_path.exists() {
             bail!("Path does not exist: {}", lib_path.display());
         }
-        let sublib_include_path = include_path.join(crate_name);
+        let sublib_include_path = include_path.join(&crate_name);
         if !sublib_include_path.exists() {
             bail!("Path does not exist: {}", sublib_include_path.display());
         }
@@ -114,7 +114,7 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
             paths.add_include_path(&sublib_include_path);
             paths.add_lib_path(&lib_path);
 
-            for &lib in lib_dependencies(crate_name)? {
+            for &lib in lib_dependencies(&crate_name)? {
                 let dep_include_path = include_path.join(lib);
                 if !dep_include_path.exists() {
                     bail!("Path does not exist: {}", dep_include_path.display());
@@ -127,8 +127,8 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
 
         {
             let mut data = CppBuildConfigData::new();
-            data.add_linked_lib(crate_name);
-            for &lib in lib_dependencies(crate_name)? {
+            data.add_linked_lib(&crate_name);
+            for &lib in lib_dependencies(&crate_name)? {
                 data.add_linked_lib(lib);
             }
             // TODO: why shared for moqt?
@@ -170,7 +170,7 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
 
         let mut config = Config::new(crate_properties);
 
-        let qt_config = get_full_build_config(crate_name, qmake_path)?;
+        let qt_config = get_full_build_config(&crate_name, qmake_path)?;
         config.set_cpp_build_config(qt_config.cpp_build_config);
         config.set_cpp_build_paths(qt_config.cpp_build_paths);
 
@@ -178,7 +178,7 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
         config.set_cpp_lib_version(qt_config.installation_data.qt_version.as_str());
         // TODO: does parsing work on MacOS without adding "-F"?
 
-        config.add_include_directive(&lib_folder_name(crate_name));
+        config.add_include_directive(&lib_folder_name(&crate_name));
 
         // TODO: allow to override parser flags
         if target::current_os() != target::OS::Windows {
@@ -219,7 +219,7 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
         set_crate_root_doc,
     )?;
 
-    let lib_config = match crate_name {
+    let lib_config = match crate_name.as_str() {
         "qt_core" => core_config,
         "qt_gui" => gui_config,
         "qt_widgets" => widgets_config,

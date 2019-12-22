@@ -3,7 +3,7 @@
 //! See [README](https://github.com/rust-qt/ritual)
 //! for more information.
 
-use crate::config::GlobalConfig;
+use crate::config::{CrateProperties, GlobalConfig};
 use crate::database::ItemId;
 use crate::processor;
 use crate::workspace::Workspace;
@@ -32,6 +32,9 @@ pub struct Options {
     #[structopt(short = "o", long = "operations", required = true)]
     /// Operations to perform
     pub operations: Vec<String>,
+    #[structopt(short = "v", long = "version")]
+    /// Version of the output crates.
+    pub output_crates_version: String,
     #[structopt(long = "cluster")]
     /// Cluster configuration
     pub cluster: Option<PathBuf>,
@@ -108,7 +111,10 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
             .create_config_hook()
             .ok_or_else(|| err_msg("create_config_hook is missing"))?;
 
-        let mut config = create_config(&crate_name)?;
+        let mut config = create_config(CrateProperties::new(
+            crate_name,
+            &options.output_crates_version,
+        ))?;
 
         if let Some(cluster_config_path) = &options.cluster {
             config.set_cluster_config(load_json(cluster_config_path)?);

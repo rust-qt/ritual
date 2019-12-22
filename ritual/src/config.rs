@@ -489,7 +489,7 @@ impl Config {
 
 #[derive(Default)]
 pub struct GlobalConfig {
-    create_config_hook: Option<Box<dyn FnMut(&str) -> Result<Config>>>,
+    create_config_hook: Option<Box<dyn FnMut(CrateProperties) -> Result<Config>>>,
     all_crate_names: Vec<String>,
 }
 
@@ -498,13 +498,16 @@ impl GlobalConfig {
         Self::default()
     }
 
-    pub fn set_create_config_hook<F: FnMut(&str) -> Result<Config> + 'static>(&mut self, f: F) {
+    pub fn set_create_config_hook<F: FnMut(CrateProperties) -> Result<Config> + 'static>(
+        &mut self,
+        f: F,
+    ) {
         self.create_config_hook = Some(Box::new(f));
     }
 
     pub fn create_config_hook(
         &mut self,
-    ) -> Option<&mut (dyn FnMut(&str) -> Result<Config> + 'static)> {
+    ) -> Option<&mut (dyn FnMut(CrateProperties) -> Result<Config> + 'static)> {
         self.create_config_hook.as_mut().map(|b| &mut **b)
     }
 

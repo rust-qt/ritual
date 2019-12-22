@@ -117,6 +117,7 @@ fn test_moqt() {
             local_paths: Some(true),
             crates: vec!["moqt_core".into(), "moqt_gui".into()],
             operations: vec!["discard".into(), "main".into()],
+            output_crates_version: "0.0.0".into(),
             cluster: None,
             trace: None,
         },

@@ -14,11 +14,9 @@ use std::path::PathBuf;
 
 mod after_cpp_parser;
 
-pub const CPP_STD_VERSION: &str = "0.1.1";
 pub const STD_HEADERS_PATH_ENV_VAR_NAME: &str = "RITUAL_STD_HEADERS";
 
-fn create_config() -> Result<Config> {
-    let mut crate_properties = CrateProperties::new("cpp_std", CPP_STD_VERSION);
+fn create_config(mut crate_properties: CrateProperties) -> Result<Config> {
     let mut custom_fields = toml::value::Table::new();
     let mut package_data = toml::value::Table::new();
     package_data.insert(
@@ -160,7 +158,7 @@ fn create_config() -> Result<Config> {
 fn main() {
     let mut config = GlobalConfig::new();
     config.set_all_crate_names(vec!["cpp_std".into()]);
-    config.set_create_config_hook(|_crate_name| create_config());
+    config.set_create_config_hook(create_config);
 
     cli::run_from_args(config).fancy_unwrap();
 }

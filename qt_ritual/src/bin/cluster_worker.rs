@@ -5,6 +5,7 @@ use log::{info, warn};
 use qt_ritual::lib_configs::{create_config, MOQT_INSTALL_DIR_ENV_VAR_NAME};
 use qt_ritual_common::all_crate_names;
 use ritual::cluster_api::{Client, GroupKey, TaskOutput};
+use ritual::config::CrateProperties;
 use ritual::cpp_checker::{LocalCppChecker, SnippetTask};
 use ritual_common::errors::{format_err, FancyUnwrap, Result};
 use ritual_common::file_utils::create_dir;
@@ -73,7 +74,7 @@ fn run() -> Result<()> {
         create_dir(&dir)?;
 
         let qmake_path = qmake_path.as_ref().map(String::as_str);
-        let config = create_config(&lib.crate_name, qmake_path)?;
+        let config = create_config(CrateProperties::new(&lib.crate_name, ""), qmake_path)?;
         let checker = LocalCppChecker::new(dir, &config)?;
         let mut checker = checker.get("0")?;
         if run_tests {
