@@ -145,11 +145,6 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
                 .cpp_build_config_mut()
                 .add(target::Condition::Env(target::Env::Msvc).negate(), data);
         }
-        if target::current_env() == target::Env::Msvc {
-            config.add_cpp_parser_argument("-std=c++14");
-        } else {
-            config.add_cpp_parser_argument("-std=gnu++11");
-        }
 
         let template_path =
             PathBuf::from(env::var(MOQT_TEMPLATE_DIR_ENV_VAR_NAME).with_context(|_| {
@@ -186,14 +181,10 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
         config.add_include_directive(&lib_folder_name(crate_name));
 
         // TODO: allow to override parser flags
-        config.add_cpp_parser_arguments(vec!["-fPIC", "-fcxx-exceptions"]);
-
-        if target::current_env() == target::Env::Msvc {
-            config.add_cpp_parser_argument("-std=c++14");
-        } else {
-            config.add_cpp_parser_argument("-std=gnu++11");
+        if target::current_os() != target::OS::Windows {
+            config.add_cpp_parser_argument("-fPIC");
         }
-        //config.add_cpp_parser_blocked_name(CppName::from_one_part("qt_check_for_QGADGET_macro"));
+        config.add_cpp_parser_argument("-fcxx-exceptions");
 
         let steps = config.processing_steps_mut();
         let crate_name_clone = crate_name.to_string();
@@ -208,6 +199,12 @@ pub fn create_config(crate_name: &str, qmake_path: Option<&str>) -> Result<Confi
 
         config
     };
+
+    if target::current_env() == target::Env::Msvc {
+        config.add_cpp_parser_argument("-std=c++14");
+    } else {
+        config.add_cpp_parser_argument("-std=gnu++11");
+    }
 
     config.add_after_cpp_parser_hook(detect_signals_and_slots);
 
