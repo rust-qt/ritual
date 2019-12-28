@@ -1,5 +1,5 @@
-//! Utility types and functions used by `cpp_to_rust_generator` and
-//! `cpp_to_rust_build_tools` crates.
+//! Utility types and functions used by `ritual` and
+//! `ritual_build` crates.
 //!
 //! See [README](https://github.com/rust-qt/ritual) of the repository root for more information.
 

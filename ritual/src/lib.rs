@@ -1,4 +1,4 @@
-//! Implementation of `cpp_to_rust` generator that
+//! A generator that
 //! analyzes a C++ library and produces a Rust crate for it.
 //! See [README]
 //! (https://github.com/rust-qt/ritual)

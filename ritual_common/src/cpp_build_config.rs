@@ -10,7 +10,7 @@ use serde_derive::{Deserialize, Serialize};
 /// libraries, frameworks, compiler types and selected type of
 /// C++ wrapper library (shared or static). Default value of this
 /// object is set before generation of the crate using
-/// `cpp_to_rust_generator::config::Config::set_cpp_build_config` or
+/// `ritual::config::Config::set_cpp_build_config` or
 /// `cpp_build_config_mut` and intended to be cross-platform.
 ///
 /// In order to allow target-dependent build configuration,
@@ -22,7 +22,7 @@ use serde_derive::{Deserialize, Serialize};
 ///
 /// If this conditional evaluation is not enough, a custom build script
 /// can modify this config during build script execution using
-/// `cpp_to_rust_build_tools::Config::set_cpp_build_config` or
+/// `ritual_build::Config::set_cpp_build_config` or
 /// `cpp_build_config_mut`.
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct CppBuildConfig {
@@ -168,14 +168,11 @@ use std::path::PathBuf;
 ///
 /// By default, all path lists are empty, and the build script doesn't add
 /// any extra directories to paths while compiling and linking the crate.
-/// If `CPP_TO_RUST_LIB_PATHS`, `CPP_TO_RUST_FRAMEWORK_PATHS` or
-/// `CPP_TO_RUST_INCLUDE_PATHS` environment variables are present during
+/// If `RITUAL_LIBRARY_PATH`, `RITUAL_FRAMEWORK_PATH` or
+/// `RITUAL_INCLUDE_PATH` environment variables are present during
 /// execution of the build script, their values are used. A custom
 /// build script can get an object of this type using `Config::cpp_build_paths_mut`
 /// and use its API to set extra search paths.
-///
-/// This type is currently only used in `cpp_to_rust_build_tools`, but
-/// `cpp_to_rust_generator` may start to use it in the future if needed.
 #[derive(Debug, Default, Clone)]
 pub struct CppBuildPaths {
     lib_paths: Vec<PathBuf>,
@@ -217,8 +214,8 @@ impl CppBuildPaths {
         }
     }
 
-    /// If `CPP_TO_RUST_LIB_PATHS`, `CPP_TO_RUST_FRAMEWORK_PATHS` or
-    /// `CPP_TO_RUST_INCLUDE_PATHS` environment variables are present,
+    /// If `RITUAL_LIBRARY_PATH`, `RITUAL_FRAMEWORK_PATH` or
+    /// `RITUAL_INCLUDE_PATH` environment variables are present,
     /// their values override current values of the object.
     pub fn apply_env(&mut self) {
         use std::env;

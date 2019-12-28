@@ -84,7 +84,7 @@ impl CrateProperties {
         }
     }
 
-    /// Adds an extra non-`cpp_to_rust`-based dependency with
+    /// Adds a dependency with
     /// `name`, `version` and optionally `local_path`.
     pub fn add_dependency(
         &mut self,
@@ -128,7 +128,7 @@ impl CrateProperties {
         self.remove_default_dependencies = true;
     }
     /// Removes default build dependencies from output `Cargo.toml`. Default
-    /// build dependency is `cpp_to_rust_build_tools`.
+    /// build dependency is `ritual_build`.
     pub fn remove_default_build_dependencies(&mut self) {
         self.remove_default_build_dependencies = true;
     }
@@ -148,7 +148,7 @@ impl CrateProperties {
         &self.version
     }
 
-    /// Extra non-`cpp_to_rust`-based dependencies of the crate
+    /// Dependencies of the crate
     pub fn dependencies(&self) -> &[CrateDependency] {
         &self.dependencies
     }
@@ -196,7 +196,7 @@ pub struct ClusterConfig {
     pub workers: Vec<WorkerConfig>,
 }
 
-/// The starting point of `cpp_to_rust` API.
+/// The starting point of `ritual` API.
 /// Create a `Config` object, set its properties,
 /// add custom functions if necessary, and start
 /// the processing with `Config::exec`.

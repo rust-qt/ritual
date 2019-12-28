@@ -1,6 +1,6 @@
-//! Implementation of `cpp_to_rust`'s build script.
+//! Implementation of `ritual`'s build script.
 //! Default generated build script uses this crate as a build dependency
-//! and just calls `cpp_to_rust_build_tools::run()`.
+//! and just calls `ritual_build::run()`.
 //! If a custom build script is used, it should either
 //! use the same call to execute all operations normally
 //! or use `Config` type to change the build script's settings.

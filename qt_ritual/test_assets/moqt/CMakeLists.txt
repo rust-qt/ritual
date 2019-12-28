@@ -1,7 +1,7 @@
 # This is a C++ library used by `full_run` test to perform
-# an integration test of `cpp_to_rust`.
-# The library is built and passed to `cpp_to_rust` to produce a crate.
-# The test itself is located at `cpp_to_rust/cpp_to_rust_generator/src/tests/full_run.rs`.
+# an integration test of `ritual`.
+# The library is built and passed to `ritual` to produce a crate.
+# The test itself is located at `qt_ritual/src/test_moqt.rs`.
 #
 # To enhance the test, add or change types and methods in this library
 # and put corresponding tests in `?`
