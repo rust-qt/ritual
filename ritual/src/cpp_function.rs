@@ -394,12 +394,13 @@ impl CppFunction {
             RustQtReceiverType::Signal => "2",
             RustQtReceiverType::Slot => "1",
         };
-        Ok(format!(
-            "{}{}({})",
-            type_num,
-            name,
-            arguments.map_if_ok(|arg| arg.to_cpp_code(None))?.join(",")
-        ))
+        // Qt doesn't recognize `QList<QModelIndex>`, e.g. in `QListWidget::indexesMoved`.
+        let arguments = arguments
+            .map_if_ok(|arg| arg.to_cpp_code(None))?
+            .into_iter()
+            .map(|arg| arg.replace("QList< QModelIndex >", "QModelIndexList"))
+            .join(",");
+        Ok(format!("{}{}({})", type_num, name, arguments))
     }
 
     /// Returns the identifier that should be used in `QObject::connect`

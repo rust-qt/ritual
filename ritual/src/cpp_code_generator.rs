@@ -47,11 +47,9 @@ impl Generator<'_> {
             .iter()
             .enumerate()
             .map_if_ok(|(num, t)| -> Result<_> {
-                Ok(format!(
-                    "{} arg{}",
-                    t.original_type().to_cpp_code(None)?,
-                    num
-                ))
+                let arg_type = t.original_type().to_cpp_code(None)?;
+                let arg_type = arg_type.replace("QList< QModelIndex >", "QModelIndexList");
+                Ok(format!("{} arg{}", arg_type, num))
             })?
             .join(", ");
         let func_args = once("m_data".to_string())
