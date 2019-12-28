@@ -2033,16 +2033,9 @@ impl State<'_, '_> {
                 .iter()
                 .map_if_ok(|t| self.ffi_type_to_rust_ffi_type(t.ffi_type()))?;
 
-            let receiver_id = CppFunction::receiver_id_from_data(
-                RustQtReceiverType::Slot,
-                "custom_slot",
-                &wrapper.item.signal_arguments,
-            )?;
-
             let impl_item = RustItem::ExtraImpl(RustExtraImpl {
                 parent_path: public_path.parent()?,
                 kind: RustExtraImplKind::RawSlotReceiver(RustRawSlotReceiver {
-                    receiver_id,
                     target_path: public_path.clone(),
                     arguments: RustType::Tuple(arg_types.clone()),
                 }),
@@ -2187,11 +2180,7 @@ impl State<'_, '_> {
                     }
                 }
 
-                let receiver_id = cpp_function.receiver_id()?;
-                let function_kind = RustFunctionKind::SignalOrSlotGetter(RustSignalOrSlotGetter {
-                    receiver_type,
-                    receiver_id,
-                });
+                let function_kind = RustFunctionKind::SignalOrSlotGetter(RustSignalOrSlotGetter {});
 
                 let path = self.generate_rust_path(
                     &cpp_function.path,

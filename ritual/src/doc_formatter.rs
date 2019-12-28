@@ -8,7 +8,7 @@ use crate::cpp_type::CppType;
 use crate::database::{DatabaseClient, DbItem, DocItem};
 use crate::rust_code_generator::rust_type_to_code;
 use crate::rust_info::{
-    RustEnumValue, RustFunction, RustFunctionKind, RustModule, RustModuleKind, RustQtReceiverType,
+    RustEnumValue, RustFunction, RustFunctionKind, RustModule, RustModuleKind,
     RustSpecialModuleKind, RustStruct, RustStructKind, RustWrapperTypeKind,
 };
 use itertools::Itertools;
@@ -430,20 +430,25 @@ pub fn function_doc(function: DbItem<&RustFunction>, database: &DatabaseClient) 
                 }
             }
         }
-        RustFunctionKind::SignalOrSlotGetter(getter) => {
+        RustFunctionKind::SignalOrSlotGetter(_) => {
             let cpp_item = cpp_item
                 .item
                 .as_function_ref()
                 .ok_or_else(|| err_msg("invalid source cpp item type"))?;
 
+            let signal = if cpp_item.is_signal() {
+                "signal"
+            } else if cpp_item.is_slot() {
+                "slot"
+            } else {
+                bail!("source cpp item is not a signal or slot");
+            };
+
             writeln!(
                 output,
                 "Returns a built-in Qt {signal} `{cpp_path}` that can be passed to \
                  `qt_core::Signal::connect`.\n",
-                signal = match getter.receiver_type {
-                    RustQtReceiverType::Signal => "signal",
-                    RustQtReceiverType::Slot => "slot",
-                },
+                signal = signal,
                 cpp_path = cpp_item.path.to_cpp_pseudo_code()
             )?;
         }

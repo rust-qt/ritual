@@ -143,12 +143,7 @@ pub struct RustFfiWrapperData {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
-pub struct RustSignalOrSlotGetter {
-    /// Type of the receiver.
-    pub receiver_type: RustQtReceiverType,
-    /// Identifier of the signal or slot for passing to `QObject::connect`.
-    pub receiver_id: String,
-}
+pub struct RustSignalOrSlotGetter {}
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
@@ -508,7 +503,6 @@ pub struct RustFFIArgument {
 pub struct RustRawSlotReceiver {
     pub target_path: RustPath,
     pub arguments: RustType,
-    pub receiver_id: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

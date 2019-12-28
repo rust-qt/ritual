@@ -2,13 +2,15 @@
 
 use crate::cpp_checks::Condition;
 use crate::cpp_ffi_data::CppFfiArgumentMeaning;
+use crate::cpp_function::CppFunction;
 use crate::database::{DatabaseClient, DbItem, ItemId};
 use crate::doc_formatter;
 use crate::rust_generator::qt_core_path;
 use crate::rust_info::{
     RustEnumValue, RustExtraImpl, RustExtraImplKind, RustFfiWrapperData, RustFunction,
     RustFunctionArgument, RustFunctionKind, RustItem, RustModule, RustModuleKind,
-    RustSpecialModuleKind, RustStruct, RustStructKind, RustTraitImpl, RustWrapperTypeKind,
+    RustQtReceiverType, RustSpecialModuleKind, RustStruct, RustStructKind, RustTraitImpl,
+    RustWrapperTypeKind,
 };
 use crate::rust_type::{
     RustCommonType, RustFinalType, RustPath, RustPointerLikeTypeKind, RustToFfiTypeConversion,
@@ -964,13 +966,21 @@ impl Generator<'_> {
                 data,
                 func.item.is_unsafe,
             )?),
-            RustFunctionKind::SignalOrSlotGetter(getter) => {
+            RustFunctionKind::SignalOrSlotGetter(_) => {
+                let cpp_item = self
+                    .current_database
+                    .source_cpp_item(&func.id)?
+                    .ok_or_else(|| err_msg("source cpp item not found"))?
+                    .item
+                    .as_function_ref()
+                    .ok_or_else(|| err_msg("invalid source cpp item type"))?;
+
                 let path = &func.item.return_type.api_type().as_common()?.path;
                 let call = format!(
                     "{}::new(::cpp_core::Ref::from_raw_ref(self), \
                      ::std::ffi::CStr::from_bytes_with_nul_unchecked(b\"{}\\0\"))",
                     self.rust_path_to_string(&path),
-                    getter.receiver_id
+                    cpp_item.receiver_id()?,
                 );
                 Some(wrap_unsafe(func.item.is_unsafe, &call))
             }
@@ -1077,10 +1087,10 @@ impl Generator<'_> {
 
     fn generate_extra_impl(
         &mut self,
-        data: DbItem<&RustExtraImpl>,
+        item: DbItem<&RustExtraImpl>,
         condition_texts: &ConditionTexts,
     ) -> Result<()> {
-        match &data.item.kind {
+        match &item.item.kind {
             RustExtraImplKind::FlagEnum(data) => {
                 let enum_path = self.rust_path_to_string(&data.enum_path);
                 let qflags = self.rust_path_to_string(&self.qt_core_path().join("QFlags"));
@@ -1093,13 +1103,27 @@ impl Generator<'_> {
                 )?;
             }
             RustExtraImplKind::RawSlotReceiver(data) => {
+                let wrapper = self
+                    .current_database
+                    .source_ffi_item(&item.id)?
+                    .ok_or_else(|| err_msg("source ffi item not found"))?
+                    .item
+                    .as_slot_wrapper_ref()
+                    .ok_or_else(|| err_msg("invalid source ffi item type"))?;
+
+                let receiver_id = CppFunction::receiver_id_from_data(
+                    RustQtReceiverType::Slot,
+                    "custom_slot",
+                    &wrapper.signal_arguments,
+                )?;
+
                 writeln!(
                     self,
                     include_str!("../templates/crate/impl_receiver_for_raw_slot.rs.in"),
                     qt_core = self.qt_core_prefix(),
                     type_path = self.rust_path_to_string(&data.target_path),
                     args = self.rust_type_to_code(&data.arguments),
-                    receiver_id = data.receiver_id,
+                    receiver_id = receiver_id,
                     condition_attribute = condition_texts.attribute,
                 )?;
                 // TODO: use condition_texts.doc_text

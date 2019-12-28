@@ -371,6 +371,20 @@ impl CppFunction {
         }
     }
 
+    pub fn is_signal(&self) -> bool {
+        match &self.member {
+            Some(info) => info.is_signal,
+            None => false,
+        }
+    }
+
+    pub fn is_slot(&self) -> bool {
+        match &self.member {
+            Some(info) => info.is_slot,
+            None => false,
+        }
+    }
+
     pub fn receiver_id_from_data<'a>(
         receiver_type: RustQtReceiverType,
         name: &'a str,
