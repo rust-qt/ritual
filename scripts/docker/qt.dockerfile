@@ -11,8 +11,9 @@ RUN /install_qt.py 5.9.7 linux_x64 gcc_64 && \
     /install_qt.py 5.12.2 linux_x64 gcc_64 && \
     /install_qt.py 5.12.2 --docs && \
     /install_qt.py 5.13.0 linux_x64 gcc_64 && \
-    /install_qt.py 5.13.0 --docs
-
+    /install_qt.py 5.13.0 --docs && \
+    /install_qt.py 5.14.0 linux_x64 gcc_64 && \
+    /install_qt.py 5.14.0 --docs
 
 FROM ritual_builder
 COPY --from=qt_downloader /opt/qt /opt/qt
