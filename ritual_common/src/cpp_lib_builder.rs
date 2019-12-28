@@ -232,7 +232,7 @@ impl CppLibBuilder {
             if let Some(capture_output_file) = capture_output_file {
                 if let Err(err) = run_command(&mut make_command) {
                     let output = CommandOutput {
-                        status: unsafe { std::mem::zeroed() },
+                        status: 0,
                         stderr: format!(
                             "{}\n{}",
                             err.to_string(),

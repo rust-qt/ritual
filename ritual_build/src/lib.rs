@@ -22,6 +22,8 @@
 //! If a custom build script is defined, it should use this crate's API to perform
 //! the necessary build operations.
 
+#![forbid(unsafe_code)]
+
 use log::info;
 pub use ritual_common as common;
 use ritual_common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryType};

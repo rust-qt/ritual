@@ -128,7 +128,6 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
         processor::process(&mut workspace, &config, &operations, trace_item_id.as_ref())?;
     }
 
-    //workspace.save_data()?;
     if was_any_action {
         info!("ritual finished");
     } else {

@@ -4,6 +4,8 @@
 //! (https://github.com/rust-qt/ritual)
 //! for more information.
 
+#![forbid(unsafe_code)]
+
 pub use ritual_common as common;
 
 pub mod cli;

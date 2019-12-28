@@ -1,9 +1,10 @@
-#![allow(clippy::cognitive_complexity)]
-
 //! Utility types and functions used by `cpp_to_rust_generator` and
 //! `cpp_to_rust_build_tools` crates.
 //!
 //! See [README](https://github.com/rust-qt/ritual) of the repository root for more information.
+
+#![forbid(unsafe_code)]
+#![allow(clippy::cognitive_complexity)]
 
 use crate::target::LibraryTarget;
 use serde_derive::{Deserialize, Serialize};

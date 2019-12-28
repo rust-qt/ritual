@@ -5,6 +5,8 @@
 //! The build script uses `qmake` available in `PATH` to determine paths to the Qt installation and passes them to
 //! `ritual_build`.
 
+#![forbid(unsafe_code)]
+
 use itertools::Itertools;
 use qt_ritual_common::get_full_build_config;
 use ritual_build::common::errors::{FancyUnwrap, Result};

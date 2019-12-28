@@ -2,6 +2,8 @@
 //!
 //! See [README](https://github.com/rust-qt/ritual) of the repository root for more information.
 
+#![forbid(unsafe_code)]
+
 use log::debug;
 use ritual_common::cpp_build_config::{
     CppBuildConfig, CppBuildConfigData, CppBuildPaths, CppLibraryType,

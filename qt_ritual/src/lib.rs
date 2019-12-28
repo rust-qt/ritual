@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 mod detect_signal_argument_types;
 mod detect_signals_and_slots;
 mod doc_decoder;
