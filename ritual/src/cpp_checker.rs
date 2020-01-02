@@ -75,7 +75,7 @@ impl CppCheckerInstance {
         let mut any_needs_moc = false;
 
         let mut file = create_file(&self.main_cpp_path)?;
-        writeln!(file, "#include \"utils.h\"")?;
+        writeln!(file, "#include \"global.h\"")?;
         writeln!(file)?;
         let mut main_content = Vec::new();
         for snippet in snippets {
@@ -324,10 +324,10 @@ impl LocalCppChecker {
             include_str!("../templates/cpp_checker/CMakeLists.txt")
         )?;
 
-        let mut utils_file = create_file(src_path.join("utils.h"))?;
+        let mut global_file = create_file(src_path.join("global.h"))?;
         write!(
-            utils_file,
-            include_str!("../templates/cpp_checker/utils.h"),
+            global_file,
+            include_str!("../templates/c_lib/global.h"),
             include_directives_code = all_include_directives
                 .iter()
                 .map_if_ok(|d| -> Result<_> { Ok(format!("#include \"{}\"", path_to_str(d)?)) })?
