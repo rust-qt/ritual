@@ -11,7 +11,7 @@ use crate::cpp_type::{
     is_qflags, CppBuiltInNumericType, CppFunctionPointerType, CppPointerLikeTypeKind,
     CppSpecificNumericType, CppSpecificNumericTypeKind, CppType, CppTypeRole,
 };
-use crate::database::{DbItem, ItemWithSource};
+use crate::database::{DbItem, ItemId, ItemWithSource};
 use crate::processor::ProcessorData;
 use crate::rust_info::{
     NameType, RustEnumValue, RustExtraImpl, RustExtraImplKind, RustFfiWrapperData,
@@ -2267,8 +2267,19 @@ impl State<'_, '_> {
             source,
             target: RustPath::from_parts(vec![crate_name.to_string()]),
         });
-        self.data.db.add_rust_item(None, rust_item)?;
+        self.add_rust_item(None, rust_item)?;
         Ok(())
+    }
+
+    fn add_rust_item(
+        &mut self,
+        source_id: Option<ItemId>,
+        mut item: RustItem,
+    ) -> Result<Option<ItemId>> {
+        if let Some(hook) = self.data.config.rust_item_hook() {
+            hook(&mut item, &self.data)?;
+        }
+        self.data.db.add_rust_item(source_id, item)
     }
 
     fn generate_special_module(&mut self, kind: RustSpecialModuleKind) -> Result<()> {
@@ -2289,7 +2300,7 @@ impl State<'_, '_> {
             path: rust_path.clone(),
             kind: RustModuleKind::Special(kind),
         });
-        let new_id = self.data.db.add_rust_item(None, rust_item)?;
+        let new_id = self.add_rust_item(None, rust_item)?;
         let real_path = if new_id.is_some() {
             rust_path
         } else {
@@ -2319,9 +2330,7 @@ impl State<'_, '_> {
                 let cpp_item = self.data.db.cpp_item(&cpp_item_id)?;
                 if let Ok(rust_items) = self.process_cpp_item(cpp_item) {
                     for rust_item in rust_items {
-                        self.data
-                            .db
-                            .add_rust_item(Some(cpp_item_id.clone()), rust_item)?;
+                        self.add_rust_item(Some(cpp_item_id.clone()), rust_item)?;
                     }
                     processed_ids.insert(cpp_item_id);
                     any_processed = true;
@@ -2374,9 +2383,7 @@ impl State<'_, '_> {
                                     trait_types.push(trait_impl.into());
                                 }
 
-                                self.data
-                                    .db
-                                    .add_rust_item(Some(ffi_item_id.clone()), rust_item)?;
+                                self.add_rust_item(Some(ffi_item_id.clone()), rust_item)?;
                             }
                             ProcessedFfiItem::Function(function) => {
                                 let entry = grouped_functions
@@ -2465,7 +2472,7 @@ impl State<'_, '_> {
                 };
                 let final_path = self.data.db.make_unique_rust_path(&path);
                 let item = RustItem::Function(function.item.function.with_path(final_path));
-                self.data.db.add_rust_item(Some(function.source_id), item)?;
+                self.add_rust_item(Some(function.source_id), item)?;
             }
         }
         Ok(())

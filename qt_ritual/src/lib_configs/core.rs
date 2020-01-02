@@ -1,19 +1,21 @@
 use ritual::config::Config;
 use ritual::cpp_checker::{PreliminaryTest, Snippet};
-use ritual::cpp_data::{CppItem, CppPath};
+use ritual::cpp_data::{CppItem, CppPath, CppPathItem};
 use ritual::cpp_ffi_data::CppFfiFunctionKind;
+use ritual::cpp_function::{CppFunction, CppFunctionArgument};
 use ritual::cpp_parser::CppParserOutput;
 use ritual::cpp_template_instantiator::instantiate_function;
-use ritual::cpp_type::CppType;
+use ritual::cpp_type::{CppBuiltInNumericType, CppType};
 use ritual::processor::ProcessorData;
-use ritual::rust_info::{NameType, RustPathScope};
-use ritual::rust_type::RustPath;
+use ritual::rust_info::{NameType, RustItem, RustPathScope};
+use ritual::rust_type::{RustFinalType, RustPath, RustToFfiTypeConversion};
 use ritual_common::errors::{bail, err_msg, Result};
 use ritual_common::string_utils::CaseOperations;
 
 /// QtCore specific configuration.
 pub fn core_config(config: &mut Config) -> Result<()> {
     let crate_name = config.crate_properties().name().to_string();
+    let crate_name2 = crate_name.clone();
     let namespace = CppPath::from_good_str("Qt");
     config.set_rust_path_scope_hook(move |path| {
         if path == &namespace {
@@ -165,6 +167,12 @@ pub fn core_config(config: &mut Config) -> Result<()> {
     // TODO: replace QVariant::Type with QMetaType::Type?
 
     let connect_path = CppPath::from_good_str("QObject::connect");
+    let connection_to_bool_function = connection_to_bool_function();
+    let connection_is_valid_path = RustPath::from_good_str(&format!(
+        "{}::q_meta_object::Connection::is_valid",
+        crate_name2
+    ));
+    let connection_is_valid_path2 = connection_is_valid_path.clone();
     let qmetamethod_ref_type =
         CppType::new_reference(true, CppType::Class(CppPath::from_good_str("QMetaMethod")));
     config.set_rust_path_hook(move |_path, name_type, data| {
@@ -189,6 +197,10 @@ pub fn core_config(config: &mut Config) -> Result<()> {
                             data.db.crate_name()
                         ))));
                     }
+                }
+
+                if cpp_function.is_same(&connection_to_bool_function) {
+                    return Ok(Some(connection_is_valid_path.clone()));
                 }
 
                 let q_text_stream_functions = &[
@@ -232,7 +244,30 @@ pub fn core_config(config: &mut Config) -> Result<()> {
                 }
             }
         }
+
         Ok(None)
+    });
+
+    config.set_rust_item_hook(move |item, _data| {
+        if item.path() == Some(&connection_is_valid_path2) {
+            if let RustItem::Function(item) = item {
+                let arg = item
+                    .arguments
+                    .get_mut(0)
+                    .ok_or_else(|| err_msg("missing argument"))?;
+                arg.argument_type = RustFinalType::new(
+                    arg.argument_type.ffi_type().clone(),
+                    RustToFfiTypeConversion::RefToPtr {
+                        force_api_is_const: None,
+                        lifetime: None,
+                    },
+                )?;
+                arg.name = "self".into();
+            } else {
+                bail!("unexpected item type");
+            }
+        }
+        Ok(())
     });
 
     config.set_ffi_generator_hook(|item| {
@@ -306,6 +341,7 @@ pub fn core_config(config: &mut Config) -> Result<()> {
     config.add_cpp_checker_tests(tests);
 
     config.add_after_cpp_parser_hook(add_find_child_methods);
+    config.add_after_cpp_parser_hook(add_connection_to_bool);
 
     // for moqt_core
     let namespace = CppPath::from_good_str("ignored_ns");
@@ -321,10 +357,7 @@ pub fn core_config(config: &mut Config) -> Result<()> {
     Ok(())
 }
 
-pub fn add_find_child_methods(
-    data: &mut ProcessorData<'_>,
-    output: &CppParserOutput,
-) -> Result<()> {
+fn add_find_child_methods(data: &mut ProcessorData<'_>, output: &CppParserOutput) -> Result<()> {
     for item in &output.0 {
         let cpp_item = data.db.cpp_item(&item.id)?;
         let function = if let Some(f) = cpp_item.item.as_function_ref() {
@@ -341,4 +374,35 @@ pub fn add_find_child_methods(
         }
     }
     Ok(())
+}
+
+fn add_connection_to_bool(data: &mut ProcessorData<'_>, _output: &CppParserOutput) -> Result<()> {
+    // `QMetaObject::Connection::operator bool()` is a fake method, so we need to
+    // explicitly add a conversion function to replace it.
+    data.db
+        .add_cpp_item(None, CppItem::Function(connection_to_bool_function()))?;
+    Ok(())
+}
+
+fn connection_to_bool_function() -> CppFunction {
+    CppFunction {
+        path: CppPath::from_item(CppPathItem {
+            name: "static_cast".into(),
+            template_arguments: Some(vec![CppType::BuiltInNumeric(CppBuiltInNumericType::Bool)]),
+        }),
+        member: None,
+        allows_variadic_arguments: false,
+        arguments: vec![CppFunctionArgument {
+            name: "connection".into(),
+            has_default_value: false,
+            argument_type: CppType::new_reference(
+                true,
+                CppType::Class(CppPath::from_good_str("QMetaObject::Connection")),
+            ),
+        }],
+        cast: None,
+        operator: None,
+        declaration_code: None,
+        return_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Bool),
+    }
 }

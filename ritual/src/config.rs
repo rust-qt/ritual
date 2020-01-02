@@ -4,7 +4,7 @@ use crate::cpp_checker::PreliminaryTest;
 use crate::cpp_data::{CppItem, CppPath};
 use crate::cpp_parser::CppParserOutput;
 use crate::processor::{ProcessingSteps, ProcessorData};
-use crate::rust_info::{NameType, RustPathScope};
+use crate::rust_info::{NameType, RustItem, RustPathScope};
 use crate::rust_type::RustPath;
 use ritual_common::cpp_build_config::{CppBuildConfig, CppBuildPaths};
 use ritual_common::errors::{bail, Result};
@@ -173,6 +173,7 @@ impl CrateProperties {
 pub type RustPathScopeHook = dyn Fn(&CppPath) -> Result<Option<RustPathScope>> + 'static;
 pub type RustPathHook =
     dyn Fn(&CppPath, NameType<'_>, &ProcessorData<'_>) -> Result<Option<RustPath>> + 'static;
+pub type RustItemHook = dyn Fn(&mut RustItem, &ProcessorData<'_>) -> Result<()> + 'static;
 pub type AfterCppParserHook =
     dyn Fn(&mut ProcessorData<'_>, &CppParserOutput) -> Result<()> + 'static;
 pub type FfiGeneratorHook = dyn Fn(&CppItem) -> Result<bool> + 'static;
@@ -215,6 +216,7 @@ pub struct Config {
     cpp_parser_path_hook: Option<Box<dyn Fn(&CppPath) -> Result<bool>>>,
     rust_path_scope_hook: Option<Box<RustPathScopeHook>>,
     rust_path_hook: Option<Box<RustPathHook>>,
+    rust_item_hook: Option<Box<RustItemHook>>,
     after_cpp_parser_hooks: Vec<Box<AfterCppParserHook>>,
     ffi_generator_hook: Option<Box<FfiGeneratorHook>>,
     cluster_config: Option<ClusterConfig>,
@@ -247,6 +249,7 @@ impl Config {
             cpp_parser_path_hook: Default::default(),
             rust_path_scope_hook: Default::default(),
             rust_path_hook: Default::default(),
+            rust_item_hook: Default::default(),
             after_cpp_parser_hooks: Default::default(),
             ffi_generator_hook: Default::default(),
             cluster_config: None,
@@ -441,6 +444,17 @@ impl Config {
 
     pub fn rust_path_hook(&self) -> Option<&RustPathHook> {
         self.rust_path_hook.as_ref().map(|b| &**b)
+    }
+
+    pub fn set_rust_item_hook(
+        &mut self,
+        hook: impl Fn(&mut RustItem, &ProcessorData<'_>) -> Result<()> + 'static,
+    ) {
+        self.rust_item_hook = Some(Box::new(hook));
+    }
+
+    pub fn rust_item_hook(&self) -> Option<&RustItemHook> {
+        self.rust_item_hook.as_ref().map(|b| &**b)
     }
 
     pub fn add_after_cpp_parser_hook(
