@@ -71,3 +71,10 @@ fn operators() {
         let _ = &b << vec.as_ref();
     }
 }
+
+#[test]
+fn extra() {
+    unsafe {
+        assert_eq!(moqt_core::extra_fn(), 42);
+    }
+}

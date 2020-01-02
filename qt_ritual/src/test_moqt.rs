@@ -93,6 +93,13 @@ fn build_moqt() -> Result<TempTestDir> {
             let mut file = create_file(template_src_dir.join(item.file_name()))?;
             write!(file, "{}", new_content)?;
         }
+
+        if repo_template_dir.join(&real_lib).join("c_lib").exists() {
+            copy_recursively(
+                &repo_template_dir.join(&real_lib).join("c_lib"),
+                &template_dir.join(lib).join("c_lib"),
+            )?;
+        }
     }
     let lib_path = install_dir.join("lib");
     add_env("LIBRARY_PATH", &lib_path)?;

@@ -21,7 +21,8 @@ use regex::Regex;
 use ritual_common::env_var_names;
 use ritual_common::errors::{bail, err_msg, format_err, print_trace, Result, ResultExt};
 use ritual_common::file_utils::{
-    canonicalize, create_file, open_file, os_str_to_str, path_to_str, remove_file,
+    canonicalize, copy_recursively, create_file, open_file, os_str_to_str, path_to_str, read_dir,
+    remove_dir_all, remove_file,
 };
 use ritual_common::target::{current_target, LibraryTarget};
 use std::io::Write;
@@ -236,15 +237,34 @@ fn run_clang<R, F: FnMut(Entity<'_>) -> Result<R>>(
     let clang = init_clang()?;
     let index = Index::new(&clang, false, false);
     let tmp_cpp_path = tmp_path.join("1.cpp");
-    {
-        let mut tmp_file = create_file(&tmp_cpp_path)?;
-        for directive in config.include_directives() {
-            writeln!(tmp_file, "#include \"{}\"", path_to_str(directive)?)?;
-        }
-        if let Some(cpp_code) = cpp_code {
-            write!(tmp_file, "{}", cpp_code)?;
+    let mut tmp_file = create_file(&tmp_cpp_path)?;
+    for directive in config.include_directives() {
+        writeln!(tmp_file, "#include \"{}\"", path_to_str(directive)?)?;
+    }
+    if let Some(cpp_code) = cpp_code {
+        write!(tmp_file, "{}", cpp_code)?;
+    }
+
+    if let Some(template_path) = config.crate_template_path() {
+        let extra_files_dir = template_path.join("c_lib/extra");
+        if extra_files_dir.exists() {
+            let destination = tmp_path.join("extra");
+            if destination.exists() {
+                remove_dir_all(&destination)?;
+            }
+            copy_recursively(&extra_files_dir, &destination)?;
+            for item in read_dir(&extra_files_dir)? {
+                writeln!(
+                    tmp_file,
+                    "#include \"extra/{}\"",
+                    os_str_to_str(&item?.file_name())?
+                )?;
+            }
         }
     }
+
+    drop(tmp_file);
+
     let mut args = vec![
         "-Xclang".to_string(),
         "-detailed-preprocessing-record".to_string(),
@@ -284,7 +304,7 @@ fn run_clang<R, F: FnMut(Entity<'_>) -> Result<R>>(
         .parse()
         .with_context(|_| "clang parse failed")?;
     let translation_unit = tu.get_entity();
-    assert!(translation_unit.get_kind() == EntityKind::TranslationUnit);
+    assert_eq!(translation_unit.get_kind(), EntityKind::TranslationUnit);
     {
         let diagnostics = tu.get_diagnostics();
         if !diagnostics.is_empty() {
@@ -318,6 +338,9 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         data,
         output: Default::default(),
     };
+    parser
+        .current_target_paths
+        .push(parser.data.workspace.tmp_path().join("extra"));
     run_clang(
         &parser.data.config,
         &parser.data.workspace.tmp_path(),
@@ -347,7 +370,7 @@ pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
         }
         let code = ffi_item.item.source_item_cpp_code(data.db)?;
         let mut parser = CppParser {
-            current_target_paths: vec![data.workspace.tmp_path()],
+            current_target_paths: vec![data.workspace.tmp_path().join("1.cpp")],
             source_id: Some(ffi_item_id),
             data,
             output: Default::default(),

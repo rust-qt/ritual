@@ -16,7 +16,8 @@ use ritual_common::cpp_lib_builder::{
 };
 use ritual_common::errors::{bail, err_msg, Result};
 use ritual_common::file_utils::{
-    create_dir_all, create_file, os_str_to_str, path_to_str, remove_dir_all,
+    copy_recursively, create_dir_all, create_file, os_str_to_str, path_to_str, read_dir,
+    remove_dir_all,
 };
 use ritual_common::target::{current_target, LibraryTarget};
 use ritual_common::utils::{MapIfOk, ProgressBar};
@@ -268,6 +269,7 @@ pub struct LocalCppChecker {
     crate_name: String,
     cpp_build_config: CppBuildConfigData,
     cpp_build_paths: CppBuildPaths,
+    crate_template_path: Option<PathBuf>,
     tests: Vec<PreliminaryTest>,
 }
 
@@ -280,6 +282,7 @@ impl LocalCppChecker {
             parent_path: parent_path.into(),
             include_directives: config.include_directives().to_vec(),
             crate_name: config.crate_properties().name().to_string(),
+            crate_template_path: config.crate_template_path().cloned(),
             cpp_build_paths: {
                 let mut data = config.cpp_build_paths().clone();
                 data.apply_env();
@@ -298,6 +301,22 @@ impl LocalCppChecker {
         let src_path = root_path.join("src");
         create_dir_all(&src_path)?;
 
+        let mut all_include_directives = self.include_directives.clone();
+        let extra_path = src_path.join("extra");
+        create_dir_all(&extra_path)?;
+        if let Some(crate_template_path) = &self.crate_template_path {
+            let extra_template = crate_template_path.join("c_lib/extra");
+            if extra_template.exists() {
+                copy_recursively(&extra_template, &extra_path)?;
+                for item in read_dir(&extra_template)? {
+                    all_include_directives.push(PathBuf::from(format!(
+                        "extra/{}",
+                        os_str_to_str(&item?.file_name())?
+                    )));
+                }
+            }
+        }
+
         let mut cmake_file = create_file(src_path.join("CMakeLists.txt"))?;
         write!(
             cmake_file,
@@ -309,8 +328,7 @@ impl LocalCppChecker {
         write!(
             utils_file,
             include_str!("../templates/cpp_checker/utils.h"),
-            include_directives_code = self
-                .include_directives
+            include_directives_code = all_include_directives
                 .iter()
                 .map_if_ok(|d| -> Result<_> { Ok(format!("#include \"{}\"", path_to_str(d)?)) })?
                 .join("\n")

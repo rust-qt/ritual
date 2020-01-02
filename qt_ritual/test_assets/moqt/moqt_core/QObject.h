@@ -12,6 +12,10 @@ class QMetaObject {
 public:
     class Connection {
     public:
+        typedef void *Connection::*RestrictedBool;
+        operator RestrictedBool() const {
+            return nullptr;
+        }
     };
 };
 
