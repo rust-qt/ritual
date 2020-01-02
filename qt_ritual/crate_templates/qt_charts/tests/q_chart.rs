@@ -1,7 +1,7 @@
 use qt_charts::{qt_core::QString, qt_widgets::QApplication, QChart};
 
 #[test]
-fn push_button1() {
+fn chart1() {
     QApplication::init(|_| unsafe {
         let mut chart = QChart::new_0a();
         chart.set_title(&QString::from_std_str("test"));

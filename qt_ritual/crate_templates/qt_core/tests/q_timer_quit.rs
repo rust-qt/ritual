@@ -12,10 +12,12 @@ fn timer_quit() {
     QCoreApplication::init(|app| unsafe {
         let mut slot1 = RawSlot::new();
         slot1.set(Some(func1), MutPtr::from_raw(42 as *mut c_void));
-        app.about_to_quit().connect(&slot1);
+        let c = app.about_to_quit().connect(&slot1);
+        assert!(c.is_valid());
 
         let mut timer = QTimer::new_0a();
-        timer.timeout().connect(app.slot_quit());
+        let c = timer.timeout().connect(app.slot_quit());
+        assert!(c.is_valid());
         timer.start_1a(1000);
         QCoreApplication::exec()
     })
