@@ -22,7 +22,7 @@ use std::{env, fmt};
 /// Creates output and cache directories if they don't exist.
 /// Returns `Err` if any path in `config` is invalid or relative.
 fn check_all_paths(config: &Config) -> Result<()> {
-    let check_dir = |path: &PathBuf| -> Result<()> {
+    let check_path = |path: &PathBuf, is_dir: bool| -> Result<()> {
         if !path.is_absolute() {
             bail!(
                 "Only absolute paths allowed. Relative path: {}",
@@ -32,26 +32,26 @@ fn check_all_paths(config: &Config) -> Result<()> {
         if !path.exists() {
             bail!("Directory doesn't exist: {}", path.display());
         }
-        if !path.is_dir() {
+        if is_dir && !path.is_dir() {
             bail!("Path is not a directory: {}", path.display());
         }
         Ok(())
     };
 
     if let Some(path) = config.crate_template_path() {
-        check_dir(path)?;
+        check_path(path, true)?;
     }
     for path in config.cpp_build_paths().include_paths() {
-        check_dir(path)?;
+        check_path(path, true)?;
     }
     for path in config.cpp_build_paths().lib_paths() {
-        check_dir(path)?;
+        check_path(path, true)?;
     }
     for path in config.cpp_build_paths().framework_paths() {
-        check_dir(path)?;
+        check_path(path, true)?;
     }
     for path in config.target_include_paths() {
-        check_dir(path)?;
+        check_path(path, false)?;
     }
     Ok(())
 }

@@ -171,6 +171,13 @@ pub enum RustToFfiTypeConversion {
     /// Rust public type has an additional reference (`&`)
     RefTo(Box<RustToFfiTypeConversion>),
     ImplCastInto(Box<RustToFfiTypeConversion>),
+    ClosureToCallback(Box<RustClosureToCallbackConversion>),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct RustClosureToCallbackConversion {
+    pub closure_arguments: Vec<RustFinalType>,
+    pub closure_return_type: RustFinalType,
 }
 
 impl RustToFfiTypeConversion {
@@ -187,6 +194,14 @@ impl RustToFfiTypeConversion {
             true
         } else {
             false
+        }
+    }
+
+    pub fn as_callback_ref(&self) -> Option<&RustClosureToCallbackConversion> {
+        if let RustToFfiTypeConversion::ClosureToCallback(x) = self {
+            Some(x)
+        } else {
+            None
         }
     }
 }
@@ -297,6 +312,9 @@ impl RustFinalType {
                     generic_arguments: Some(vec![intermediate.api_type]),
                 };
                 RustType::ImplTrait(trait_type)
+            }
+            RustToFfiTypeConversion::ClosureToCallback { .. } => {
+                RustType::GenericParameter("T".into())
             }
         };
         Ok(RustFinalType {
@@ -444,6 +462,14 @@ impl RustCommonType {
     }
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct RustFunctionPointerType {
+    /// Return type of the function.
+    pub return_type: Box<RustType>,
+    /// Argument types of the function.
+    pub arguments: Vec<RustType>,
+}
+
 /// A Rust type
 #[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum RustType {
@@ -453,18 +479,14 @@ pub enum RustType {
     /// A type specified by path with possible generic arguments
     Common(RustCommonType),
     /// A function pointer type.
-    FunctionPointer {
-        /// Return type of the function.
-        return_type: Box<RustType>,
-        /// Argument types of the function.
-        arguments: Vec<RustType>,
-    },
+    FunctionPointer(RustFunctionPointerType),
     PointerLike {
         kind: RustPointerLikeTypeKind,
         is_const: bool,
         target: Box<RustType>,
     },
     ImplTrait(RustCommonType),
+    GenericParameter(String),
 }
 
 impl RustType {
@@ -516,7 +538,7 @@ impl RustType {
                 .iter()
                 .map_if_ok(|t| t.caption(context, strategy))?
                 .join("_"),
-            RustType::Primitive(type1) => type1.to_string(),
+            RustType::Primitive(type1) | RustType::GenericParameter(type1) => type1.to_string(),
             RustType::PointerLike {
                 kind,
                 is_const,
@@ -668,7 +690,7 @@ impl RustType {
             RustType::PointerLike { kind, target, .. } => {
                 kind.is_pointer() || target.is_unsafe_argument()
             }
-            RustType::Primitive(_) => false,
+            RustType::Primitive(_) | RustType::GenericParameter(_) => false,
             RustType::Common(RustCommonType {
                 generic_arguments, ..
             }) => {
@@ -680,12 +702,9 @@ impl RustType {
                 false
             }
             RustType::Tuple(types) => types.iter().any(RustType::is_unsafe_argument),
-            RustType::FunctionPointer {
-                return_type,
-                arguments,
-            } => {
-                return_type.is_unsafe_argument()
-                    || arguments.iter().any(RustType::is_unsafe_argument)
+            RustType::FunctionPointer(function) => {
+                function.return_type.is_unsafe_argument()
+                    || function.arguments.iter().any(RustType::is_unsafe_argument)
             }
             RustType::ImplTrait(_) => true,
         }
@@ -750,20 +769,14 @@ impl RustType {
                 }
                 _ => false,
             },
-            RustType::FunctionPointer {
-                return_type: self_return_type,
-                arguments: self_arguments,
-            } => {
-                if let RustType::FunctionPointer {
-                    return_type,
-                    arguments,
-                } = other
-                {
-                    self_return_type.can_be_same_as(return_type)
-                        && self_arguments.len() == arguments.len()
-                        && self_arguments
+            RustType::FunctionPointer(function) => {
+                if let RustType::FunctionPointer(other) = other {
+                    function.return_type.can_be_same_as(&other.return_type)
+                        && function.arguments.len() == other.arguments.len()
+                        && function
+                            .arguments
                             .iter()
-                            .zip(arguments)
+                            .zip(&other.arguments)
                             .all(|(a, b)| a.can_be_same_as(b))
                 } else {
                     false
@@ -794,6 +807,7 @@ impl RustType {
                     false
                 }
             }
+            RustType::GenericParameter(_) => self == other,
         }
     }
 }

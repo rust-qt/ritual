@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::cpp_checks::CppChecksItem;
+use crate::cpp_code_generator::{all_include_directives, write_include_directives};
 use crate::cpp_data::CppPath;
 use crate::cpp_ffi_data::CppFfiItem;
 use crate::cpp_type::CppType;
@@ -16,11 +17,10 @@ use ritual_common::cpp_lib_builder::{
 };
 use ritual_common::errors::{bail, err_msg, Result};
 use ritual_common::file_utils::{
-    copy_recursively, create_dir_all, create_file, os_str_to_str, path_to_str, read_dir,
-    remove_dir_all,
+    copy_recursively, create_dir_all, create_file, os_str_to_str, remove_dir_all,
 };
 use ritual_common::target::{current_target, LibraryTarget};
-use ritual_common::utils::{MapIfOk, ProgressBar};
+use ritual_common::utils::ProgressBar;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::{hash_map::Entry, HashMap};
 use std::io::Write;
@@ -265,7 +265,7 @@ impl PreliminaryTest {
 #[derive(Debug, Clone)]
 pub struct LocalCppChecker {
     parent_path: PathBuf,
-    include_directives: Vec<PathBuf>,
+    all_include_directives: Vec<PathBuf>,
     crate_name: String,
     cpp_build_config: CppBuildConfigData,
     cpp_build_paths: CppBuildPaths,
@@ -280,7 +280,7 @@ impl LocalCppChecker {
 
         Ok(LocalCppChecker {
             parent_path: parent_path.into(),
-            include_directives: config.include_directives().to_vec(),
+            all_include_directives: all_include_directives(config)?,
             crate_name: config.crate_properties().name().to_string(),
             crate_template_path: config.crate_template_path().cloned(),
             cpp_build_paths: {
@@ -301,19 +301,12 @@ impl LocalCppChecker {
         let src_path = root_path.join("src");
         create_dir_all(&src_path)?;
 
-        let mut all_include_directives = self.include_directives.clone();
         let extra_path = src_path.join("extra");
         create_dir_all(&extra_path)?;
         if let Some(crate_template_path) = &self.crate_template_path {
             let extra_template = crate_template_path.join("c_lib/extra");
             if extra_template.exists() {
                 copy_recursively(&extra_template, &extra_path)?;
-                for item in read_dir(&extra_template)? {
-                    all_include_directives.push(PathBuf::from(format!(
-                        "extra/{}",
-                        os_str_to_str(&item?.file_name())?
-                    )));
-                }
             }
         }
 
@@ -325,14 +318,12 @@ impl LocalCppChecker {
         )?;
 
         let mut global_file = create_file(src_path.join("global.h"))?;
-        write!(
+        writeln!(
             global_file,
+            "{}",
             include_str!("../templates/c_lib/global.h"),
-            include_directives_code = all_include_directives
-                .iter()
-                .map_if_ok(|d| -> Result<_> { Ok(format!("#include \"{}\"", path_to_str(d)?)) })?
-                .join("\n")
         )?;
+        write_include_directives(&mut global_file, &self.all_include_directives)?;
 
         let cmake_config = CMakeConfigData {
             cpp_build_config_data: &self.cpp_build_config,

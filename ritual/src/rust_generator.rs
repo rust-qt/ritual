@@ -17,14 +17,14 @@ use crate::rust_info::{
     NameType, RustEnumValue, RustExtraImpl, RustExtraImplKind, RustFfiWrapperData,
     RustFlagEnumImpl, RustFunction, RustFunctionArgument, RustFunctionCaptionStrategy,
     RustFunctionKind, RustFunctionSelfArgKind, RustItem, RustModule, RustModuleKind, RustPathScope,
-    RustQtReceiverType, RustQtSlotWrapper, RustRawQtSlotWrapperData, RustRawSlotReceiver,
-    RustReexport, RustReexportSource, RustSignalOrSlotGetter, RustSizedType, RustSpecialModuleKind,
-    RustStruct, RustStructKind, RustTraitAssociatedType, RustTraitImpl, RustTraitImplExtraKind,
+    RustQtReceiverType, RustRawQtSlotWrapperData, RustRawSlotReceiver, RustReexport,
+    RustReexportSource, RustSignalOrSlotGetter, RustSizedType, RustSpecialModuleKind, RustStruct,
+    RustStructKind, RustTraitAssociatedType, RustTraitImpl, RustTraitImplExtraKind,
     RustTypeCaptionStrategy, RustWrapperTypeKind, UnnamedRustFunction,
 };
 use crate::rust_type::{
-    RustCommonType, RustFinalType, RustPath, RustPointerLikeTypeKind, RustToFfiTypeConversion,
-    RustType,
+    RustClosureToCallbackConversion, RustCommonType, RustFinalType, RustFunctionPointerType,
+    RustPath, RustPointerLikeTypeKind, RustToFfiTypeConversion, RustType,
 };
 use itertools::Itertools;
 use log::{debug, trace};
@@ -776,10 +776,10 @@ impl State<'_, '_> {
                     .iter()
                     .map_if_ok(|arg| self.ffi_type_to_rust_ffi_type(arg))?;
                 let rust_return_type = self.ffi_type_to_rust_ffi_type(return_type)?;
-                let pointer = RustType::FunctionPointer {
+                let pointer = RustType::FunctionPointer(RustFunctionPointerType {
                     arguments: rust_args,
                     return_type: Box::new(rust_return_type),
-                };
+                });
                 RustType::Common(RustCommonType {
                     path: RustPath::from_good_str("std::option::Option"),
                     generic_arguments: Some(vec![pointer]),
@@ -1383,6 +1383,64 @@ impl State<'_, '_> {
         Ok(results)
     }
 
+    fn convert_callbacks_to_closure(
+        &self,
+        id: &ItemId,
+        function: &mut UnnamedRustFunction,
+        checks: &CppChecks,
+    ) -> Result<()> {
+        let callback_type = if let Some(t) = detect_callback_function(function) {
+            t.clone()
+        } else {
+            return Ok(());
+        };
+        println!("OK!!! {:?}", callback_type);
+
+        let wrapper = self
+            .data
+            .db
+            .source_ffi_item(id)?
+            .ok_or_else(|| err_msg("source ffi item not found"))?
+            .item
+            .as_slot_wrapper_ref()
+            .ok_or_else(|| err_msg("invalid source ffi item type"))?;
+
+        println!("OK1 wrapper {:?}", wrapper);
+        let closure_arguments = wrapper.arguments.iter().map_if_ok(|arg| {
+            self.rust_final_type(
+                arg,
+                // closure argument should be handled in the same way
+                // as return type (value is produced behind FFI)
+                &CppFfiArgumentMeaning::ReturnValue,
+                ReturnValueAllocationPlace::NotApplicable,
+                Some(&checks),
+            )
+        })?;
+        println!("OK2 closure_args {:?}", closure_arguments);
+        let closure_return_type = self.rust_final_type(
+            &CppFfiType::void(),
+            // TODO: not sure about the meaning.
+            &CppFfiArgumentMeaning::Argument(0),
+            ReturnValueAllocationPlace::NotApplicable,
+            Some(&checks),
+        )?;
+
+        function.arguments.drain(function.arguments.len() - 2..);
+        let arg = function
+            .arguments
+            .last_mut()
+            .expect("function must have enough args");
+        arg.argument_type = RustFinalType::new(
+            arg.argument_type.ffi_type().clone(),
+            RustToFfiTypeConversion::ClosureToCallback(Box::new(RustClosureToCallbackConversion {
+                closure_arguments,
+                closure_return_type,
+            })),
+        )?;
+
+        Ok(())
+    }
+
     /// Converts one function to a `RustSingleMethod`.
     fn process_rust_function(
         &self,
@@ -1484,6 +1542,7 @@ impl State<'_, '_> {
             kind: RustFunctionKind::FfiWrapper(RustFfiWrapperData { ffi_function_path }),
             is_unsafe: true,
         };
+        self.convert_callbacks_to_closure(&item.id, &mut unnamed_function, checks)?;
 
         let cpp_item = self
             .data
@@ -1842,7 +1901,9 @@ impl State<'_, '_> {
                 .map_if_ok(|item| self.cpp_path_item_to_name(item, &scope.path, &name_type))?
                 .join("_"),
             NameType::ApiFunction(function) => {
-                let s = if let Some(last_name_override) =
+                let s = if is_second_slot_constructor(self.data, function)? {
+                    "with".to_string()
+                } else if let Some(last_name_override) =
                     self.special_function_rust_name(function.clone(), &scope.path)?
                 {
                     last_name_override.clone()
@@ -1878,16 +1939,12 @@ impl State<'_, '_> {
                 .cpp_path_item_to_name(&cpp_path.last(), &scope.path, &name_type)?
                 .to_snake_case(),
             NameType::FfiFunction => cpp_path.last().name.clone(),
-            NameType::QtSlotWrapper {
-                signal_arguments,
-                is_public,
-            } => {
-                let name = if *is_public { "Slot" } else { "RawSlot" };
+            NameType::QtSlotWrapper { signal_arguments } => {
                 if signal_arguments.is_empty() {
-                    name.to_string()
+                    "Slot".to_string()
                 } else {
                     let captions = self.type_list_caption(signal_arguments, &scope.path)?;
-                    format!("{}_Of_{}", name, captions).to_class_case()
+                    format!("SlotOf_{}", captions).to_class_case()
                 }
             }
         };
@@ -1968,7 +2025,6 @@ impl State<'_, '_> {
         let public_name_type = if let Some(wrapper) = &qt_slot_wrapper {
             NameType::QtSlotWrapper {
                 signal_arguments: &wrapper.item.signal_arguments,
-                is_public: false,
             }
         } else {
             NameType::Type {
@@ -2042,40 +2098,8 @@ impl State<'_, '_> {
             });
             rust_items.push(impl_item);
 
-            let closure_item_path = self.generate_rust_path(
-                &data.path,
-                NameType::QtSlotWrapper {
-                    signal_arguments: &wrapper.item.signal_arguments,
-                    is_public: true,
-                },
-            )?;
-
-            let checks = self.data.db.cpp_checks(&wrapper.id)?;
-            let public_args = wrapper.item.arguments.iter().map_if_ok(|arg| {
-                self.rust_final_type(
-                    arg,
-                    // closure argument should be handled in the same way
-                    // as return type (value is produced behind FFI)
-                    &CppFfiArgumentMeaning::ReturnValue,
-                    ReturnValueAllocationPlace::NotApplicable,
-                    Some(&checks),
-                )
-            })?;
-
-            let public_item = RustItem::Struct(RustStruct {
-                is_public: true,
-                kind: RustStructKind::QtSlotWrapper(RustQtSlotWrapper {
-                    arguments: public_args,
-                    raw_slot_wrapper: public_path.clone(),
-                }),
-                path: closure_item_path.clone(),
-                raw_slot_wrapper_data: None,
-            });
-            rust_items.push(public_item);
-
             raw_slot_wrapper_data = Some(RustRawQtSlotWrapperData {
                 arguments: arg_types,
-                closure_wrapper: closure_item_path,
             });
         } else {
             raw_slot_wrapper_data = None;
@@ -2512,6 +2536,61 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     Ok(())
 }
 
+fn detect_callback_function(function: &UnnamedRustFunction) -> Option<&RustFunctionPointerType> {
+    if function.arguments.len() < 3 {
+        return None;
+    }
+    let args = &function.arguments[function.arguments.len() - 3..];
+    let void_ptr = RustType::new_pointer(
+        false,
+        RustType::Common(RustCommonType {
+            path: RustPath::from_good_str("std::ffi::c_void"),
+            generic_arguments: None,
+        }),
+    );
+    if args[0].name != "callback" {
+        return None;
+    }
+    let callback_type;
+    if let RustType::Common(common) = &args[0].argument_type.ffi_type() {
+        if common.path != "std::option::Option" {
+            return None;
+        }
+        if let Some(args) = &common.generic_arguments {
+            if args.len() == 1 {
+                if let RustType::FunctionPointer(t) = &args[0] {
+                    callback_type = t;
+                } else {
+                    return None;
+                }
+            } else {
+                return None;
+            }
+        } else {
+            return None;
+        }
+    } else {
+        return None;
+    }
+    if args[1].name != "deleter" {
+        return None;
+    }
+    let deleter_type = RustType::new_option(RustType::FunctionPointer(RustFunctionPointerType {
+        arguments: vec![void_ptr.clone()],
+        return_type: Box::new(RustType::unit()),
+    }));
+    if args[1].argument_type.ffi_type() != &deleter_type {
+        return None;
+    }
+    if args[2].name != "data" {
+        return None;
+    }
+    if args[2].argument_type.ffi_type() != &void_ptr {
+        return None;
+    }
+    Some(callback_type)
+}
+
 impl FunctionWithDesiredPath {
     fn apply_strategy(&self, strategy: &RustFunctionCaptionStrategy) -> Result<RustPath> {
         let mut suffix = String::new();
@@ -2645,6 +2724,35 @@ fn operator_function_name(operator: &CppOperator) -> Result<&'static str> {
         Delete => "delete",
         DeleteArray => "delete_array",
     })
+}
+
+fn is_second_slot_constructor(
+    data: &ProcessorData<'_>,
+    function: &DbItem<&CppFfiFunction>,
+) -> Result<bool> {
+    if function.item.arguments.len() != 3 {
+        return Ok(false);
+    }
+
+    let cpp_function = if let Some(f) = data
+        .db
+        .source_cpp_item(&function.id)?
+        .and_then(|i| i.item.as_function_ref())
+    {
+        f
+    } else {
+        return Ok(false);
+    };
+
+    if !cpp_function.is_constructor() {
+        return Ok(false);
+    }
+
+    let from_slot_wrapper = data
+        .db
+        .source_ffi_item(&function.id)?
+        .map_or(false, |x| x.item.is_slot_wrapper());
+    Ok(from_slot_wrapper)
 }
 
 #[allow(dead_code)]

@@ -39,6 +39,7 @@ fn run_parser(code: &'static str) -> ParserCppData {
     let mut config = Config::new(CrateProperties::new("A", "0.0.0"));
     config.add_include_directive(include_name);
     config.set_cpp_build_paths(paths);
+    config.add_target_include_path(include_file_path);
 
     processor::process(&mut workspace, &config, &["cpp_parser".into()], None).unwrap();
 

@@ -43,7 +43,7 @@ pub struct RustSizedType {
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub enum RustStructKind {
     WrapperType(RustWrapperTypeKind),
-    QtSlotWrapper(RustQtSlotWrapper),
+    QtSlotWrapper(RustQtSlotWrapper), // TODO: remove
     SizedType(RustSizedType),
 }
 
@@ -93,7 +93,6 @@ impl RustStructKind {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RustRawQtSlotWrapperData {
     pub arguments: Vec<RustType>,
-    pub closure_wrapper: RustPath,
 }
 
 /// Exported information about a Rust wrapper type
@@ -821,23 +820,14 @@ impl RustPathScope {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NameType<'a> {
-    Type {
-        is_from_other_crate: bool,
-    },
+    Type { is_from_other_crate: bool },
     EnumValue,
-    Module {
-        is_from_other_crate: bool,
-    },
+    Module { is_from_other_crate: bool },
     FfiFunction,
     ApiFunction(DbItem<&'a CppFfiFunction>),
-    ReceiverFunction {
-        receiver_type: RustQtReceiverType,
-    },
+    ReceiverFunction { receiver_type: RustQtReceiverType },
     SizedItem,
-    QtSlotWrapper {
-        signal_arguments: &'a [CppType],
-        is_public: bool,
-    },
+    QtSlotWrapper { signal_arguments: &'a [CppType] },
 }
 
 impl NameType<'_> {

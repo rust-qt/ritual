@@ -1,17 +1,18 @@
 use crate::config::CrateDependencySource;
 use crate::cpp_code_generator;
-use crate::cpp_code_generator::generate_cpp_type_size_requester;
+use crate::cpp_code_generator::{
+    all_include_directives, generate_cpp_type_size_requester, write_include_directives,
+};
 use crate::database::CRATE_DB_FILE_NAME;
 use crate::processor::ProcessorData;
 use crate::rust_code_generator;
 use ritual_common::errors::Result;
 use ritual_common::file_utils::{
     copy_file, copy_recursively, crate_version, create_dir, create_dir_all, create_file,
-    diff_paths, os_str_to_str, path_to_str, read_dir, remove_dir_all, repo_dir_path, save_json,
-    save_toml_table,
+    diff_paths, path_to_str, read_dir, remove_dir_all, repo_dir_path, save_json, save_toml_table,
 };
 use ritual_common::toml;
-use ritual_common::utils::{run_command, MapIfOk};
+use ritual_common::utils::run_command;
 use ritual_common::BuildScriptData;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -216,17 +217,14 @@ fn generate_c_lib_template(
         lib_name_uppercase = name_upper
     )?;
 
-    let include_directives_code = include_directives
-        .map_if_ok(|d| -> Result<_> { Ok(format!("#include \"{}\"", path_to_str(d)?)) })?
-        .join("\n");
-
     let global_header_path = lib_path.join(&global_header_name);
     let mut global_header_file = create_file(&global_header_path)?;
     write!(
         global_header_file,
+        "{}",
         include_str!("../templates/c_lib/global.h"),
-        include_directives_code = include_directives_code
     )?;
+    write_include_directives(&mut global_header_file, include_directives)?;
     Ok(())
 }
 
@@ -248,23 +246,11 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     }
     let c_lib_name = format!("{}_c", data.config.crate_properties().name());
     let global_header_name = format!("{}_global.h", c_lib_name);
-    let mut all_include_directives = data.config.include_directives().to_vec();
-    if let Some(crate_template_path) = data.config.crate_template_path() {
-        let extra_template = crate_template_path.join("c_lib/extra");
-        if extra_template.exists() {
-            for item in read_dir(&extra_template)? {
-                all_include_directives.push(PathBuf::from(format!(
-                    "extra/{}",
-                    os_str_to_str(&item?.file_name())?
-                )));
-            }
-        }
-    }
     generate_c_lib_template(
         &c_lib_name,
         &c_lib_path,
         &global_header_name,
-        &all_include_directives,
+        &all_include_directives(data.config)?,
     )?;
 
     cpp_code_generator::generate_cpp_file(

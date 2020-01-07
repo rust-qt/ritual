@@ -138,7 +138,7 @@ pub fn struct_doc(type1: DbItem<&RustStruct>, database: &DatabaseClient) -> Resu
                 output.clear(); // remove irrelevant C++ type name
                 writeln!(
                     output,
-                    "Binds a Qt signal with {} to a Rust extern function.\n",
+                    "Binds a Qt signal with {} to a Rust closure.\n",
                     if raw_slot_wrapper.arguments.is_empty() {
                         "no arguments".to_string()
                     } else {
@@ -151,13 +151,6 @@ pub fn struct_doc(type1: DbItem<&RustStruct>, database: &DatabaseClient) -> Resu
                                 .join(",")
                         )
                     }
-                )?;
-
-                writeln!(
-                    output,
-                    "It's recommended to use `{}` instead \
-                     because it provides a more high-level API.\n",
-                    raw_slot_wrapper.closure_wrapper.last()
                 )?;
 
                 let ffi_item = database
@@ -183,80 +176,24 @@ pub fn struct_doc(type1: DbItem<&RustStruct>, database: &DatabaseClient) -> Resu
                 writeln!(
                     output,
                     "Create an object using `new()` \
-                     and bind your function and payload using `set()`. \
-                     The function will receive the payload as its first arguments, \
-                     and the rest of arguments will be values passed \
-                     through the Qt connection system. \
-                     Use `connect()` method of a `qt_core::Signal` object \
-                     to connect the signal to this slot. \
-                     The callback function will be executed each time the slot is invoked \
-                     until source signals are disconnected or the slot object is destroyed.\n\n\
+                     and bind your closure using `set()`. \
+                     The closure will be called with the signal's arguments \
+                     when the slot is invoked. \
+                     Use `connect()` method of a `qt_core::Signal` object to connect \
+                     the signal to this slot. The closure will be executed each time \
+                     the slot is invoked until source signals are disconnected \
+                     or the slot object is destroyed. \n\n\
+                     The slot object takes ownership of the passed closure. \
+                     If `set()` is called again, \
+                     previously set closure is dropped. \
+                     Make sure that the slot object does not outlive \
+                     objects referenced by the closure. \n\n\
                      If `set()` was not called, slot invocation has no effect.\n"
                 )?;
             }
         }
-        RustStructKind::QtSlotWrapper(wrapper) => {
-            let cpp_item = database
-                .source_cpp_item(&type1.id)?
-                .ok_or_else(|| err_msg("source cpp item not found"))?;
-
-            let ffi_item = database
-                .source_ffi_item(&cpp_item.id)?
-                .ok_or_else(|| err_msg("source ffi item not found"))?
-                .item
-                .as_slot_wrapper_ref()
-                .ok_or_else(|| err_msg("invalid source ffi item type"))?;
-
-            writeln!(
-                output,
-                "Binds a Qt signal with {} to a Rust closure.\n",
-                if wrapper.arguments.is_empty() {
-                    "no arguments".to_string()
-                } else {
-                    format!(
-                        "arguments `{}`",
-                        wrapper
-                            .arguments
-                            .iter()
-                            .map(|arg| rust_type_to_code(
-                                arg.api_type(),
-                                Some(database.crate_name())
-                            ))
-                            .join(",")
-                    )
-                }
-            )?;
-
-            if !ffi_item.signal_arguments.is_empty() {
-                let cpp_args = ffi_item
-                    .signal_arguments
-                    .iter()
-                    .map(CppType::to_cpp_pseudo_code)
-                    .join(", ");
-                writeln!(
-                    output,
-                    "Corresponding C++ argument types: ({}).\n",
-                    wrap_inline_cpp_code(&cpp_args)
-                )?;
-            }
-
-            writeln!(
-                output,
-                "Create an object using `new()` \
-                 and bind your closure using `set()`. \
-                 The closure will be called with the signal's arguments \
-                 when the slot is invoked. \
-                 Use `connect()` method of a `qt_core::Signal` object to connect \
-                 the signal to this slot. The closure will be executed each time \
-                 the slot is invoked until source signals are disconnected \
-                 or the slot object is destroyed. \n\n\
-                 The slot object takes ownership of the passed closure. \
-                 If `set()` is called again, \
-                 previously set closure is dropped. \
-                 Make sure that the slot object does not outlive \
-                 objects referenced by the closure. \n\n\
-                 If `set()` was not called, slot invocation has no effect.\n"
-            )?;
+        RustStructKind::QtSlotWrapper(_) => {
+            bail!("RustStructKind::QtSlotWrapper is deprecated");
         }
         // private struct, no doc needed
         RustStructKind::SizedType(_) => {}
@@ -336,7 +273,7 @@ pub fn function_doc(function: DbItem<&RustFunction>, database: &DatabaseClient) 
         && !is_trait_impl
     {
         match function.item.path.last() {
-            "custom_slot" => {
+            "slot" => {
                 writeln!(
                     output,
                     "Calls the slot directly, invoking the assigned handler (if any).\n"
@@ -345,8 +282,15 @@ pub fn function_doc(function: DbItem<&RustFunction>, database: &DatabaseClient) 
             "new" => {
                 writeln!(output, "Creates a new object.\n")?;
             }
+            "with" => {
+                writeln!(
+                    output,
+                    "Creates a new object and assigns `callback` \
+                     as the signal handler.\n"
+                )?;
+            }
             "set" => {
-                writeln!(output, "Assigns `func` as the signal handler.\n")?;
+                writeln!(output, "Assigns `callback` as the signal handler.\n")?;
                 writeln!(
                     output,
                     "`func` will be called each time a connected signal is emitted. \
@@ -484,7 +428,7 @@ pub fn function_doc(function: DbItem<&RustFunction>, database: &DatabaseClient) 
       .into(),
   );
             }
-            "custom_slot" => {
+            "slot" => {
                 method.common_doc = Some(
     "Executes the callback function, as if the slot was invoked \
      with these arguments. Does nothing if no callback function was set."

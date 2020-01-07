@@ -13,8 +13,8 @@ use crate::rust_info::{
     RustWrapperTypeKind,
 };
 use crate::rust_type::{
-    RustCommonType, RustFinalType, RustPath, RustPointerLikeTypeKind, RustToFfiTypeConversion,
-    RustType,
+    RustClosureToCallbackConversion, RustCommonType, RustFinalType, RustPath,
+    RustPointerLikeTypeKind, RustToFfiTypeConversion, RustType,
 };
 use itertools::Itertools;
 use ritual_common::errors::{bail, err_msg, format_err, Result};
@@ -61,7 +61,7 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: Option<&str>) -> S
                 .join("");
             format!("({})", types_text)
         }
-        RustType::Primitive(type1) => type1.to_string(),
+        RustType::Primitive(type1) | RustType::GenericParameter(type1) => type1.to_string(),
         RustType::PointerLike {
             kind,
             target,
@@ -90,19 +90,20 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: Option<&str>) -> S
             }
         }
         RustType::Common(common) => rust_common_type_to_code(common, current_crate),
-        RustType::FunctionPointer {
-            return_type,
-            arguments,
-        } => format!(
+        RustType::FunctionPointer(function) => format!(
             "extern \"C\" fn({}){}",
-            arguments
+            function
+                .arguments
                 .iter()
                 .map(|arg| rust_type_to_code(arg, current_crate))
                 .join(", "),
-            if return_type.is_unit() {
+            if function.return_type.is_unit() {
                 String::new()
             } else {
-                format!(" -> {}", rust_type_to_code(return_type, current_crate))
+                format!(
+                    " -> {}",
+                    rust_type_to_code(&function.return_type, current_crate)
+                )
             }
         ),
         RustType::ImplTrait(trait_type) => format!(
@@ -489,39 +490,8 @@ impl Generator<'_> {
                     writeln!(self)?;
                 }
             },
-            RustStructKind::QtSlotWrapper(slot_wrapper) => {
-                let arg_texts = slot_wrapper
-                    .arguments
-                    .iter()
-                    .map(|t| self.rust_type_to_code(t.api_type()))
-                    .collect_vec();
-                let args = arg_texts.join(", ");
-
-                let callback_args = slot_wrapper
-                    .arguments
-                    .iter()
-                    .enumerate()
-                    .map(|(num, t)| format!("arg{}: {}", num, self.rust_type_to_code(t.ffi_type())))
-                    .join(", ");
-                let func_args = slot_wrapper
-                    .arguments
-                    .iter()
-                    .enumerate()
-                    .map_if_ok(|(num, t)| {
-                        self.convert_type_from_ffi(t, format!("arg{}", num), false, false)
-                    })?
-                    .join(", ");
-                writeln!(
-                    self,
-                    include_str!("../templates/crate/closure_slot_wrapper.rs.in"),
-                    qt_core = self.qt_core_prefix(),
-                    type_name = self.rust_path_to_string(&slot_wrapper.raw_slot_wrapper),
-                    pub_type_name = rust_struct.item.path.last(),
-                    args = args,
-                    func_args = func_args,
-                    callback_args = callback_args,
-                    condition_attribute = condition_texts.attribute,
-                )?;
+            RustStructKind::QtSlotWrapper(_) => {
+                bail!("RustStructKind::QtSlotWrapper is deprecated");
             }
             RustStructKind::SizedType(_) => {
                 bail!("sized struct can't be generated with rust code generator")
@@ -599,7 +569,7 @@ impl Generator<'_> {
 
         let (code1, source_expr) = if use_ffi_result_var {
             (
-                format!("let ffi_result = {};\n", expression),
+                format!("let ffi_result = {{ {} }};\n", expression),
                 "ffi_result".to_string(),
             )
         } else {
@@ -698,6 +668,9 @@ impl Generator<'_> {
             RustToFfiTypeConversion::ImplCastInto(_) => {
                 bail!("ImplCastInto is not convertable from FFI type");
             }
+            RustToFfiTypeConversion::ClosureToCallback { .. } => {
+                bail!("ClosureToCallback is not convertable from FFI type");
+            }
         };
         Ok(code1 + &code2)
     }
@@ -780,7 +753,74 @@ impl Generator<'_> {
                 );
                 self.convert_type_to_ffi(&intermediate_expr, &intermediate)?
             }
+            RustToFfiTypeConversion::ClosureToCallback { .. } => {
+                "Some(ffi_callback::<T>), Some(deleter::<T>), data".to_string()
+            }
         };
+        Ok(code)
+    }
+
+    fn callback_bound_code(&self, conversion: &RustClosureToCallbackConversion) -> String {
+        let return_type_text = if conversion.closure_return_type.api_type().is_unit() {
+            String::new()
+        } else {
+            format!(
+                " -> {}",
+                self.rust_type_to_code(conversion.closure_return_type.api_type(),)
+            )
+        };
+        let args_text = conversion
+            .closure_arguments
+            .iter()
+            .map(|arg| self.rust_type_to_code(arg.api_type()))
+            .join(", ");
+
+        format!("T: FnMut({}){}", args_text, return_type_text)
+    }
+
+    fn callback_glue_code(&self, conversion: &RustClosureToCallbackConversion) -> Result<String> {
+        let mut code = String::new();
+        writeln!(
+            code,
+            "extern \"C\" fn deleter<T>(data: *mut ::std::ffi::c_void) {{
+                unsafe {{
+                    let _ = Box::from_raw(data as *mut T);
+                }}
+            }}"
+        )?;
+
+        writeln!(
+            code,
+            "extern \"C\" fn ffi_callback<{}>(data: *mut ::std::ffi::c_void, {}) {{",
+            self.callback_bound_code(conversion),
+            conversion
+                .closure_arguments
+                .iter()
+                .enumerate()
+                .map(|(i, arg)| format!("arg{}: {}", i, self.rust_type_to_code(arg.ffi_type())))
+                .join(", ")
+        )?;
+
+        let func_args = conversion
+            .closure_arguments
+            .iter()
+            .enumerate()
+            .map_if_ok(|(num, t)| {
+                self.convert_type_from_ffi(t, format!("arg{}", num), true, false)
+            })?
+            .join(", ");
+
+        code.push_str(&wrap_unsafe(
+            false,
+            &format!("(*(data as *mut T))({})", func_args),
+        ));
+
+        writeln!(code, "}}")?;
+        writeln!(
+            code,
+            "let data = Box::into_raw(Box::new(callback)) as *mut ::std::ffi::c_void;"
+        )?;
+
         Ok(code)
     }
 
@@ -803,6 +843,15 @@ impl Generator<'_> {
         }
 
         let mut result = Vec::new();
+
+        if let Some(conversion) = arguments
+            .iter()
+            .filter_map(|x| x.argument_type.conversion().as_callback_ref())
+            .next()
+        {
+            result.push(self.callback_glue_code(conversion)?);
+        }
+
         let mut maybe_result_var_name = None;
 
         let ffi_item = self
@@ -1000,19 +1049,27 @@ impl Generator<'_> {
                 self.rust_type_to_code(func.item.return_type.api_type())
             )
         };
-        let all_lifetimes = func
+        let generic_args = func
             .item
             .arguments
             .iter()
-            .filter_map(|x| x.argument_type.api_type().lifetime())
+            .filter_map(|x| {
+                if let Some(lifetime) = x.argument_type.api_type().lifetime() {
+                    Some(format!("'{}", lifetime))
+                } else if let RustToFfiTypeConversion::ClosureToCallback(conversion) =
+                    x.argument_type.conversion()
+                {
+                    Some(self.callback_bound_code(conversion))
+                } else {
+                    None
+                }
+            })
             .collect_vec();
-        let lifetimes_text = if all_lifetimes.is_empty() {
+
+        let generic_args_text = if generic_args.is_empty() {
             String::new()
         } else {
-            format!(
-                "<{}>",
-                all_lifetimes.iter().map(|x| format!("'{}", x)).join(", ")
-            )
+            format!("<{}>", generic_args.join(", "))
         };
 
         // TODO: move condition texts to doc parser
@@ -1021,7 +1078,7 @@ impl Generator<'_> {
         writeln!(
             self,
             "{doc}{maybe_inline}{condition}{maybe_pub}{maybe_unsafe} \
-             fn {name}{lifetimes_text}({args}){return_type} \
+             fn {name}{generic_args_text}({args}){return_type} \
              {maybe_body}\n\n",
             doc = format_doc(&doc),
             maybe_inline = if body.is_some() {
@@ -1032,7 +1089,7 @@ impl Generator<'_> {
             condition = condition_texts.attribute,
             maybe_pub = maybe_pub,
             maybe_unsafe = maybe_unsafe,
-            lifetimes_text = lifetimes_text,
+            generic_args_text = generic_args_text,
             name = func.item.path.last(),
             args = self
                 .arg_texts(&func.item.arguments, None, self_type)?
@@ -1113,7 +1170,7 @@ impl Generator<'_> {
 
                 let receiver_id = CppFunction::receiver_id_from_data(
                     RustQtReceiverType::Slot,
-                    "custom_slot",
+                    "slot_",
                     &wrapper.signal_arguments,
                 )?;
 

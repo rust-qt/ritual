@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::cpp_checks::Condition;
 use crate::cpp_ffi_data::{
     CppFfiArgumentMeaning, CppFfiFunctionKind, CppFfiType, CppFieldAccessorType,
@@ -12,7 +13,7 @@ use crate::rust_info::{RustItem, RustStructKind};
 use itertools::Itertools;
 use ritual_common::cpp_lib_builder::version_to_number;
 use ritual_common::errors::{bail, err_msg, format_err, Result};
-use ritual_common::file_utils::{create_file, os_str_to_str, path_to_str};
+use ritual_common::file_utils::{create_file, os_str_to_str, path_to_str, read_dir};
 use ritual_common::utils::MapIfOk;
 use std::collections::HashSet;
 use std::io::Write;
@@ -52,7 +53,7 @@ impl Generator<'_> {
                 Ok(format!("{} arg{}", arg_type, num))
             })?
             .join(", ");
-        let func_args = once("m_data".to_string())
+        let func_args = once("m_callback.data()".to_string())
             .chain(
                 wrapper
                     .arguments
@@ -64,8 +65,8 @@ impl Generator<'_> {
         Ok(format!(
             include_str!("../templates/c_lib/qt_slot_wrapper.h"),
             class_name = wrapper.class_path.to_cpp_code()?,
-            func_arg = func_type.to_cpp_code(Some("func"))?,
-            func_field = func_type.to_cpp_code(Some("m_func"))?,
+            callback_arg = func_type.to_cpp_code(Some("callback"))?,
+            callback_type = func_type.to_cpp_code(Some(""))?,
             method_args = method_args,
             func_args = func_args
         ))
@@ -206,7 +207,7 @@ impl Generator<'_> {
                 .iter()
                 .find(|x| x.meaning == CppFfiArgumentMeaning::This)
             {
-                format!("ritual_call_destructor({})", arg.name)
+                format!("ritual::call_destructor({})", arg.name)
             } else {
                 bail!("no this arg in destructor");
             }
@@ -481,4 +482,33 @@ pub fn generate_cpp_type_size_requester(
     output: impl Write,
 ) -> Result<()> {
     Generator(db).generate_cpp_type_size_requester(include_directives, output)
+}
+
+pub fn all_include_directives(config: &Config) -> Result<Vec<PathBuf>> {
+    let mut all_include_directives = config.include_directives().to_vec();
+
+    if let Some(crate_template_path) = config.crate_template_path() {
+        let extra_template = crate_template_path.join("c_lib/extra");
+        if extra_template.exists() {
+            for item in read_dir(&extra_template)? {
+                all_include_directives.push(PathBuf::from(format!(
+                    "extra/{}",
+                    os_str_to_str(&item?.file_name())?
+                )));
+            }
+        }
+    }
+
+    Ok(all_include_directives)
+}
+
+pub fn write_include_directives(mut destination: impl Write, directives: &[PathBuf]) -> Result<()> {
+    for directive in directives {
+        writeln!(
+            &mut destination,
+            "#include \"{}\"",
+            path_to_str(&directive)?
+        )?;
+    }
+    Ok(())
 }

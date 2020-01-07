@@ -3,20 +3,24 @@
 class {class_name} : public QObject {{
     Q_OBJECT
 public:
-    {class_name}() : m_func(nullptr), m_data(nullptr) {{ }}
-    void set({func_arg}, void* data) {{
-        m_func = func;
-        m_data = data;
+    {class_name}() {{ }}
+
+    {class_name}({callback_arg}, void (*deleter)(void*), void* data) {{
+        set(callback, deleter, data);
+    }}
+
+    void set({callback_arg}, void (*deleter)(void*), void* data) {{
+        m_callback.set(callback, deleter, data);
     }}
 
 public Q_SLOTS:
-    void custom_slot({method_args}) {{
-        if (m_func) {{
-            m_func({func_args});
+    void slot_({method_args}) {{
+        auto callback = m_callback.get();
+        if (callback) {{
+            callback({func_args});
         }}
     }}
 
 private:
-    {func_field};
-    void* m_data;
+    ritual::Callback<{callback_type}> m_callback;
 }};

@@ -434,6 +434,14 @@ impl CppType {
             bail!("not a pointer like type");
         }
     }
+
+    pub fn as_function_pointer(&self) -> Option<&CppFunctionPointerType> {
+        if let CppType::FunctionPointer(t) = self {
+            Some(t)
+        } else {
+            None
+        }
+    }
 }
 
 /// Context of usage for a C++ type

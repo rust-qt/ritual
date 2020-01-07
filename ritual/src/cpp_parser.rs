@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::cpp_code_generator::{all_include_directives, write_include_directives};
 use crate::cpp_data::{
     CppBaseSpecifier, CppClassField, CppEnumValue, CppItem, CppNamespace, CppOriginLocation,
     CppPath, CppPathItem, CppTypeDeclaration, CppTypeDeclarationKind, CppVisibility,
@@ -21,7 +22,7 @@ use regex::Regex;
 use ritual_common::env_var_names;
 use ritual_common::errors::{bail, err_msg, format_err, print_trace, Result, ResultExt};
 use ritual_common::file_utils::{
-    canonicalize, copy_recursively, create_file, open_file, os_str_to_str, path_to_str, read_dir,
+    canonicalize, copy_recursively, create_file, open_file, os_str_to_str, path_to_str,
     remove_dir_all, remove_file,
 };
 use ritual_common::target::{current_target, LibraryTarget};
@@ -236,14 +237,24 @@ fn run_clang<R, F: FnMut(Entity<'_>) -> Result<R>>(
 ) -> Result<R> {
     let clang = init_clang()?;
     let index = Index::new(&clang, false, false);
+
+    let global_file_path = tmp_path.join("global.h");
+    let mut global_file = create_file(&global_file_path)?;
+    writeln!(
+        global_file,
+        "{}",
+        include_str!("../templates/c_lib/global.h"),
+    )?;
+    write_include_directives(&mut global_file, &all_include_directives(config)?)?;
+    drop(global_file);
+
     let tmp_cpp_path = tmp_path.join("1.cpp");
     let mut tmp_file = create_file(&tmp_cpp_path)?;
-    for directive in config.include_directives() {
-        writeln!(tmp_file, "#include \"{}\"", path_to_str(directive)?)?;
-    }
+    writeln!(tmp_file, "#include \"global.h\"")?;
     if let Some(cpp_code) = cpp_code {
         write!(tmp_file, "{}", cpp_code)?;
     }
+    drop(tmp_file);
 
     if let Some(template_path) = config.crate_template_path() {
         let extra_files_dir = template_path.join("c_lib/extra");
@@ -253,17 +264,8 @@ fn run_clang<R, F: FnMut(Entity<'_>) -> Result<R>>(
                 remove_dir_all(&destination)?;
             }
             copy_recursively(&extra_files_dir, &destination)?;
-            for item in read_dir(&extra_files_dir)? {
-                writeln!(
-                    tmp_file,
-                    "#include \"extra/{}\"",
-                    os_str_to_str(&item?.file_name())?
-                )?;
-            }
         }
     }
-
-    drop(tmp_file);
 
     let mut args = vec![
         "-Xclang".to_string(),
@@ -325,6 +327,7 @@ fn run_clang<R, F: FnMut(Entity<'_>) -> Result<R>>(
     }
     let result = f(translation_unit);
     remove_file(&tmp_cpp_path)?;
+    remove_file(&global_file_path)?;
     result
 }
 
