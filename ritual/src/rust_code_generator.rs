@@ -1,7 +1,7 @@
 //! Types and functions used for Rust code generation.
 
 use crate::cpp_checks::Condition;
-use crate::cpp_ffi_data::CppFfiArgumentMeaning;
+use crate::cpp_ffi_data::{CppFfiArgumentMeaning, CppFfiItem};
 use crate::cpp_function::CppFunction;
 use crate::database::{DatabaseClient, DbItem, ItemId};
 use crate::doc_formatter;
@@ -1159,24 +1159,30 @@ impl Generator<'_> {
                     qflags = qflags
                 )?;
             }
-            RustExtraImplKind::RawSlotReceiver(data) => {
-                let wrapper = self
+            RustExtraImplKind::QtReceiverImpl(data) => {
+                let wrapper = &self
                     .current_database
                     .source_ffi_item(&item.id)?
                     .ok_or_else(|| err_msg("source ffi item not found"))?
-                    .item
-                    .as_slot_wrapper_ref()
-                    .ok_or_else(|| err_msg("invalid source ffi item type"))?;
+                    .item;
 
-                let receiver_id = CppFunction::receiver_id_from_data(
-                    RustQtReceiverType::Slot,
-                    "slot_",
-                    &wrapper.signal_arguments,
-                )?;
+                let receiver_id = match wrapper {
+                    CppFfiItem::Function(_) => bail!("invalid source ffi item type"),
+                    CppFfiItem::QtSlotWrapper(w) => CppFunction::receiver_id_from_data(
+                        RustQtReceiverType::Slot,
+                        "slot_",
+                        &w.signal_arguments,
+                    )?,
+                    CppFfiItem::QtSignalWrapper(w) => CppFunction::receiver_id_from_data(
+                        RustQtReceiverType::Signal,
+                        "emit_",
+                        &w.signal_arguments,
+                    )?,
+                };
 
                 writeln!(
                     self,
-                    include_str!("../templates/crate/impl_receiver_for_raw_slot.rs.in"),
+                    include_str!("../templates/crate/impl_as_receiver.rs"),
                     qt_core = self.qt_core_prefix(),
                     type_path = self.rust_path_to_string(&data.target_path),
                     args = self.rust_type_to_code(&data.arguments),
@@ -1184,6 +1190,17 @@ impl Generator<'_> {
                     condition_attribute = condition_texts.attribute,
                 )?;
                 // TODO: use condition_texts.doc_text
+
+                if data.receiver_type == RustQtReceiverType::Signal {
+                    writeln!(
+                        self,
+                        include_str!("../templates/crate/impl_signal.rs"),
+                        qt_core = self.qt_core_prefix(),
+                        type_path = self.rust_path_to_string(&data.target_path),
+                        args = self.rust_type_to_code(&data.arguments),
+                        condition_attribute = condition_texts.attribute,
+                    )?;
+                }
             }
         }
         Ok(())

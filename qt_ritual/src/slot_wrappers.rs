@@ -1,7 +1,7 @@
 use crate::detect_signal_argument_types::detect_signal_argument_types;
 use itertools::Itertools;
 use log::trace;
-use ritual::cpp_ffi_data::{CppFfiItem, QtSlotWrapper};
+use ritual::cpp_ffi_data::{CppFfiItem, QtSignalWrapper, QtSlotWrapper};
 use ritual::cpp_ffi_generator::{ffi_type, FfiNameProvider};
 use ritual::cpp_type::{CppFunctionPointerType, CppPointerLikeTypeKind, CppType, CppTypeRole};
 use ritual::processor::ProcessorData;
@@ -9,8 +9,7 @@ use ritual_common::errors::Result;
 use ritual_common::utils::MapIfOk;
 use std::iter::once;
 
-/// Generates slot wrappers for all encountered argument types
-/// (excluding types already handled in the dependencies).
+/// Generates slot wrapper for `arguments`.
 fn generate_slot_wrapper(
     arguments: &[CppType],
     name_provider: &mut FfiNameProvider,
@@ -45,7 +44,23 @@ fn generate_slot_wrapper(
     Ok(qt_slot_wrapper)
 }
 
-pub fn add_slot_wrappers(data: &mut ProcessorData<'_>) -> Result<()> {
+/// Generates signal wrapper for `arguments`.
+fn generate_signal_wrapper(
+    arguments: &[CppType],
+    name_provider: &mut FfiNameProvider,
+) -> QtSignalWrapper {
+    let class_path = name_provider.create_path(&format!(
+        "signal_wrapper_{}",
+        arguments.iter().map(CppType::ascii_caption).join("_")
+    ));
+
+    QtSignalWrapper {
+        class_path,
+        signal_arguments: arguments.to_vec(),
+    }
+}
+
+pub fn add_signal_slot_wrappers(data: &mut ProcessorData<'_>) -> Result<()> {
     let all_types = detect_signal_argument_types(data)?;
 
     let mut name_provider = FfiNameProvider::new(data);
@@ -77,6 +92,23 @@ pub fn add_slot_wrappers(data: &mut ProcessorData<'_>) -> Result<()> {
                         err
                     );
                 }
+            }
+        }
+
+        let found = data
+            .db
+            .all_ffi_items()
+            .filter_map(|item| item.item.as_signal_wrapper_ref())
+            .any(|item| item.signal_arguments == arg_types);
+        if found {
+            trace!("signal wrapper already exists: {}", arg_types_text);
+        } else {
+            let signal_wrapper = generate_signal_wrapper(&arg_types, &mut name_provider);
+            let id = data
+                .db
+                .add_ffi_item(None, CppFfiItem::QtSignalWrapper(signal_wrapper))?;
+            if id.is_some() {
+                trace!("adding signal wrapper for args: ({})", arg_types_text);
             }
         }
     }

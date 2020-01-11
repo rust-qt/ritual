@@ -2,10 +2,10 @@ use crate::config::Config;
 use crate::cpp_checks::Condition;
 use crate::cpp_ffi_data::{
     CppFfiArgumentMeaning, CppFfiFunctionKind, CppFfiType, CppFieldAccessorType,
-    CppToFfiTypeConversion, QtSlotWrapper,
+    CppToFfiTypeConversion, QtSignalWrapper, QtSlotWrapper,
 };
 use crate::cpp_ffi_data::{CppFfiFunction, CppFfiItem};
-use crate::cpp_function::ReturnValueAllocationPlace;
+use crate::cpp_function::{CppFunction, ReturnValueAllocationPlace};
 use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
 use crate::database::{DatabaseClient, DbItem};
@@ -49,7 +49,7 @@ impl Generator<'_> {
             .enumerate()
             .map_if_ok(|(num, t)| -> Result<_> {
                 let arg_type = t.original_type().to_cpp_code(None)?;
-                let arg_type = arg_type.replace("QList< QModelIndex >", "QModelIndexList");
+                let arg_type = CppFunction::patch_receiver_argument_type(&arg_type);
                 Ok(format!("{} arg{}", arg_type, num))
             })?
             .join(", ");
@@ -69,6 +69,30 @@ impl Generator<'_> {
             callback_type = func_type.to_cpp_code(Some(""))?,
             method_args = method_args,
             func_args = func_args
+        ))
+    }
+
+    /// Generates code for a Qt signal wrapper
+    fn qt_signal_wrapper(&self, wrapper: &QtSignalWrapper) -> Result<String> {
+        let method_args = wrapper
+            .signal_arguments
+            .iter()
+            .enumerate()
+            .map_if_ok(|(num, t)| -> Result<_> {
+                let arg_type = t.to_cpp_code(None)?;
+                let arg_type = CppFunction::patch_receiver_argument_type(&arg_type);
+                Ok(format!("{} arg{}", arg_type, num))
+            })?
+            .join(", ");
+        Ok(format!(
+            include_str!("../templates/c_lib/qt_signal_wrapper.h"),
+            class_name = wrapper.class_path.to_cpp_code()?,
+            method_args = method_args,
+            signal_impl = if self.0.crate_name().starts_with("moqt_") {
+                "{}"
+            } else {
+                ";"
+            }
         ))
     }
 
@@ -380,17 +404,30 @@ impl Generator<'_> {
             })
             .collect_vec();
 
-        let mut any_slot_wrappers = false;
+        let mut needs_moc = false;
         for ffi_item in &ffi_items {
-            if let CppFfiItem::QtSlotWrapper(qt_slot_wrapper) = &ffi_item.item {
-                let checks = self.0.cpp_checks(&ffi_item.id)?;
-                if !checks.any_success() {
-                    continue;
+            match &ffi_item.item {
+                CppFfiItem::QtSlotWrapper(qt_slot_wrapper) => {
+                    let checks = self.0.cpp_checks(&ffi_item.id)?;
+                    if !checks.any_success() {
+                        continue;
+                    }
+                    needs_moc = true;
+                    let condition = checks.condition(self.0.environments());
+                    let code = self.qt_slot_wrapper(qt_slot_wrapper)?;
+                    write!(cpp_file, "{}", self.wrap_with_condition(&code, &condition))?;
                 }
-                any_slot_wrappers = true;
-                let condition = checks.condition(self.0.environments());
-                let code = self.qt_slot_wrapper(qt_slot_wrapper)?;
-                write!(cpp_file, "{}", self.wrap_with_condition(&code, &condition))?;
+                CppFfiItem::QtSignalWrapper(qt_signal_wrapper) => {
+                    let checks = self.0.cpp_checks(&ffi_item.id)?;
+                    if !checks.any_success() {
+                        continue;
+                    }
+                    needs_moc = true;
+                    let condition = checks.condition(self.0.environments());
+                    let code = self.qt_signal_wrapper(qt_signal_wrapper)?;
+                    write!(cpp_file, "{}", self.wrap_with_condition(&code, &condition))?;
+                }
+                _ => {}
             }
         }
 
@@ -408,7 +445,7 @@ impl Generator<'_> {
         }
         writeln!(cpp_file, "}} // extern \"C\"")?;
 
-        if any_slot_wrappers && !self.0.crate_name().starts_with("moqt_") {
+        if needs_moc && !self.0.crate_name().starts_with("moqt_") {
             let stem = file_path
                 .file_stem()
                 .ok_or_else(|| err_msg("failed to get file stem"))?;
@@ -466,6 +503,10 @@ pub fn function_implementation(
 
 pub fn qt_slot_wrapper(db: &DatabaseClient, wrapper: &QtSlotWrapper) -> Result<String> {
     Generator(db).qt_slot_wrapper(wrapper)
+}
+
+pub fn qt_signal_wrapper(db: &DatabaseClient, wrapper: &QtSignalWrapper) -> Result<String> {
+    Generator(db).qt_signal_wrapper(wrapper)
 }
 
 pub fn generate_cpp_file(

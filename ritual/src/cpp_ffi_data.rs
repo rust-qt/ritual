@@ -271,6 +271,15 @@ impl CppFfiType {
     }
 }
 
+/// Information about a Qt signal wrapper with
+/// certain signal arguments
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QtSignalWrapper {
+    pub signal_arguments: Vec<CppType>,
+    /// Generated name of the wrapper class
+    pub class_path: CppPath,
+}
+
 /// Information about a Qt slot wrapper with
 /// certain slot arguments
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -289,6 +298,7 @@ pub struct QtSlotWrapper {
 pub enum CppFfiItem {
     Function(CppFfiFunction),
     QtSlotWrapper(QtSlotWrapper),
+    QtSignalWrapper(QtSignalWrapper),
 }
 
 impl CppFfiItem {
@@ -316,8 +326,24 @@ impl CppFfiItem {
         }
     }
 
+    pub fn as_signal_wrapper_ref(&self) -> Option<&QtSignalWrapper> {
+        if let CppFfiItem::QtSignalWrapper(data) = self {
+            Some(data)
+        } else {
+            None
+        }
+    }
+
     pub fn is_slot_wrapper(&self) -> bool {
         if let CppFfiItem::QtSlotWrapper(_) = self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_signal_wrapper(&self) -> bool {
+        if let CppFfiItem::QtSignalWrapper(_) = self {
             true
         } else {
             false
@@ -330,6 +356,14 @@ impl CppFfiItem {
             CppFfiItem::QtSlotWrapper(slot_wrapper) => format!(
                 "slot wrapper for ({})",
                 slot_wrapper
+                    .signal_arguments
+                    .iter()
+                    .map(CppType::to_cpp_pseudo_code)
+                    .join(", ")
+            ),
+            CppFfiItem::QtSignalWrapper(signal_wrapper) => format!(
+                "signal wrapper for ({})",
+                signal_wrapper
                     .signal_arguments
                     .iter()
                     .map(CppType::to_cpp_pseudo_code)
@@ -354,6 +388,13 @@ impl CppFfiItem {
                     false
                 }
             }
+            CppFfiItem::QtSignalWrapper(wrapper) => {
+                if let CppFfiItem::QtSignalWrapper(other_wrapper) = other {
+                    wrapper.signal_arguments == other_wrapper.signal_arguments
+                } else {
+                    false
+                }
+            }
         }
     }
 
@@ -361,13 +402,14 @@ impl CppFfiItem {
         match self {
             CppFfiItem::Function(f) => &f.path,
             CppFfiItem::QtSlotWrapper(s) => &s.class_path,
+            CppFfiItem::QtSignalWrapper(s) => &s.class_path,
         }
     }
 
     pub fn is_source_item(&self) -> bool {
         match self {
             CppFfiItem::Function(_) => false,
-            CppFfiItem::QtSlotWrapper(_) => true,
+            CppFfiItem::QtSlotWrapper(_) | CppFfiItem::QtSignalWrapper(_) => true,
         }
     }
 
@@ -376,6 +418,9 @@ impl CppFfiItem {
             CppFfiItem::Function(_) => bail!("not a source item"),
             CppFfiItem::QtSlotWrapper(slot_wrapper) => {
                 cpp_code_generator::qt_slot_wrapper(db, slot_wrapper)
+            }
+            CppFfiItem::QtSignalWrapper(signal_wrapper) => {
+                cpp_code_generator::qt_signal_wrapper(db, signal_wrapper)
             }
         }
     }

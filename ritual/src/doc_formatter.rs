@@ -3,12 +3,12 @@
 
 #![allow(dead_code)]
 
-use crate::cpp_ffi_data::{CppFfiFunctionKind, CppFieldAccessorType};
+use crate::cpp_ffi_data::{CppFfiFunctionKind, CppFfiItem, CppFieldAccessorType};
 use crate::cpp_type::CppType;
 use crate::database::{DatabaseClient, DbItem, DocItem};
 use crate::rust_code_generator::rust_type_to_code;
 use crate::rust_info::{
-    RustEnumValue, RustFunction, RustFunctionKind, RustModule, RustModuleKind,
+    RustEnumValue, RustFunction, RustFunctionKind, RustModule, RustModuleKind, RustQtReceiverType,
     RustSpecialModuleKind, RustStruct, RustStructKind, RustWrapperTypeKind,
 };
 use itertools::Itertools;
@@ -134,62 +134,85 @@ pub fn struct_doc(type1: DbItem<&RustStruct>, database: &DatabaseClient) -> Resu
                 }
             }
 
-            if let Some(raw_slot_wrapper) = &type1.item.raw_slot_wrapper_data {
+            if let Some(qt_receiver_data) = &type1.item.qt_receiver_data {
                 output.clear(); // remove irrelevant C++ type name
-                writeln!(
-                    output,
-                    "Binds a Qt signal with {} to a Rust closure.\n",
-                    if raw_slot_wrapper.arguments.is_empty() {
-                        "no arguments".to_string()
-                    } else {
-                        format!(
-                            "arguments `{}`",
-                            raw_slot_wrapper
-                                .arguments
-                                .iter()
-                                .map(|arg| rust_type_to_code(arg, Some(database.crate_name())))
-                                .join(",")
-                        )
-                    }
-                )?;
+                let args_text = if qt_receiver_data.arguments.is_empty() {
+                    "no arguments".to_string()
+                } else {
+                    format!(
+                        "arguments `{}`",
+                        qt_receiver_data
+                            .arguments
+                            .iter()
+                            .map(|arg| rust_type_to_code(arg, Some(database.crate_name())))
+                            .join(",")
+                    )
+                };
 
-                let ffi_item = database
+                match qt_receiver_data.receiver_type {
+                    RustQtReceiverType::Signal => {
+                        writeln!(output, "Emits a Qt signal with {}.\n", args_text)?;
+                    }
+                    RustQtReceiverType::Slot => {
+                        writeln!(
+                            output,
+                            "Binds a Qt signal with {} to a Rust closure.\n",
+                            args_text
+                        )?;
+                    }
+                }
+
+                let ffi_item = &database
                     .source_ffi_item(&cpp_item.id)?
                     .ok_or_else(|| err_msg("source ffi item not found"))?
-                    .filter_map(|i| i.as_slot_wrapper_ref())
-                    .ok_or_else(|| err_msg("invalid source ffi item type"))?;
+                    .item;
 
-                if !ffi_item.item.signal_arguments.is_empty() {
-                    let cpp_args = ffi_item
-                        .item
-                        .signal_arguments
+                let cpp_signal_arguments = match ffi_item {
+                    CppFfiItem::Function(_) => bail!("invalid source ffi item type"),
+                    CppFfiItem::QtSlotWrapper(w) => &w.signal_arguments,
+                    CppFfiItem::QtSignalWrapper(w) => &w.signal_arguments,
+                };
+
+                if !cpp_signal_arguments.is_empty() {
+                    let args_text = cpp_signal_arguments
                         .iter()
                         .map(CppType::to_cpp_pseudo_code)
                         .join(", ");
                     writeln!(
                         output,
                         "Corresponding C++ argument types: ({}).\n",
-                        wrap_inline_cpp_code(&cpp_args)
+                        wrap_inline_cpp_code(&args_text)
                     )?;
                 }
 
-                writeln!(
-                    output,
-                    "Create an object using `new()` \
-                     and bind your closure using `set()`. \
-                     The closure will be called with the signal's arguments \
-                     when the slot is invoked. \
-                     Use `connect()` method of a `qt_core::Signal` object to connect \
-                     the signal to this slot. The closure will be executed each time \
-                     the slot is invoked until source signals are disconnected \
-                     or the slot object is destroyed. \n\n\
-                     The slot object takes ownership of the passed closure. \
-                     If `set()` is called again, \
-                     previously set closure is dropped. \
-                     Make sure that the slot object does not outlive \
-                     objects referenced by the closure. \n\n\
-                     If `set()` was not called, slot invocation has no effect.\n"
-                )?;
+                match qt_receiver_data.receiver_type {
+                    RustQtReceiverType::Signal => {
+                        writeln!(
+                            output,
+                            "Use `connect()` method of this object to connect this signal \
+                             to a slot. Use `emit()` method to emit the signal."
+                        )?;
+                    }
+                    RustQtReceiverType::Slot => {
+                        writeln!(
+                            output,
+                            "Create an object using `new()` \
+                             and bind your closure using `set()`. \
+                             The closure will be called with the signal's arguments \
+                             when the slot is invoked. \
+                             Use `connect()` method of a `qt_core::Signal` object to connect \
+                             the signal to this slot. The closure will be executed each time \
+                             the slot is invoked until source signals are disconnected \
+                             or the slot object is destroyed. \n\n\
+                             The slot object takes ownership of the passed closure. \
+                             If `set()` is called again, \
+                             previously set closure is dropped. \
+                             Make sure that the slot object does not outlive \
+                             objects referenced by the closure. \n\n\
+                             If `set()` was not called, slot invocation has no effect.\n"
+                        )?;
+                    }
+                }
             }
         }
         RustStructKind::QtSlotWrapper(_) => {
@@ -262,49 +285,73 @@ pub fn function_doc(function: DbItem<&RustFunction>, database: &DatabaseClient) 
         .ok_or_else(|| err_msg("invalid item type"))?
         .is_trait_impl();
 
-    let has_source_slot_wrapper = database
-        .source_ffi_item(&cpp_item.id)?
+    let source_ffi_item = database.source_ffi_item(&cpp_item.id)?;
+    let has_source_slot_wrapper = source_ffi_item
+        .clone()
         .map_or(false, |item| item.item.is_slot_wrapper());
+
+    let has_source_signal_wrapper =
+        source_ffi_item.map_or(false, |item| item.item.is_signal_wrapper());
 
     let mut output = String::new();
 
-    if has_source_slot_wrapper
-        && function.item.kind != RustFunctionKind::FfiFunction
-        && !is_trait_impl
-    {
-        match function.item.path.last() {
-            "slot" => {
-                writeln!(
-                    output,
-                    "Calls the slot directly, invoking the assigned handler (if any).\n"
-                )?;
+    if function.item.kind != RustFunctionKind::FfiFunction && !is_trait_impl {
+        if has_source_slot_wrapper {
+            match function.item.path.last() {
+                "slot" => {
+                    writeln!(
+                        output,
+                        "Calls the slot directly, invoking the assigned handler (if any).\n"
+                    )?;
+                }
+                "new" => {
+                    writeln!(output, "Creates a new object.\n")?;
+                }
+                "with" => {
+                    writeln!(
+                        output,
+                        "Creates a new object and assigns `callback` \
+                         as the signal handler.\n"
+                    )?;
+                }
+                "set" => {
+                    writeln!(output, "Assigns `callback` as the signal handler.\n")?;
+                    writeln!(
+                        output,
+                        "`func` will be called each time a connected signal is emitted. \
+                         Any previously assigned function will be deregistered. \
+                         Passing `None` will deregister the handler without setting a new one.\n"
+                    )?;
+                }
+                "meta_object" | "qt_metacall" | "qt_metacast" | "static_meta_object" | "tr"
+                | "tr_utf8" => {
+                    // TODO: document or blacklist these methods for all Qt classes
+                }
+                other => bail!("unknown slot wrapper method: {}", other),
             }
-            "new" => {
-                writeln!(output, "Creates a new object.\n")?;
+            return Ok(output);
+        } else if has_source_signal_wrapper {
+            match function.item.path.last() {
+                "new" => {
+                    writeln!(output, "Creates a new object.\n")?;
+                }
+                "emit" => {
+                    writeln!(output, "Emits the signal.\n")?;
+                }
+                "signal" => {
+                    writeln!(
+                        output,
+                        "Returns a `Signal` object representing the signal.\n\n\
+                         This method is useful if you need to connect \
+                         another signal to this signal. However, when you need to connect this \
+                         signal to another signal or slot, it's simpler to use the `connect()` \
+                         method of this object directly.\n"
+                    )?;
+                }
+                other => bail!("unknown signal wrapper method: {}", other),
             }
-            "with" => {
-                writeln!(
-                    output,
-                    "Creates a new object and assigns `callback` \
-                     as the signal handler.\n"
-                )?;
-            }
-            "set" => {
-                writeln!(output, "Assigns `callback` as the signal handler.\n")?;
-                writeln!(
-                    output,
-                    "`func` will be called each time a connected signal is emitted. \
-                     Any previously assigned function will be deregistered. \
-                     Passing `None` will deregister the handler without setting a new one.\n"
-                )?;
-            }
-            "meta_object" | "qt_metacall" | "qt_metacast" | "static_meta_object" | "tr"
-            | "tr_utf8" => {
-                // TODO: document or blacklist these methods for all Qt classes
-            }
-            other => bail!("unknown slot wrapper method: {}", other),
+            return Ok(output);
         }
-        return Ok(output);
     }
 
     let doc_item = database.find_doc_for(&function.id)?;

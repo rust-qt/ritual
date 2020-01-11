@@ -91,8 +91,9 @@ impl RustStructKind {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RustRawQtSlotWrapperData {
+pub struct RustQtReceiverData {
     pub arguments: Vec<RustType>,
+    pub receiver_type: RustQtReceiverType,
 }
 
 /// Exported information about a Rust wrapper type
@@ -104,7 +105,7 @@ pub struct RustStruct {
     /// Indicates whether this type is public
     pub is_public: bool,
 
-    pub raw_slot_wrapper_data: Option<RustRawQtSlotWrapperData>,
+    pub qt_receiver_data: Option<RustQtReceiverData>,
 }
 
 /// Location of a Rust method.
@@ -499,9 +500,10 @@ pub struct RustFFIArgument {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RustRawSlotReceiver {
+pub struct RustQtReceiverImpl {
     pub target_path: RustPath,
     pub arguments: RustType,
+    pub receiver_type: RustQtReceiverType,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -512,7 +514,7 @@ pub struct RustFlagEnumImpl {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RustExtraImplKind {
     FlagEnum(RustFlagEnumImpl),
-    RawSlotReceiver(RustRawSlotReceiver),
+    QtReceiverImpl(RustQtReceiverImpl),
 }
 
 impl RustExtraImplKind {
@@ -525,8 +527,8 @@ impl RustExtraImplKind {
                     false
                 }
             }
-            RustExtraImplKind::RawSlotReceiver(_) => {
-                if let RustExtraImplKind::RawSlotReceiver(_) = other {
+            RustExtraImplKind::QtReceiverImpl(_) => {
+                if let RustExtraImplKind::QtReceiverImpl(_) = other {
                     true
                 } else {
                     false
@@ -820,14 +822,26 @@ impl RustPathScope {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NameType<'a> {
-    Type { is_from_other_crate: bool },
+    Type {
+        is_from_other_crate: bool,
+    },
     EnumValue,
-    Module { is_from_other_crate: bool },
+    Module {
+        is_from_other_crate: bool,
+    },
     FfiFunction,
     ApiFunction(DbItem<&'a CppFfiFunction>),
-    ReceiverFunction { receiver_type: RustQtReceiverType },
+    ReceiverFunction {
+        receiver_type: RustQtReceiverType,
+        is_wrapped_signal: bool,
+    },
     SizedItem,
-    QtSlotWrapper { signal_arguments: &'a [CppType] },
+    QtSlotWrapper {
+        signal_arguments: &'a [CppType],
+    },
+    QtSignalWrapper {
+        signal_arguments: &'a [CppType],
+    },
 }
 
 impl NameType<'_> {

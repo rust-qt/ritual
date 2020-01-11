@@ -53,7 +53,7 @@ fn snippet_for_item(item: DbItem<&CppFfiItem>, database: &DatabaseClient) -> Res
             };
             Ok(Snippet::new_global(full_code, needs_moc))
         }
-        CppFfiItem::QtSlotWrapper(_) => Ok(Snippet::new_global(
+        CppFfiItem::QtSlotWrapper(_) | CppFfiItem::QtSignalWrapper(_) => Ok(Snippet::new_global(
             item.item.source_item_cpp_code(database)?,
             true,
         )),

@@ -385,6 +385,10 @@ impl CppFunction {
         }
     }
 
+    pub fn patch_receiver_argument_type(type_text: &str) -> String {
+        type_text.replace("QList< QModelIndex >", "QModelIndexList")
+    }
+
     pub fn receiver_id_from_data<'a>(
         receiver_type: RustQtReceiverType,
         name: &'a str,
@@ -398,7 +402,7 @@ impl CppFunction {
         let arguments = arguments
             .map_if_ok(|arg| arg.to_cpp_code(None))?
             .into_iter()
-            .map(|arg| arg.replace("QList< QModelIndex >", "QModelIndexList"))
+            .map(|arg| Self::patch_receiver_argument_type(&arg))
             .join(",");
         Ok(format!("{}{}({})", type_num, name, arguments))
     }

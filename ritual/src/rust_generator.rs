@@ -17,10 +17,10 @@ use crate::rust_info::{
     NameType, RustEnumValue, RustExtraImpl, RustExtraImplKind, RustFfiWrapperData,
     RustFlagEnumImpl, RustFunction, RustFunctionArgument, RustFunctionCaptionStrategy,
     RustFunctionKind, RustFunctionSelfArgKind, RustItem, RustModule, RustModuleKind, RustPathScope,
-    RustQtReceiverType, RustRawQtSlotWrapperData, RustRawSlotReceiver, RustReexport,
-    RustReexportSource, RustSignalOrSlotGetter, RustSizedType, RustSpecialModuleKind, RustStruct,
-    RustStructKind, RustTraitAssociatedType, RustTraitImpl, RustTraitImplExtraKind,
-    RustTypeCaptionStrategy, RustWrapperTypeKind, UnnamedRustFunction,
+    RustQtReceiverData, RustQtReceiverImpl, RustQtReceiverType, RustReexport, RustReexportSource,
+    RustSignalOrSlotGetter, RustSizedType, RustSpecialModuleKind, RustStruct, RustStructKind,
+    RustTraitAssociatedType, RustTraitImpl, RustTraitImplExtraKind, RustTypeCaptionStrategy,
+    RustWrapperTypeKind, UnnamedRustFunction,
 };
 use crate::rust_type::{
     RustClosureToCallbackConversion, RustCommonType, RustFinalType, RustFunctionPointerType,
@@ -1389,12 +1389,9 @@ impl State<'_, '_> {
         function: &mut UnnamedRustFunction,
         checks: &CppChecks,
     ) -> Result<()> {
-        let callback_type = if let Some(t) = detect_callback_function(function) {
-            t.clone()
-        } else {
+        if detect_callback_function(function).is_none() {
             return Ok(());
         };
-        println!("OK!!! {:?}", callback_type);
 
         let wrapper = self
             .data
@@ -1405,7 +1402,6 @@ impl State<'_, '_> {
             .as_slot_wrapper_ref()
             .ok_or_else(|| err_msg("invalid source ffi item type"))?;
 
-        println!("OK1 wrapper {:?}", wrapper);
         let closure_arguments = wrapper.arguments.iter().map_if_ok(|arg| {
             self.rust_final_type(
                 arg,
@@ -1416,7 +1412,6 @@ impl State<'_, '_> {
                 Some(&checks),
             )
         })?;
-        println!("OK2 closure_args {:?}", closure_arguments);
         let closure_return_type = self.rust_final_type(
             &CppFfiType::void(),
             // TODO: not sure about the meaning.
@@ -1857,7 +1852,7 @@ impl State<'_, '_> {
                 path: self.special_module_paths[&RustSpecialModuleKind::SizedTypes].clone(),
                 prefix: None,
             },
-            NameType::QtSlotWrapper { .. } => {
+            NameType::QtSlotWrapper { .. } | NameType::QtSignalWrapper { .. } => {
                 // crate root
                 self.default_path_scope()
             }
@@ -1912,13 +1907,20 @@ impl State<'_, '_> {
                 };
                 s.to_snake_case()
             }
-            NameType::ReceiverFunction { receiver_type } => {
-                let name = self
-                    .cpp_path_item_to_name(cpp_path.last(), &scope.path, &name_type)?
-                    .to_snake_case();
-                match receiver_type {
-                    RustQtReceiverType::Signal => name,
-                    RustQtReceiverType::Slot => format!("slot_{}", name),
+            NameType::ReceiverFunction {
+                receiver_type,
+                is_wrapped_signal,
+            } => {
+                if *is_wrapped_signal {
+                    "signal".to_string()
+                } else {
+                    let name = self
+                        .cpp_path_item_to_name(cpp_path.last(), &scope.path, &name_type)?
+                        .to_snake_case();
+                    match receiver_type {
+                        RustQtReceiverType::Signal => name,
+                        RustQtReceiverType::Slot => format!("slot_{}", name),
+                    }
                 }
             }
             NameType::Type { .. } | NameType::EnumValue => {
@@ -1941,10 +1943,18 @@ impl State<'_, '_> {
             NameType::FfiFunction => cpp_path.last().name.clone(),
             NameType::QtSlotWrapper { signal_arguments } => {
                 if signal_arguments.is_empty() {
-                    "Slot".to_string()
+                    "SlotNoArgs".to_string()
                 } else {
                     let captions = self.type_list_caption(signal_arguments, &scope.path)?;
                     format!("SlotOf_{}", captions).to_class_case()
+                }
+            }
+            NameType::QtSignalWrapper { signal_arguments } => {
+                if signal_arguments.is_empty() {
+                    "SignalNoArgs".to_string()
+                } else {
+                    let captions = self.type_list_caption(signal_arguments, &scope.path)?;
+                    format!("SignalOf_{}", captions).to_class_case()
                 }
             }
         };
@@ -1982,6 +1992,9 @@ impl State<'_, '_> {
             CppFfiItem::QtSlotWrapper(_) => {
                 bail!("slot wrappers do not need to be processed here");
             }
+            CppFfiItem::QtSignalWrapper(_) => {
+                bail!("signal wrappers do not need to be processed here");
+            }
         }
     }
 
@@ -2012,9 +2025,15 @@ impl State<'_, '_> {
         }
 
         let mut qt_slot_wrapper = None;
+        let mut qt_signal_wrapper = None;
         if let Some(source_ffi_item) = self.data.db.source_ffi_item(&item.id)? {
-            if let Some(item) = source_ffi_item.filter_map(|i| i.as_slot_wrapper_ref()) {
+            if let Some(item) = source_ffi_item
+                .clone()
+                .filter_map(|i| i.as_slot_wrapper_ref())
+            {
                 qt_slot_wrapper = Some(item);
+            } else if let Some(item) = source_ffi_item.filter_map(|i| i.as_signal_wrapper_ref()) {
+                qt_signal_wrapper = Some(item);
             }
         }
 
@@ -2024,6 +2043,10 @@ impl State<'_, '_> {
 
         let public_name_type = if let Some(wrapper) = &qt_slot_wrapper {
             NameType::QtSlotWrapper {
+                signal_arguments: &wrapper.item.signal_arguments,
+            }
+        } else if let Some(wrapper) = &qt_signal_wrapper {
+            NameType::QtSignalWrapper {
                 signal_arguments: &wrapper.item.signal_arguments,
             }
         } else {
@@ -2055,7 +2078,7 @@ impl State<'_, '_> {
                     cpp_path: data.path.clone(),
                 }),
                 is_public: true,
-                raw_slot_wrapper_data: None,
+                qt_receiver_data: None,
             });
 
             rust_items.push(internal_rust_item);
@@ -2081,7 +2104,7 @@ impl State<'_, '_> {
         });
         rust_items.push(nested_types_rust_item);
 
-        let raw_slot_wrapper_data;
+        let qt_receiver_data;
         if let Some(wrapper) = qt_slot_wrapper {
             let arg_types = wrapper
                 .item
@@ -2091,25 +2114,49 @@ impl State<'_, '_> {
 
             let impl_item = RustItem::ExtraImpl(RustExtraImpl {
                 parent_path: public_path.parent()?,
-                kind: RustExtraImplKind::RawSlotReceiver(RustRawSlotReceiver {
+                kind: RustExtraImplKind::QtReceiverImpl(RustQtReceiverImpl {
                     target_path: public_path.clone(),
                     arguments: RustType::Tuple(arg_types.clone()),
+                    receiver_type: RustQtReceiverType::Slot,
                 }),
             });
             rust_items.push(impl_item);
 
-            raw_slot_wrapper_data = Some(RustRawQtSlotWrapperData {
+            qt_receiver_data = Some(RustQtReceiverData {
                 arguments: arg_types,
+                receiver_type: RustQtReceiverType::Slot,
+            });
+        } else if let Some(wrapper) = qt_signal_wrapper {
+            let arg_types = wrapper
+                .item
+                .signal_arguments
+                .iter()
+                .map_if_ok(|t| ffi_type(&t, CppTypeRole::NotReturnType))?
+                .map_if_ok(|t| self.ffi_type_to_rust_ffi_type(t.ffi_type()))?;
+
+            let impl_item = RustItem::ExtraImpl(RustExtraImpl {
+                parent_path: public_path.parent()?,
+                kind: RustExtraImplKind::QtReceiverImpl(RustQtReceiverImpl {
+                    target_path: public_path.clone(),
+                    arguments: RustType::Tuple(arg_types.clone()),
+                    receiver_type: RustQtReceiverType::Signal,
+                }),
+            });
+            rust_items.push(impl_item);
+
+            qt_receiver_data = Some(RustQtReceiverData {
+                arguments: arg_types,
+                receiver_type: RustQtReceiverType::Signal,
             });
         } else {
-            raw_slot_wrapper_data = None;
+            qt_receiver_data = None;
         }
 
         let public_rust_item = RustItem::Struct(RustStruct {
             path: public_path,
             kind: RustStructKind::WrapperType(wrapper_kind),
             is_public: true,
-            raw_slot_wrapper_data,
+            qt_receiver_data,
         });
         rust_items.push(public_rust_item);
         Ok(rust_items)
@@ -2152,7 +2199,7 @@ impl State<'_, '_> {
                         path: rust_path,
                         kind: RustStructKind::WrapperType(RustWrapperTypeKind::EnumWrapper),
                         is_public: true,
-                        raw_slot_wrapper_data: None,
+                        qt_receiver_data: None,
                     });
 
                     Ok(vec![rust_item])
@@ -2181,16 +2228,17 @@ impl State<'_, '_> {
                     return Ok(Vec::new());
                 };
 
-                let has_source_slot_wrapper = self
-                    .data
-                    .db
-                    .source_ffi_item(&cpp_item.id)?
+                let source_ffi_item = self.data.db.source_ffi_item(&cpp_item.id)?;
+                let has_source_slot_wrapper = source_ffi_item
+                    .clone()
                     .map_or(false, |item| item.item.is_slot_wrapper());
                 if has_source_slot_wrapper {
                     // no need to add slot accessors because
                     // `AsReceiver` is implemented directly on structs
                     return Ok(Vec::new());
                 }
+                let is_wrapped_signal =
+                    source_ffi_item.map_or(false, |item| item.item.is_signal_wrapper());
 
                 let original_item = self
                     .data
@@ -2208,7 +2256,10 @@ impl State<'_, '_> {
 
                 let path = self.generate_rust_path(
                     &cpp_function.path,
-                    NameType::ReceiverFunction { receiver_type },
+                    NameType::ReceiverFunction {
+                        receiver_type,
+                        is_wrapped_signal,
+                    },
                 )?;
 
                 let class_type = self.find_wrapper_type(&cpp_function.path.parent()?)?;

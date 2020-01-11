@@ -13,6 +13,7 @@ use crate::cpp_type::CppPointerLikeTypeKind;
 use crate::cpp_type::CppType;
 use crate::cpp_type::CppTypeRole;
 use crate::cpp_type::{is_qflags, CppFunctionPointerType};
+use crate::database::DbItem;
 use crate::processor::ProcessorData;
 use itertools::Itertools;
 use log::{debug, trace};
@@ -153,7 +154,10 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
 
     for cpp_item_id in all_cpp_item_ids {
         let item = data.db.cpp_item(&cpp_item_id)?;
-        if let Err(err) = check_preconditions(&item.item) {
+
+        let source_ffi_item = data.db.source_ffi_item(&cpp_item_id)?;
+
+        if let Err(err) = check_preconditions(&item.item, source_ffi_item) {
             trace!("skipping {}: {}", item.item, err);
             continue;
         }
@@ -416,7 +420,7 @@ fn generate_field_accessors(
     Ok(new_methods)
 }
 
-fn check_preconditions(item: &CppItem) -> Result<()> {
+fn check_preconditions(item: &CppItem, source_ffi_item: Option<DbItem<&CppFfiItem>>) -> Result<()> {
     match item {
         CppItem::Function(function) => {
             if let Some(membership) = &function.member {
@@ -427,7 +431,11 @@ fn check_preconditions(item: &CppItem) -> Result<()> {
                     bail!("function is protected");
                 }
                 if membership.is_signal {
-                    bail!("signals are excluded");
+                    if source_ffi_item.map_or(false, |item| item.item.is_signal_wrapper()) {
+                        // Allow signal of the signal wrapper class.
+                    } else {
+                        bail!("signals are excluded");
+                    }
                 }
             }
             if let Some(args) = &function.path.last().template_arguments {

@@ -2,7 +2,7 @@
 
 use crate::detect_signals_and_slots::detect_signals_and_slots;
 use crate::doc_parser::{parse_docs, set_crate_root_doc};
-use crate::slot_wrappers::add_slot_wrappers;
+use crate::slot_wrappers::add_signal_slot_wrappers;
 use log::info;
 use qt_ritual_common::{all_crate_names, get_full_build_config, lib_dependencies, lib_folder_name};
 use ritual::config::{Config, CrateDependencyKind, GlobalConfig};
@@ -210,7 +210,11 @@ pub fn create_config(
 
     let steps = config.processing_steps_mut();
     for cpp_parser_stage in &["cpp_parser", "cpp_parser_stage2"] {
-        steps.add_after(&[cpp_parser_stage], "add_slot_wrappers", add_slot_wrappers)?;
+        steps.add_after(
+            &[cpp_parser_stage],
+            "add_slot_wrappers",
+            add_signal_slot_wrappers,
+        )?;
     }
 
     steps.add_after(
