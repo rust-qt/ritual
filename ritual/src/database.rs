@@ -837,6 +837,9 @@ impl DatabaseClient {
             result
         });
         self.counters.items_deleted += items_deleted;
+        if items_deleted > 0 {
+            self.is_modified = true;
+        }
         self.delete_children(ids);
         self.current_database.refresh();
     }
@@ -860,6 +863,9 @@ impl DatabaseClient {
                 break;
             }
             ids = new_ids;
+        }
+        if items_deleted > 0 {
+            self.is_modified = true;
         }
         self.counters.items_deleted += items_deleted;
     }
