@@ -775,7 +775,7 @@ impl Generator<'_> {
             .map(|arg| self.rust_type_to_code(arg.api_type()))
             .join(", ");
 
-        format!("T: FnMut({}){}", args_text, return_type_text)
+        format!("T: FnMut({}){} + 'static", args_text, return_type_text)
     }
 
     fn callback_glue_code(&self, conversion: &RustClosureToCallbackConversion) -> Result<String> {
