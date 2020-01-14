@@ -1,17 +1,16 @@
-use cpp_core::MutPtr;
-use qt_core::{QCoreApplication, QTimer, RawSlot};
-use std::ffi::c_void;
-
-extern "C" fn func1(data: *mut c_void) {
-    println!("about_to_quit: {}", data as usize);
-}
+use qt_core::{QCoreApplication, QTimer, SlotNoArgs};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 #[test]
 fn timer_quit() {
-    println!("timer_quit: Started");
     QCoreApplication::init(|app| unsafe {
-        let mut slot1 = RawSlot::new();
-        slot1.set(Some(func1), MutPtr::from_raw(42 as *mut c_void));
+        let mut slot1 = SlotNoArgs::new();
+        let value = Rc::new(RefCell::new(Some(42)));
+        let value2 = Rc::clone(&value);
+        slot1.set(move || {
+            assert_eq!(value2.borrow_mut().take(), Some(42));
+        });
         let c = app.about_to_quit().connect(&slot1);
         assert!(c.is_valid());
 
@@ -19,6 +18,8 @@ fn timer_quit() {
         let c = timer.timeout().connect(app.slot_quit());
         assert!(c.is_valid());
         timer.start_1a(1000);
-        QCoreApplication::exec()
+        let r = QCoreApplication::exec();
+        assert!(value.borrow().is_none());
+        r
     })
 }

@@ -3,8 +3,11 @@ use qt_core::{QCoreApplication, QVariant, QVariantAnimation, SlotOfQVariant};
 #[test]
 fn variant_animation2() {
     QCoreApplication::init(|app| unsafe {
-        let slot1 = SlotOfQVariant::new(|value| {
-            println!("value_changed: {}", value.to_string().to_std_string());
+        let mut next_value = 1;
+        let slot1 = SlotOfQVariant::with(move |value| {
+            assert_eq!(next_value, value.to_int_0a());
+            assert_eq!(next_value.to_string(), value.to_string().to_std_string());
+            next_value += 1;
         });
 
         let mut animation = QVariantAnimation::new_0a();
