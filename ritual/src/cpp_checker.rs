@@ -43,8 +43,10 @@ fn snippet_for_item(item: DbItem<&CppFfiItem>, database: &DatabaseClient) -> Res
             let source_ffi_item = database.source_ffi_item(&item.id)?;
 
             let full_code = if let Some(source_ffi_item) = source_ffi_item {
-                if source_ffi_item.item.is_slot_wrapper() {
-                    needs_moc = true
+                if source_ffi_item.item.is_slot_wrapper()
+                    || source_ffi_item.item.is_signal_wrapper()
+                {
+                    needs_moc = true;
                 }
                 let source_item_code = source_ffi_item.item.source_item_cpp_code(database)?;
                 format!("{}\n{}", source_item_code, item_code)
