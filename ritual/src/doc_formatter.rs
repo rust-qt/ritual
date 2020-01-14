@@ -348,6 +348,10 @@ pub fn function_doc(function: DbItem<&RustFunction>, database: &DatabaseClient) 
                          method of this object directly.\n"
                     )?;
                 }
+                "meta_object" | "qt_metacall" | "qt_metacast" | "static_meta_object" | "tr"
+                | "tr_utf8" => {
+                    // TODO: document or blacklist these methods for all Qt classes
+                }
                 other => bail!("unknown signal wrapper method: {}", other),
             }
             return Ok(output);
