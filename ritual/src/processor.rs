@@ -138,11 +138,7 @@ impl Default for ProcessingSteps {
             Ok(())
         });
         s.add_custom("show_non_portable", show_non_portable);
-
-        //        s.add_custom(
-        //            "suggest_allocation_places",
-        //            type_allocation_places::suggest_allocation_places,
-        //        );
+        s.add_custom("migrate", migrate);
         s
     }
 }
@@ -204,7 +200,6 @@ fn build_crate(data: &mut ProcessorData<'_>) -> Result<()> {
     data.workspace.update_cargo_toml()?;
     let path = data.workspace.path();
     let crate_name = data.config.crate_properties().name();
-    //run_command(Command::new("cargo").arg("update").current_dir(path))?;
 
     for cargo_cmd in &["build", "doc", "test"] {
         let mut command = Command::new("cargo");
@@ -227,9 +222,6 @@ fn build_crate(data: &mut ProcessorData<'_>) -> Result<()> {
         } else {
             command.current_dir(path);
         }
-        // if cargo_cmd == &"build" {
-        //     command.arg("-vv");
-        // }
         run_command(&mut command)?;
     }
     Ok(())
@@ -255,6 +247,15 @@ fn show_non_portable(data: &mut ProcessorData<'_>) -> Result<()> {
             info!("    {}", text);
         }
     }
+    Ok(())
+}
+
+fn migrate(data: &mut ProcessorData<'_>) -> Result<()> {
+    data.db.delete_items(|item| {
+        item.item
+            .as_ffi_item()
+            .map_or(false, |item| item.is_signal_wrapper())
+    });
     Ok(())
 }
 
