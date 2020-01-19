@@ -634,6 +634,19 @@ fn type_paths(type1: &CppType) -> Vec<&CppPath> {
     }
 }
 
+fn recursive_hook(mut path: CppPath, hook: impl Fn(&CppPath) -> Result<bool>) -> Result<bool> {
+    loop {
+        if !hook(&path)? {
+            return Ok(false);
+        }
+        if let Ok(parent) = path.parent() {
+            path = parent;
+        } else {
+            return Ok(true);
+        }
+    }
+}
+
 pub fn delete_blacklisted_items(data: &mut ProcessorData<'_>) -> Result<()> {
     if let Some(hook) = data.config.cpp_parser_path_hook() {
         let mut bad_cpp_item_ids = Vec::new();
@@ -644,7 +657,8 @@ pub fn delete_blacklisted_items(data: &mut ProcessorData<'_>) -> Result<()> {
                 .flat_map(|type1| type_paths(type1))
                 .chain(cpp_item.item.path());
             for path in paths {
-                if !hook(path)? {
+                if !recursive_hook(path.clone(), hook)? {
+                    info!("deleting {}: {}", cpp_item.id, cpp_item.item.short_text());
                     bad_cpp_item_ids.push(cpp_item.id);
                     break;
                 }
@@ -658,16 +672,13 @@ pub fn delete_blacklisted_items(data: &mut ProcessorData<'_>) -> Result<()> {
         let mut bad_cpp_item_ids = Vec::new();
         for cpp_item in data.db.cpp_items() {
             if !hook(&cpp_item.item)? {
+                info!("deleting {}: {}", cpp_item.id, cpp_item.item.short_text());
                 bad_cpp_item_ids.push(cpp_item.id);
             }
         }
-        data.db.delete_items(|item| {
-            item.item.is_ffi_item()
-                && item
-                    .source_id
-                    .as_ref()
-                    .map_or(false, |source_id| bad_cpp_item_ids.contains(source_id))
-        });
+
+        data.db
+            .delete_items(|item| bad_cpp_item_ids.contains(&item.id));
     }
 
     Ok(())

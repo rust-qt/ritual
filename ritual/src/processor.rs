@@ -141,6 +141,7 @@ impl Default for ProcessingSteps {
         });
         s.add_custom("show_non_portable", show_non_portable);
         s.add_custom("migrate", migrate);
+        s.add_custom("delete_blacklisted_items", delete_blacklisted_items);
         s
     }
 }
