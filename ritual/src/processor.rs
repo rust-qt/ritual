@@ -1,4 +1,5 @@
 use crate::config::Config;
+use crate::cpp_checker::delete_blacklisted_items;
 use crate::database::{DatabaseClient, ItemId};
 use crate::workspace::Workspace;
 use crate::{
@@ -10,6 +11,7 @@ use log::{error, info, trace};
 use regex::Regex;
 use ritual_common::env_var_names::WORKSPACE_TARGET_DIR;
 use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
+use ritual_common::target::LibraryTarget;
 use ritual_common::utils::{run_command, MapIfOk};
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -227,22 +229,62 @@ fn build_crate(data: &mut ProcessorData<'_>) -> Result<()> {
     Ok(())
 }
 
+fn library_target_sort_key(item: &LibraryTarget) -> impl Ord {
+    #[derive(PartialEq, Eq, PartialOrd, Ord)]
+    enum Version {
+        Semver(semver::Version),
+        String(String),
+    }
+
+    item.cpp_library_version.as_ref().map(|version| {
+        if let Ok(x) = semver::Version::parse(version) {
+            Version::Semver(x)
+        } else {
+            Version::String(version.clone())
+        }
+    })
+}
+
+fn is_breaking_change(current: &[LibraryTarget], all: &[LibraryTarget]) -> bool {
+    for x in current {
+        let index = all
+            .iter()
+            .position(|i| x.cpp_library_version == i.cpp_library_version)
+            .unwrap();
+        if all[index + 1..].iter().any(|i| !current.contains(i)) {
+            return true;
+        }
+    }
+    false
+}
+
 fn show_non_portable(data: &mut ProcessorData<'_>) -> Result<()> {
-    let all_envs = data.db.environments();
+    let mut all_envs = data.db.environments().to_vec();
+    all_envs.sort_by_cached_key(library_target_sort_key);
     let mut results = HashMap::<_, Vec<_>>::new();
     for item in data.db.ffi_items() {
         let checks = data.db.cpp_checks(&item.id)?;
-        if checks.any_success() && !checks.all_success(all_envs) {
-            let envs = checks.successful_envs().cloned().collect_vec();
-            let text = item.item.short_text();
+        if checks.any_success() && !checks.all_success(&all_envs) {
+            let mut envs = checks.successful_envs().cloned().collect_vec();
+            envs.sort_by_cached_key(library_target_sort_key);
+            let text = format!("{}: {}", item.id, item.item.short_text());
             results.entry(envs).or_default().push(text);
         }
     }
+    let mut results = results.into_iter().collect::<Vec<_>>();
+    results.sort_by_cached_key(|(envs, _)| {
+        envs.iter().map(library_target_sort_key).collect::<Vec<_>>()
+    });
     for (envs, texts) in results {
         info!(
             "envs: {}",
             envs.iter().map(|env| format!("{:?}", env)).join(", ")
         );
+        if is_breaking_change(&envs, &all_envs) {
+            info!("breaking changes!");
+        } else {
+            info!("added in {:?}", envs[0].cpp_library_version);
+        }
         for text in texts {
             info!("    {}", text);
         }

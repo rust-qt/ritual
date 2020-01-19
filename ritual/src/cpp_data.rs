@@ -559,9 +559,16 @@ impl CppItem {
         }
     }
 
-    /*pub fn path(&self) -> Option<String> {
-        unimplemented!()
-    }*/
+    pub fn short_text(&self) -> String {
+        match self {
+            CppItem::Namespace(value) => format!("namespace {}", value.path.to_cpp_pseudo_code()),
+            CppItem::Type(value) => format!("type {}", value.path.to_cpp_pseudo_code()),
+            CppItem::EnumValue(value) => format!("enum value {}", value.path.to_cpp_pseudo_code()),
+            CppItem::Function(value) => value.short_text(),
+            CppItem::ClassField(value) => value.short_text(),
+            CppItem::ClassBase(_) => format!("{:?}", self),
+        }
+    }
 }
 
 impl fmt::Display for CppItem {
