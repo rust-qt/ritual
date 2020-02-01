@@ -10,7 +10,7 @@ exclude = ["test_assets/**/*"]
 
 [dependencies]
 
-ritual_common = { version = "0.3.0", path = "../ritual_common" }
+ritual_common = { version = "0.4.0", path = "../ritual_common" }
 
 regex = "1.1.0"
 serde = { version = "1.0.84", features = ["rc"] }

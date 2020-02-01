@@ -33,3 +33,10 @@ impl QString {
         }
     }
 }
+
+/// Creates a `QString` from a Rust string.
+///
+/// This is the same as `QString::from_std_str(str)`.
+pub fn qs<S: AsRef<str>>(str: S) -> CppBox<QString> {
+    QString::from_std_str(str)
+}

@@ -1,7 +1,7 @@
 [package]
 name = "ritual_common"
 edition = "2018"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 description = "Common utilities for ritual and ritual_build"
 license = "MIT OR Apache-2.0"
