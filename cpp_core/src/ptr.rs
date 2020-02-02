@@ -21,8 +21,8 @@ use std::os::raw::c_char;
 /// directly. In addition, methods of the object's first base class are also directly available
 /// thanks to nested `Deref` implementations.
 ///
-/// `MutPtr` can contain a null pointer. `Deref` will panic if attempted to dereference
-/// a null pointer.
+/// `MutPtr` can contain a null pointer. `Deref` and `DerefMut`
+/// will panic if attempted to dereference a null pointer.
 ///
 /// If the object provides an iterator interface through `begin()` and `end()` functions,
 /// `MutPtr` will implement `IntoIterator`, so you can iterate on it directly.
@@ -65,6 +65,9 @@ impl<T> MutPtr<T> {
     }
 
     /// Creates a null pointer.
+    ///
+    /// Note that accessing the content of a null `MutPtr` through `Deref` or `DerefMut`
+    /// will result in a panic.
     ///
     /// Note that you can also use `NullPtr` to specify a null pointer to a function accepting
     /// `impl CastInto<MutPtr<_>>`. Unlike `MutPtr`, `NullPtr` is not a generic type, so it will
@@ -212,6 +215,8 @@ impl<T: CppDeletable> MutPtr<T> {
 }
 
 /// Allows to call member functions of `T` and its base classes directly on the pointer.
+///
+/// Panics if the pointer is null.
 impl<T> Deref for MutPtr<T> {
     type Target = T;
 
@@ -224,6 +229,8 @@ impl<T> Deref for MutPtr<T> {
 }
 
 /// Allows to call member functions of `T` and its base classes directly on the pointer.
+///
+/// Panics if the pointer is null.
 impl<T> DerefMut for MutPtr<T> {
     fn deref_mut(&mut self) -> &mut T {
         if self.0.is_null() {
@@ -322,6 +329,9 @@ impl<T> Ptr<T> {
 
     /// Creates a null pointer.
     ///
+    /// Note that accessing the content of a null `Ptr` through `Deref`
+    /// will result in a panic.
+    ///
     /// Note that you can also use `NullPtr` to specify a null pointer to a function accepting
     /// `impl CastInto<Ptr<_>>`. Unlike `Ptr`, `NullPtr` is not a generic type, so it will
     /// not cause type inference issues.
@@ -394,6 +404,8 @@ impl<T> Ptr<T> {
 }
 
 /// Allows to call member functions of `T` and its base classes directly on the pointer.
+///
+/// Panics if the pointer is null.
 impl<T> Deref for Ptr<T> {
     type Target = T;
 
