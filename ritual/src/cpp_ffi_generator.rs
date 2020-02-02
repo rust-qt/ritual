@@ -161,12 +161,6 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
             trace!("skipping {}: {}", item.item, err);
             continue;
         }
-        if let Some(hook) = data.config.ffi_generator_hook() {
-            if !hook(&item.item)? {
-                trace!("skipping {} (by hook)", item.item);
-                continue;
-            }
-        }
         let result = match &item.item {
             CppItem::Function(method) => {
                 generate_ffi_methods_for_method(method, &movable_types, &mut name_provider)
@@ -187,7 +181,10 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
 
         match result {
             Err(error) => {
-                debug!("failed to add FFI item: {}: {}", item.item, error);
+                debug!(
+                    "failed to add FFI item for {} {}: {}",
+                    item.id, item.item, error
+                );
             }
             Ok(r) => {
                 let source_id = item.id;

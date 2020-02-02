@@ -398,7 +398,7 @@ impl CppParser<'_, '_> {
         origin_location: CppOriginLocation,
         item: CppItem,
     ) -> Result<()> {
-        if let Some(id) = self.data.db.add_cpp_item(self.source_id.clone(), item)? {
+        if let Some(id) = self.data.add_cpp_item(self.source_id.clone(), item)? {
             self.output.0.push(CppParserOutputItem {
                 include_file,
                 origin_location,

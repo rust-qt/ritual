@@ -199,8 +199,7 @@ fn instantiate_types(data: &mut ProcessorData<'_>) -> Result<()> {
         }
         let any_found = !new_types.is_empty();
         for new_type in new_types {
-            data.db
-                .add_cpp_item(Some(new_type.source_id), CppItem::Type(new_type.item))?;
+            data.add_cpp_item(Some(new_type.source_id), CppItem::Type(new_type.item))?;
         }
         if !any_found {
             break;
@@ -268,7 +267,7 @@ fn instantiate_functions(data: &mut ProcessorData<'_>) -> Result<()> {
         }
     }
     for new_method in new_methods {
-        data.db.add_cpp_item(
+        data.add_cpp_item(
             Some(new_method.source_id),
             CppItem::Function(new_method.item),
         )?;
@@ -343,8 +342,7 @@ pub fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> 
             let mut new_type = original_type.item.clone();
             new_type.path = item;
             let source_id = original_type.id.clone();
-            data.db
-                .add_cpp_item(Some(source_id), CppItem::Type(new_type))?;
+            data.add_cpp_item(Some(source_id), CppItem::Type(new_type))?;
         } else {
             debug!(
                 "original type not found for instantiation: {}",

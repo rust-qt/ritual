@@ -1,9 +1,9 @@
+use itertools::Itertools;
 use ritual::config::Config;
 use ritual::cpp_checker::{PreliminaryTest, Snippet};
-use ritual::cpp_data::{CppItem, CppPath, CppPathItem};
+use ritual::cpp_data::{CppItem, CppPath, CppPathItem, CppTypeDeclaration, CppTypeDeclarationKind};
 use ritual::cpp_ffi_data::CppFfiFunctionKind;
 use ritual::cpp_function::{CppFunction, CppFunctionArgument};
-use ritual::cpp_parser::CppParserOutput;
 use ritual::cpp_template_instantiator::instantiate_function;
 use ritual::cpp_type::{CppBuiltInNumericType, CppType};
 use ritual::processor::ProcessorData;
@@ -270,7 +270,9 @@ pub fn core_config(config: &mut Config) -> Result<()> {
         Ok(())
     });
 
-    config.set_ffi_generator_hook(|item| {
+    let qobject_ptr =
+        CppType::new_pointer(false, CppType::Class(CppPath::from_good_str("QObject")));
+    config.set_cpp_item_filter_hook(move |item| {
         if let CppItem::Function(function) = &item {
             if let Ok(class_type) = function.class_path() {
                 let class_text = class_type.to_templateless_string();
@@ -289,6 +291,20 @@ pub fn core_config(config: &mut Config) -> Result<()> {
                                 return Ok(false);
                             }
                         }
+                    }
+                }
+            }
+            let path = function.path.to_templateless_string();
+            if path == "QObject::findChild" || path == "QObject::findChildren" {
+                if let Some(arg) = function
+                    .path
+                    .last()
+                    .template_arguments
+                    .as_ref()
+                    .and_then(|args| args.get(0))
+                {
+                    if arg != &qobject_ptr && !arg.is_template_parameter() {
+                        return Ok(false);
                     }
                 }
             }
@@ -340,8 +356,11 @@ pub fn core_config(config: &mut Config) -> Result<()> {
     };
     config.add_cpp_checker_tests(tests);
 
-    config.add_after_cpp_parser_hook(add_find_child_methods);
-    config.add_after_cpp_parser_hook(add_connection_to_bool);
+    config.processing_steps_mut().add_after(
+        &["cpp_parser"],
+        "add_extra_cpp_items",
+        add_extra_cpp_items,
+    )?;
 
     // for moqt_core
     let namespace = CppPath::from_good_str("ignored_ns");
@@ -357,9 +376,16 @@ pub fn core_config(config: &mut Config) -> Result<()> {
     Ok(())
 }
 
-fn add_find_child_methods(data: &mut ProcessorData<'_>, output: &CppParserOutput) -> Result<()> {
-    for item in &output.0 {
-        let cpp_item = data.db.cpp_item(&item.id)?;
+fn add_extra_cpp_items(data: &mut ProcessorData<'_>) -> Result<()> {
+    add_find_child_methods(data)?;
+    add_connection_to_bool(data)?;
+    add_qpointer(data)?;
+    Ok(())
+}
+
+fn add_find_child_methods(data: &mut ProcessorData<'_>) -> Result<()> {
+    for id in data.db.cpp_item_ids().collect_vec() {
+        let cpp_item = data.db.cpp_item(&id)?;
         let function = if let Some(f) = cpp_item.item.as_function_ref() {
             f
         } else {
@@ -369,18 +395,50 @@ fn add_find_child_methods(data: &mut ProcessorData<'_>, output: &CppParserOutput
         if path == "QObject::findChild" || path == "QObject::findChildren" {
             let t = CppType::new_pointer(false, CppType::Class(CppPath::from_good_str("QObject")));
             let new_function = instantiate_function(function, 0, &[t])?;
-            data.db
-                .add_cpp_item(Some(item.id.clone()), CppItem::Function(new_function))?;
+            data.add_cpp_item(Some(id), CppItem::Function(new_function))?;
         }
     }
     Ok(())
 }
 
-fn add_connection_to_bool(data: &mut ProcessorData<'_>, _output: &CppParserOutput) -> Result<()> {
+fn add_connection_to_bool(data: &mut ProcessorData<'_>) -> Result<()> {
     // `QMetaObject::Connection::operator bool()` is a fake method, so we need to
     // explicitly add a conversion function to replace it.
-    data.db
-        .add_cpp_item(None, CppItem::Function(connection_to_bool_function()))?;
+    data.add_cpp_item(None, CppItem::Function(connection_to_bool_function()))?;
+    Ok(())
+}
+
+fn add_qpointer(data: &mut ProcessorData<'_>) -> Result<()> {
+    for id in data.db.cpp_item_ids().collect_vec() {
+        let cpp_item = data.db.cpp_item(&id)?;
+        let t = if let Some(f) = cpp_item.item.as_type_ref() {
+            f
+        } else {
+            continue;
+        };
+        let is_qpointer_t = t.path.to_templateless_string() == "QPointer"
+            && t.path
+                .last()
+                .template_arguments
+                .as_ref()
+                .map_or(false, |args| {
+                    args.get(0).map_or(false, |arg| arg.is_template_parameter())
+                });
+        if is_qpointer_t {
+            data.add_cpp_item(
+                Some(id),
+                CppItem::Type(CppTypeDeclaration {
+                    path: CppPath::from_item(CppPathItem {
+                        name: "QPointer".into(),
+                        template_arguments: Some(vec![CppType::Class(CppPath::from_good_str(
+                            "QObject",
+                        ))]),
+                    }),
+                    kind: CppTypeDeclarationKind::Class,
+                }),
+            )?;
+        }
+    }
     Ok(())
 }
 

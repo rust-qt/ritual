@@ -4,7 +4,6 @@ use ritual::cpp_data::{
 use ritual::cpp_function::{
     CppFunction, CppFunctionArgument, CppFunctionKind, CppFunctionMemberData,
 };
-use ritual::cpp_parser::CppParserOutput;
 use ritual::cpp_type::{
     CppBuiltInNumericType, CppSpecificNumericType, CppSpecificNumericTypeKind,
     CppTemplateParameter, CppType,
@@ -22,7 +21,7 @@ fn add_vector_from_pointers_functions(data: &mut ProcessorData<'_>) -> Result<()
         name: "allocator".into(),
         template_arguments: Some(vec![t.clone()]),
     }));
-    data.db.add_cpp_item(
+    data.add_cpp_item(
         None,
         CppItem::Function(CppFunction {
             path: CppPath::from_good_str("std")
@@ -72,7 +71,7 @@ fn add_vector_from_pointers_functions(data: &mut ProcessorData<'_>) -> Result<()
             declaration_code: None,
         }),
     )?;
-    data.db.add_cpp_item(
+    data.add_cpp_item(
         None,
         CppItem::Function(CppFunction {
             path: CppPath::from_good_str("std")
@@ -191,7 +190,7 @@ fn add_vector_instantiations(data: &mut ProcessorData<'_>) -> Result<()> {
             name: "allocator".into(),
             template_arguments: Some(vec![arg.clone()]),
         }));
-        data.db.add_cpp_item(
+        data.add_cpp_item(
             None,
             CppItem::Type(CppTypeDeclaration {
                 kind: CppTypeDeclarationKind::Class,
@@ -205,7 +204,7 @@ fn add_vector_instantiations(data: &mut ProcessorData<'_>) -> Result<()> {
     Ok(())
 }
 
-pub fn hook(data: &mut ProcessorData<'_>, _output: &CppParserOutput) -> Result<()> {
+pub fn hook(data: &mut ProcessorData<'_>) -> Result<()> {
     add_vector_from_pointers_functions(data)?;
     add_vector_instantiations(data)?;
     Ok(())

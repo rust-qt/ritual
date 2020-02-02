@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::cpp_checks::CppChecksItem;
 use crate::cpp_code_generator::{all_include_directives, write_include_directives};
-use crate::cpp_data::CppPath;
+use crate::cpp_data::{CppItem, CppPath};
 use crate::cpp_ffi_data::CppFfiItem;
 use crate::cpp_type::CppType;
 use crate::database::{DatabaseClient, DbItem, ItemId};
@@ -581,10 +581,15 @@ impl CppChecker<'_, '_> {
             let ffi_item = self.data.db.ffi_item_mut(&snippet.data.ffi_item_id)?;
             if let Some(output) = snippet.output {
                 if output.is_success() {
-                    debug!("success: {}", ffi_item.item.short_text());
+                    debug!("success: {} {}", ffi_item.id, ffi_item.item.short_text());
                     success_count += 1;
                 } else {
-                    debug!("error: {}: {:?}", ffi_item.item.short_text(), output);
+                    debug!(
+                        "error: {} {}: {:?}",
+                        ffi_item.id,
+                        ffi_item.item.short_text(),
+                        output
+                    );
                     error_count += 1;
                 }
                 let ffi_item_id = ffi_item.id;
@@ -634,7 +639,7 @@ fn type_paths(type1: &CppType) -> Vec<&CppPath> {
     }
 }
 
-fn recursive_hook(mut path: CppPath, hook: impl Fn(&CppPath) -> Result<bool>) -> Result<bool> {
+fn recursive_hook(mut path: CppPath, hook: &impl Fn(&CppPath) -> Result<bool>) -> Result<bool> {
     loop {
         if !hook(&path)? {
             return Ok(false);
@@ -647,28 +652,37 @@ fn recursive_hook(mut path: CppPath, hook: impl Fn(&CppPath) -> Result<bool>) ->
     }
 }
 
+pub fn check_cpp_parser_hook(
+    cpp_item: &CppItem,
+    hook: &impl Fn(&CppPath) -> Result<bool>,
+) -> Result<bool> {
+    let all_types = cpp_item.all_involved_types();
+    let paths = all_types
+        .iter()
+        .flat_map(|type1| type_paths(type1))
+        .chain(cpp_item.path());
+    for path in paths {
+        if !recursive_hook(path.clone(), hook)? {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 pub fn delete_blacklisted_items(data: &mut ProcessorData<'_>) -> Result<()> {
     if let Some(hook) = data.config.cpp_parser_path_hook() {
         let mut bad_cpp_item_ids = Vec::new();
         for cpp_item in data.db.cpp_items() {
-            let all_types = cpp_item.item.all_involved_types();
-            let paths = all_types
-                .iter()
-                .flat_map(|type1| type_paths(type1))
-                .chain(cpp_item.item.path());
-            for path in paths {
-                if !recursive_hook(path.clone(), hook)? {
-                    info!("deleting {}: {}", cpp_item.id, cpp_item.item.short_text());
-                    bad_cpp_item_ids.push(cpp_item.id);
-                    break;
-                }
+            if !check_cpp_parser_hook(&cpp_item.item, &hook)? {
+                info!("deleting {}: {}", cpp_item.id, cpp_item.item.short_text());
+                bad_cpp_item_ids.push(cpp_item.id);
             }
         }
         data.db
             .delete_items(|item| bad_cpp_item_ids.contains(&item.id));
     }
 
-    if let Some(hook) = data.config.ffi_generator_hook() {
+    if let Some(hook) = data.config.cpp_item_filter_hook() {
         let mut bad_cpp_item_ids = Vec::new();
         for cpp_item in data.db.cpp_items() {
             if !hook(&cpp_item.item)? {

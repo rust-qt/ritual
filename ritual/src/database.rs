@@ -602,6 +602,9 @@ impl DatabaseClient {
         let id = self.new_id();
 
         debug!("added ffi item {}: {}", id, item.short_text());
+        if let Some(source_id) = &source_id {
+            debug!("    source: {}", source_id);
+        }
         trace!("    ffi item data: {:?}", item);
         self.current_database.push(DbItem {
             id: id.clone(),
@@ -627,7 +630,7 @@ impl DatabaseClient {
         }
     }
 
-    pub fn add_cpp_item(
+    pub fn add_cpp_item_without_hook(
         &mut self,
         source_id: Option<ItemId>,
         data: CppItem,
@@ -639,6 +642,9 @@ impl DatabaseClient {
         self.is_modified = true;
         let id = self.new_id();
         debug!("added cpp item {}: {}", id, data);
+        if let Some(source_id) = &source_id {
+            debug!("    source: {}", source_id);
+        }
         let item = DbItem {
             id: id.clone(),
             source_id,
@@ -681,9 +687,7 @@ impl DatabaseClient {
         self.is_modified = true;
         if item.is_crate_root() {
             let item_path = item.path().expect("crate root must have path");
-            let crate_name = item_path
-                .crate_name()
-                .expect("rust item path must have crate name");
+            let crate_name = item_path.crate_name();
             if crate_name != *self.current_database.db.crate_name {
                 bail!("can't add rust item with different crate name: {:?}", item);
             }
@@ -691,9 +695,7 @@ impl DatabaseClient {
             let mut path = item
                 .parent_path()
                 .map_err(|_| format_err!("path has no parent for rust item: {:?}", item))?;
-            let crate_name = path
-                .crate_name()
-                .expect("rust item path must have crate name");
+            let crate_name = path.crate_name();
             if crate_name != *self.current_database.db.crate_name {
                 bail!("can't add rust item with different crate name: {:?}", item);
             }
@@ -718,6 +720,9 @@ impl DatabaseClient {
         let id = self.new_id();
 
         debug!("added rust item {}: {}", id, item.short_text());
+        if let Some(source_id) = &source_id {
+            debug!("    source: {}", source_id);
+        }
         trace!("    rust item data: {:?}", item);
         self.current_database.push(DbItem {
             id: id.clone(),

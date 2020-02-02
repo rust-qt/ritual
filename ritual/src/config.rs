@@ -176,7 +176,7 @@ pub type RustPathHook =
 pub type RustItemHook = dyn Fn(&mut RustItem, &ProcessorData<'_>) -> Result<()> + 'static;
 pub type AfterCppParserHook =
     dyn Fn(&mut ProcessorData<'_>, &CppParserOutput) -> Result<()> + 'static;
-pub type FfiGeneratorHook = dyn Fn(&CppItem) -> Result<bool> + 'static;
+pub type CppItemFilterHook = dyn Fn(&CppItem) -> Result<bool> + 'static;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkerLibraryConfig {
@@ -218,7 +218,7 @@ pub struct Config {
     rust_path_hook: Option<Box<RustPathHook>>,
     rust_item_hook: Option<Box<RustItemHook>>,
     after_cpp_parser_hooks: Vec<Box<AfterCppParserHook>>,
-    ffi_generator_hook: Option<Box<FfiGeneratorHook>>,
+    cpp_item_filter_hook: Option<Box<CppItemFilterHook>>,
     cluster_config: Option<ClusterConfig>,
     cpp_checker_tests: Vec<PreliminaryTest>,
     write_dependencies_local_paths: bool,
@@ -251,7 +251,7 @@ impl Config {
             rust_path_hook: Default::default(),
             rust_item_hook: Default::default(),
             after_cpp_parser_hooks: Default::default(),
-            ffi_generator_hook: Default::default(),
+            cpp_item_filter_hook: Default::default(),
             cluster_config: None,
             cpp_checker_tests: Default::default(),
             write_dependencies_local_paths: true,
@@ -468,12 +468,12 @@ impl Config {
         &self.after_cpp_parser_hooks
     }
 
-    pub fn set_ffi_generator_hook(&mut self, hook: impl Fn(&CppItem) -> Result<bool> + 'static) {
-        self.ffi_generator_hook = Some(Box::new(hook));
+    pub fn set_cpp_item_filter_hook(&mut self, hook: impl Fn(&CppItem) -> Result<bool> + 'static) {
+        self.cpp_item_filter_hook = Some(Box::new(hook));
     }
 
-    pub fn ffi_generator_hook(&self) -> Option<&FfiGeneratorHook> {
-        self.ffi_generator_hook.as_ref().map(|b| &**b)
+    pub fn cpp_item_filter_hook(&self) -> Option<&CppItemFilterHook> {
+        self.cpp_item_filter_hook.as_ref().map(|b| &**b)
     }
 
     pub fn set_cluster_config(&mut self, cluster_config: ClusterConfig) {

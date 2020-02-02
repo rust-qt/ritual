@@ -1,5 +1,6 @@
 use crate::config::Config;
-use crate::cpp_checker::delete_blacklisted_items;
+use crate::cpp_checker::{check_cpp_parser_hook, delete_blacklisted_items};
+use crate::cpp_data::CppItem;
 use crate::database::{DatabaseClient, ItemId};
 use crate::workspace::Workspace;
 use crate::{
@@ -7,6 +8,7 @@ use crate::{
     cpp_parser, cpp_template_instantiator, crate_writer, rust_generator,
 };
 use itertools::Itertools;
+use log::debug;
 use log::{error, info, trace};
 use regex::Regex;
 use ritual_common::env_var_names::WORKSPACE_TARGET_DIR;
@@ -95,10 +97,6 @@ impl Default for ProcessingSteps {
                 &format!("add_implicit_methods{}", suffix),
                 cpp_implicit_methods::run,
             );
-            //            s.push(
-            //                &format!("set_allocation_places{}", suffix),
-            //                type_allocation_places::set_allocation_places,
-            //            );
             s.push(
                 &format!("find_template_instantiations{}", suffix),
                 cpp_template_instantiator::find_template_instantiations,
@@ -572,4 +570,27 @@ fn test_parse_steps_spec() {
     assert!(parse_steps_spec("(..t1]").is_err());
     assert!(parse_steps_spec("(..)").is_err());
     assert!(parse_steps_spec("[t1..t2[").is_err());
+}
+
+impl ProcessorData<'_> {
+    pub fn add_cpp_item(
+        &mut self,
+        source_id: Option<ItemId>,
+        data: CppItem,
+    ) -> Result<Option<ItemId>> {
+        if let Some(hook) = self.config.cpp_item_filter_hook() {
+            if !hook(&data)? {
+                debug!("blacklisted cpp item: {}", data.short_text());
+                return Ok(None);
+            }
+        }
+        if let Some(hook) = self.config.cpp_parser_path_hook() {
+            if !check_cpp_parser_hook(&data, &hook)? {
+                debug!("blacklisted cpp item: {}", data.short_text());
+                return Ok(None);
+            }
+        }
+
+        self.db.add_cpp_item_without_hook(source_id, data)
+    }
 }

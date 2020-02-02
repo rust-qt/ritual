@@ -102,7 +102,11 @@ fn create_config(mut crate_properties: CrateProperties) -> Result<Config> {
         Ok(true)
     });
 
-    config.add_after_cpp_parser_hook(after_cpp_parser::hook);
+    config.processing_steps_mut().add_after(
+        &["cpp_parser"],
+        "add_extra_cpp_items",
+        after_cpp_parser::hook,
+    )?;
 
     let namespace = CppPath::from_good_str("std");
     config.set_rust_path_scope_hook(move |path| {

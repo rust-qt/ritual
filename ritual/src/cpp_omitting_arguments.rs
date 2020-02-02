@@ -24,8 +24,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     }
 
     for item in results {
-        data.db
-            .add_cpp_item(Some(item.source_id), CppItem::Function(item.item))?;
+        data.add_cpp_item(Some(item.source_id), CppItem::Function(item.item))?;
     }
 
     Ok(())
