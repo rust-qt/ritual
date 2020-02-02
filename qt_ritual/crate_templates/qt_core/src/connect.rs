@@ -1,6 +1,5 @@
-use crate::q_meta_object::Connection;
-use crate::QObject;
-use cpp_core::{CastInto, CppBox, CppDeletable, MutPtr, MutRef, Ptr, Ref};
+use crate::{q_meta_object::Connection, QBox, QObject, QPtr};
+use cpp_core::{CastInto, CppBox, CppDeletable, MutPtr, MutRef, Ptr, Ref, StaticUpcast};
 use std::ffi::CStr;
 use std::fmt;
 use std::marker::PhantomData;
@@ -147,6 +146,26 @@ where
 }
 
 impl<'a, T: CppDeletable> AsReceiver for &'a CppBox<T>
+where
+    T: AsReceiver,
+{
+    type Arguments = <T as AsReceiver>::Arguments;
+    fn as_receiver(&self) -> Receiver<Self::Arguments> {
+        (***self).as_receiver()
+    }
+}
+
+impl<'a, T: StaticUpcast<QObject> + CppDeletable> AsReceiver for &'a QBox<T>
+where
+    T: AsReceiver,
+{
+    type Arguments = <T as AsReceiver>::Arguments;
+    fn as_receiver(&self) -> Receiver<Self::Arguments> {
+        (***self).as_receiver()
+    }
+}
+
+impl<'a, T: StaticUpcast<QObject>> AsReceiver for &'a QPtr<T>
 where
     T: AsReceiver,
 {

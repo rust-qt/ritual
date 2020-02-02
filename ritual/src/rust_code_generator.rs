@@ -602,6 +602,14 @@ impl Generator<'_> {
                 );
                 wrap_unsafe(in_unsafe_context, &code)
             }
+            RustToFfiTypeConversion::QBoxToPtr => {
+                let code = format!("{}::QBox::from_raw({})", self.qt_core_prefix(), source_expr);
+                wrap_unsafe(in_unsafe_context, &code)
+            }
+            RustToFfiTypeConversion::QPtrToPtr => {
+                let code = format!("{}::QPtr::from_raw({})", self.qt_core_prefix(), source_expr);
+                wrap_unsafe(in_unsafe_context, &code)
+            }
             RustToFfiTypeConversion::UtilsPtrToPtr { .. }
             | RustToFfiTypeConversion::UtilsRefToPtr { .. }
             | RustToFfiTypeConversion::OptionUtilsRefToPtr { .. } => {
@@ -703,9 +711,12 @@ impl Generator<'_> {
                     self.rust_type_to_code(type1.ffi_type())
                 )
             }
-            RustToFfiTypeConversion::CppBoxToPtr => format!("{}.into_raw_ptr()", expr),
+            RustToFfiTypeConversion::CppBoxToPtr | RustToFfiTypeConversion::QBoxToPtr => {
+                format!("{}.into_raw_ptr()", expr)
+            }
             RustToFfiTypeConversion::UtilsPtrToPtr { .. }
-            | RustToFfiTypeConversion::UtilsRefToPtr { .. } => {
+            | RustToFfiTypeConversion::UtilsRefToPtr { .. }
+            | RustToFfiTypeConversion::QPtrToPtr { .. } => {
                 let api_type_path = &type1.api_type().as_common()?.path;
                 let api_is_const = api_type_path == &RustPath::from_good_str("cpp_core::Ptr")
                     || api_type_path == &RustPath::from_good_str("cpp_core::Ref");

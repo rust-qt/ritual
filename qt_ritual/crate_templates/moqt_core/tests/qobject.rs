@@ -1,5 +1,4 @@
-use cpp_core::MutRef;
-use moqt_core::{QObject, SlotOfInt};
+use moqt_core::{QObject, QPtr, SlotOfInt};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -41,7 +40,7 @@ fn closure_slot_connect() {
         let signal = args.signal().to_c_str().to_str().unwrap();
         assert_eq!(signal, "2objectNameChanged(int)");
 
-        let slot_as_qobject: MutRef<QObject> = slot.static_upcast_mut();
+        let slot_as_qobject: QPtr<QObject> = slot.static_upcast_mut();
         assert_eq!(args.receiver().as_raw_ptr(), slot_as_qobject.as_raw_ptr());
 
         let method = args.method().to_c_str().to_str().unwrap();

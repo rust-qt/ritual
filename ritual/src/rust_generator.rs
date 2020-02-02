@@ -1,6 +1,8 @@
 use crate::config::CrateDependencyKind;
 use crate::cpp_checks::CppChecks;
-use crate::cpp_data::{CppItem, CppPath, CppPathItem, CppTypeDeclaration, CppTypeDeclarationKind};
+use crate::cpp_data::{
+    inherits, CppItem, CppPath, CppPathItem, CppTypeDeclaration, CppTypeDeclarationKind,
+};
 use crate::cpp_ffi_data::{
     CppCast, CppFfiArgumentMeaning, CppFfiFunction, CppFfiFunctionKind, CppFfiItem, CppFfiType,
     CppFieldAccessorType, CppToFfiTypeConversion,
@@ -868,6 +870,13 @@ impl State<'_, '_> {
         let rust_ffi_type = self.ffi_type_to_rust_ffi_type(cpp_ffi_type.ffi_type())?;
         let mut api_to_ffi_conversion = RustToFfiTypeConversion::None;
         if let RustType::PointerLike { .. } = &rust_ffi_type {
+            let target = cpp_ffi_type.ffi_type().pointer_like_to_target()?;
+            let inherits_qobject = if let CppType::Class(path) = &target {
+                inherits(&self.data.db, path, &CppPath::from_good_str("QObject"))
+            } else {
+                false
+            };
+
             if let CppToFfiTypeConversion::ValueToPointer { .. } = cpp_ffi_type.conversion() {
                 if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
                     match allocation_place {
@@ -881,13 +890,17 @@ impl State<'_, '_> {
                                 true
                             };
 
-                            if is_deletable {
-                                api_to_ffi_conversion = RustToFfiTypeConversion::CppBoxToPtr;
+                            api_to_ffi_conversion = if is_deletable {
+                                if inherits_qobject {
+                                    RustToFfiTypeConversion::QBoxToPtr
+                                } else {
+                                    RustToFfiTypeConversion::CppBoxToPtr
+                                }
                             } else {
-                                api_to_ffi_conversion = RustToFfiTypeConversion::UtilsRefToPtr {
+                                RustToFfiTypeConversion::UtilsRefToPtr {
                                     force_api_is_const: None,
-                                };
-                            }
+                                }
+                            };
                         }
                         ReturnValueAllocationPlace::NotApplicable => {
                             bail!("NotApplicable conflicts with ValueToPointer");
@@ -916,8 +929,12 @@ impl State<'_, '_> {
                                 force_api_is_const: None,
                             }
                         } else {
-                            RustToFfiTypeConversion::UtilsPtrToPtr {
-                                force_api_is_const: None,
+                            if inherits_qobject {
+                                RustToFfiTypeConversion::QPtrToPtr
+                            } else {
+                                RustToFfiTypeConversion::UtilsPtrToPtr {
+                                    force_api_is_const: None,
+                                }
                             }
                         };
                 } else {
@@ -1106,9 +1123,7 @@ impl State<'_, '_> {
         check_trait_impl_uniqueness(trait_types, &target_type, &trait_type)?;
 
         let parent_path = if let RustType::Common(RustCommonType { path, .. }) = self_value_type {
-            let type_crate_name = path
-                .crate_name()
-                .ok_or_else(|| err_msg("common type must have crate name"))?;
+            let type_crate_name = path.crate_name();
             if type_crate_name != crate_name {
                 bail!("self type is outside current crate");
             }
@@ -1583,7 +1598,7 @@ impl State<'_, '_> {
                     }
                     Err(err) => {
                         debug!("failed to convert operator to trait: {}", err);
-                        debug!("function: {:?}", function);
+                        debug!("function: {} {:?}", item.id, function);
                         debug!("rust function: {:?}", unnamed_function);
                     }
                 }
@@ -1608,7 +1623,7 @@ impl State<'_, '_> {
                 if arg0.name != "self" {
                     if let Ok(type1) = arg0.argument_type.ffi_type().pointer_like_to_target() {
                         if let RustType::Common(type1) = type1 {
-                            if type1.path.crate_name() == Some(self.data.db.crate_name()) {
+                            if type1.path.crate_name() == self.data.db.crate_name() {
                                 arg0.name = "self".into();
                                 arg0.argument_type = RustFinalType::new(
                                     arg0.argument_type.ffi_type().clone(),
@@ -2420,7 +2435,10 @@ impl State<'_, '_> {
         for cpp_item_id in all_cpp_item_ids {
             let cpp_item = self.data.db.cpp_item(&cpp_item_id)?;
             if let Err(err) = self.process_cpp_item(cpp_item.clone()) {
-                debug!("failed to process cpp item: {}: {}", &cpp_item.item, err);
+                debug!(
+                    "failed to process cpp item: {} {}: {}",
+                    cpp_item.id, &cpp_item.item, err
+                );
                 print_trace(&err, Some(log::Level::Trace));
             }
         }
@@ -2444,7 +2462,8 @@ impl State<'_, '_> {
             let checks = self.data.db.cpp_checks(&ffi_item_id)?;
             if !checks.any_success() {
                 debug!(
-                    "skipping ffi item with failed checks: {}",
+                    "skipping ffi item with failed checks: {} {}",
+                    ffi_item.id,
                     ffi_item.item.short_text(),
                 );
                 continue;
@@ -2471,7 +2490,8 @@ impl State<'_, '_> {
                 }
                 Err(err) => {
                     debug!(
-                        "failed to process ffi item: {}: {}",
+                        "failed to process ffi item: {} {}: {}",
+                        ffi_item.id,
                         ffi_item.item.short_text(),
                         err
                     );

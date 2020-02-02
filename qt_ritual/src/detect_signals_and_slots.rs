@@ -1,33 +1,12 @@
 use itertools::Itertools;
 use log::trace;
 use regex::Regex;
-use ritual::cpp_data::{CppItem, CppPath};
+use ritual::cpp_data::{inherits, CppItem, CppPath};
 use ritual::cpp_parser::CppParserOutput;
 use ritual::processor::ProcessorData;
 use ritual_common::errors::{Result, ResultExt};
 use ritual_common::file_utils::open_file;
 use std::collections::{HashMap, HashSet};
-
-/// Checks if `class_name` types inherits `base_name` type directly or indirectly.
-pub fn inherits(
-    data: &ProcessorData<'_>,
-    derived_class_name: &CppPath,
-    base_class_name: &CppPath,
-) -> bool {
-    for item in data.db.all_cpp_items() {
-        if let CppItem::ClassBase(base_data) = &item.item {
-            if &base_data.derived_class_type == derived_class_name {
-                if &base_data.base_class_type == base_class_name {
-                    return true;
-                }
-                if inherits(data, &base_data.base_class_type, base_class_name) {
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
 
 #[derive(Debug, Clone)]
 enum SectionType {
@@ -56,7 +35,7 @@ pub fn detect_signals_and_slots(
 
         if let CppItem::Type(type1) = &cpp_item.item {
             if type1.kind.is_class() {
-                if type1.path == qobject_path || inherits(&data, &type1.path, &qobject_path) {
+                if type1.path == qobject_path || inherits(&data.db, &type1.path, &qobject_path) {
                     if !files.contains(&item.origin_location.include_file_path) {
                         files.insert(item.origin_location.include_file_path.clone());
                     }

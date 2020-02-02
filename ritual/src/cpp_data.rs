@@ -3,6 +3,7 @@
 use crate::cpp_function::CppFunction;
 pub use crate::cpp_operator::CppOperator;
 use crate::cpp_type::{CppTemplateParameter, CppType};
+use crate::database::DatabaseClient;
 use itertools::Itertools;
 use ritual_common::errors::{bail, ensure, Error, Result};
 use ritual_common::utils::MapIfOk;
@@ -619,4 +620,25 @@ impl fmt::Display for CppItem {
 
         f.write_str(&s)
     }
+}
+
+/// Checks if `class_name` types inherits `base_name` type directly or indirectly.
+pub fn inherits(
+    db: &DatabaseClient,
+    derived_class_name: &CppPath,
+    base_class_name: &CppPath,
+) -> bool {
+    for item in db.all_cpp_items() {
+        if let CppItem::ClassBase(base_data) = &item.item {
+            if &base_data.derived_class_type == derived_class_name {
+                if &base_data.base_class_type == base_class_name {
+                    return true;
+                }
+                if inherits(db, &base_data.base_class_type, base_class_name) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
 }

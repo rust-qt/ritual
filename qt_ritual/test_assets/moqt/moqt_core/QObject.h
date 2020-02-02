@@ -40,6 +40,7 @@ class MOQT_CORE_EXPORT QObject {
 public:
     QObject(QObject* parent = nullptr);
     virtual ~QObject();
+    QObject *parent() const { return nullptr; }
 
     static QMetaObject::Connection connect(const QObject *sender, const char *signal,
                                            const QObject *receiver, const char *member, Qt::ConnectionType = Qt::AutoConnection);
@@ -85,6 +86,17 @@ Q_SIGNALS:
 
 public Q_SLOTS:
     void deleteLater();
+};
+
+template<class T>
+class QPointer {
+public:
+    QPointer() = default;
+    QPointer(T *ptr) : m_ptr(ptr) { }
+    bool isNull() const { return m_ptr == nullptr; }
+
+private:
+    T* m_ptr;
 };
 
 #endif //QOBJECT_H

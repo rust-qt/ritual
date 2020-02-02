@@ -56,11 +56,11 @@ impl RustPath {
 
     /// Returns crate name of this name, or `None`
     /// if this name does not contain the crate name (e.g. it's a built-in type).
-    pub fn crate_name(&self) -> Option<&str> {
+    pub fn crate_name(&self) -> &str {
         if self.parts.is_empty() {
             panic!("RustPath can't be empty");
         }
-        Some(self.parts[0].as_str())
+        self.parts[0].as_str()
     }
 
     /// Returns last component of the name.
@@ -82,10 +82,8 @@ impl RustPath {
     /// will be used outside of the crate it belongs to.
     pub fn full_name(&self, current_crate: Option<&str>) -> String {
         if let Some(current_crate) = current_crate {
-            if let Some(self_crate) = self.crate_name() {
-                if self_crate == current_crate {
-                    return format!("crate::{}", self.parts[1..].join("::"));
-                }
+            if self.crate_name() == current_crate {
+                return format!("crate::{}", self.parts[1..].join("::"));
             }
         }
 
@@ -154,10 +152,14 @@ pub enum RustToFfiTypeConversion {
     OptionUtilsRefToPtr {
         force_api_is_const: Option<bool>,
     },
+    /// `QPtr<T>` to `Ptr<T>`
+    QPtrToPtr,
     /// `T` to `*const T` (or similar mutable type)
     ValueToPtr,
     /// `CppBox<T>` to `*mut T`
     CppBoxToPtr,
+    /// `QBox<T>` to `*mut T`
+    QBoxToPtr,
     /// `qt_core::flags::Flags<T>` to `c_int`
     QFlagsToUInt {
         api_type: RustType,
@@ -257,6 +259,19 @@ fn utils_ref(ffi_type: &RustType, force_api_is_const: Option<bool>) -> Result<Ru
     }))
 }
 
+fn class_type_to_qt_core_crate_path(t: &RustType) -> Result<RustPath> {
+    if let RustType::Common(t) = t {
+        let name = if t.path.crate_name().starts_with("moqt") {
+            "moqt_core"
+        } else {
+            "qt_core"
+        };
+        Ok(RustPath::from_good_str(name))
+    } else {
+        bail!("expected common type for QBox/QPtr conversion, got {:?}", t);
+    }
+}
+
 impl RustFinalType {
     pub fn new(ffi_type: RustType, api_to_ffi_conversion: RustToFfiTypeConversion) -> Result<Self> {
         let api_type = match &api_to_ffi_conversion {
@@ -295,6 +310,20 @@ impl RustFinalType {
                 let target = ffi_type.pointer_like_to_target()?;
                 RustType::Common(RustCommonType {
                     path: RustPath::from_good_str("cpp_core::CppBox"),
+                    generic_arguments: Some(vec![target.clone()]),
+                })
+            }
+            RustToFfiTypeConversion::QBoxToPtr => {
+                let target = ffi_type.pointer_like_to_target()?;
+                RustType::Common(RustCommonType {
+                    path: class_type_to_qt_core_crate_path(&target)?.join("QBox"),
+                    generic_arguments: Some(vec![target.clone()]),
+                })
+            }
+            RustToFfiTypeConversion::QPtrToPtr => {
+                let target = ffi_type.pointer_like_to_target()?;
+                RustType::Common(RustCommonType {
+                    path: class_type_to_qt_core_crate_path(&target)?.join("QPtr"),
                     generic_arguments: Some(vec![target.clone()]),
                 })
             }
@@ -572,7 +601,7 @@ impl RustType {
 
                 let mut name = if path.parts.len() == 1 {
                     path.parts[0].to_snake_case()
-                } else if path.crate_name() == Some("std") {
+                } else if path.crate_name() == "std" {
                     let last = path.last();
                     let last = if last.starts_with("c_") {
                         &last[2..]
