@@ -55,7 +55,7 @@ fn argument_func() {
 
     let arg = CppFfiFunctionArgument {
         name: "arg1".to_string(),
-        argument_type: CppFfiType::new(type1.clone(), CppToFfiTypeConversion::NoChange).unwrap(),
+        argument_type: CppFfiType::new(type1, CppToFfiTypeConversion::NoChange).unwrap(),
         meaning: CppFfiArgumentMeaning::Argument(0),
     };
     assert_eq!(arg.to_cpp_code().unwrap(), "int (*arg1)(int, bool*)");

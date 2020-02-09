@@ -155,7 +155,7 @@ fn argument_types_equal7() {
     let mut method2 = empty_regular_method();
     method1.arguments.push(int.clone());
     method2.arguments.push(int.clone());
-    method2.arguments.push(int.clone());
+    method2.arguments.push(int);
     assert!(!method1.argument_types_equal(&method2));
     assert!(!method2.argument_types_equal(&method1));
 }

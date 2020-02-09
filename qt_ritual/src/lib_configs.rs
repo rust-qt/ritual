@@ -248,7 +248,7 @@ pub fn create_config(
 
 pub fn global_config() -> GlobalConfig {
     let mut config = GlobalConfig::new();
-    config.set_all_crate_names(all_crate_names().iter().map(|s| s.to_string()).collect());
+    config.set_all_crate_names(all_crate_names().iter().map(|&s| s.to_string()).collect());
     config.set_create_config_hook(|crate_name| create_config(crate_name, None));
     config
 }

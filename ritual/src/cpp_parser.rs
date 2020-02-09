@@ -1110,7 +1110,7 @@ impl CppParser<'_, '_> {
                         if info.allows_variadic_arguments
                             || info.arguments_count == real_arguments_count
                         {
-                            method_operator = Some(operator.clone());
+                            method_operator = Some(operator);
                             break;
                         }
                     }
@@ -1135,7 +1135,7 @@ impl CppParser<'_, '_> {
             }
         }
 
-        name_with_namespace.last_mut().name = name.clone();
+        name_with_namespace.last_mut().name = name;
         name_with_namespace.last_mut().template_arguments = template_arguments;
 
         let source_range = entity
@@ -1587,7 +1587,7 @@ impl CppParser<'_, '_> {
                 if let Some(name) = entity.get_display_name() {
                     if let Ok(parent_type) = self.parse_unexposed_type(
                         None,
-                        Some(name.clone()),
+                        Some(name),
                         &get_context_template_args(entity),
                     ) {
                         if let CppType::Class(path) = parent_type {

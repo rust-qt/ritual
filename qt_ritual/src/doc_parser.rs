@@ -169,7 +169,7 @@ impl DocParser {
             }
             None => None,
         };
-        for declaration in &[declaration1, declaration2] {
+        for &declaration in &[declaration1, declaration2] {
             let mut declaration_no_scope = declaration.to_string();
             if let Some((prefix1, prefix2)) = &scope_prefix {
                 declaration_no_scope = declaration_no_scope

@@ -500,7 +500,7 @@ impl CppChecker<'_, '_> {
 
         let progress_bar = ProgressBar::new(snippets.len() as u64, "Checking items");
 
-        let instances = InstanceStorage::new(instance_provider.clone());
+        let instances = InstanceStorage::new(instance_provider);
 
         snippets
             .par_chunks_mut(CHUNK_SIZE)

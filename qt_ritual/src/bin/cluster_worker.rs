@@ -32,7 +32,7 @@ fn run() -> Result<()> {
     let supported_moqt_libs = ["moqt_core", "moqt_gui"]
         .iter()
         .filter(|_| moqt_present)
-        .map(|crate_name| {
+        .map(|&crate_name| {
             let lib = GroupKey {
                 crate_name: crate_name.to_string(),
                 cpp_library_version: None,
@@ -44,7 +44,7 @@ fn run() -> Result<()> {
         .filter(|(key, _value)| key.starts_with(QMAKE_PATH_VAR_PREFIX))
         .flat_map(|(key, value)| {
             let version = key[QMAKE_PATH_VAR_PREFIX.len()..].replace("_", ".");
-            all_crate_names().iter().map(move |crate_name| {
+            all_crate_names().iter().map(move |&crate_name| {
                 let lib = GroupKey {
                     crate_name: crate_name.to_string(),
                     cpp_library_version: Some(version.clone()),

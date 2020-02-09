@@ -1547,7 +1547,7 @@ impl State<'_, '_> {
 
         let mut unnamed_function = UnnamedRustFunction {
             is_public: true,
-            arguments: arguments.clone(),
+            arguments,
             return_type,
             kind: RustFunctionKind::FfiWrapper(RustFfiWrapperData { ffi_function_path }),
             is_unsafe: true,
@@ -1916,7 +1916,7 @@ impl State<'_, '_> {
                 } else if let Some(last_name_override) =
                     self.special_function_rust_name(function.clone(), &scope.path)?
                 {
-                    last_name_override.clone()
+                    last_name_override
                 } else {
                     self.cpp_path_item_to_name(cpp_path.last(), &scope.path, &name_type)?
                 };

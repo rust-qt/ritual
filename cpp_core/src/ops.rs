@@ -10,6 +10,11 @@ pub trait Increment {
     type Output;
 
     /// Increment `self`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must make sure `self` contains a valid pointer. This function
+    /// may invoke arbitrary foreign code, so no safety guarantees can be made.
     unsafe fn inc(&mut self) -> Self::Output;
 }
 
@@ -19,6 +24,11 @@ pub trait Decrement {
     type Output;
 
     /// Decrement `self`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must make sure `self` contains a valid pointer. This function
+    /// may invoke arbitrary foreign code, so no safety guarantees can be made.
     unsafe fn dec(&mut self) -> Self::Output;
 }
 
@@ -28,6 +38,11 @@ pub trait Indirection {
     type Output;
 
     /// Returns the object `self` is pointing to.
+    ///
+    /// # Safety
+    ///
+    /// The caller must make sure `self` contains a valid pointer. This function
+    /// may invoke arbitrary foreign code, so no safety guarantees can be made.
     unsafe fn indirection(&self) -> Self::Output;
 }
 
@@ -37,6 +52,11 @@ pub trait Begin {
     type Output;
 
     /// Returns a C++ const iterator object pointing to the beginning of the collection.
+    ///
+    /// # Safety
+    ///
+    /// The caller must make sure `self` contains a valid pointer. This function
+    /// may invoke arbitrary foreign code, so no safety guarantees can be made.
     unsafe fn begin(&self) -> Self::Output;
 }
 
@@ -46,6 +66,11 @@ pub trait BeginMut {
     type Output;
 
     /// Returns a C++ mutable iterator object pointing to the beginning of the collection.
+    ///
+    /// # Safety
+    ///
+    /// The caller must make sure `self` contains a valid pointer. This function
+    /// may invoke arbitrary foreign code, so no safety guarantees can be made.
     unsafe fn begin_mut(&mut self) -> Self::Output;
 }
 
@@ -55,6 +80,11 @@ pub trait End {
     type Output;
 
     /// Returns a C++ const iterator object pointing to the end of the collection.
+    ///
+    /// # Safety
+    ///
+    /// The caller must make sure `self` contains a valid pointer. This function
+    /// may invoke arbitrary foreign code, so no safety guarantees can be made.
     unsafe fn end(&self) -> Self::Output;
 }
 
@@ -64,5 +94,10 @@ pub trait EndMut {
     type Output;
 
     /// Returns a C++ mutable iterator object pointing to the end of the collection.
+    ///
+    /// # Safety
+    ///
+    /// The caller must make sure `self` contains a valid pointer. This function
+    /// may invoke arbitrary foreign code, so no safety guarantees can be made.
     unsafe fn end_mut(&mut self) -> Self::Output;
 }

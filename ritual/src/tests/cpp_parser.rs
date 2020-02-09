@@ -316,7 +316,7 @@ fn free_template_func() {
     assert_eq!(
         data.methods[0],
         CppFunction {
-            path: CppPath::from_item(abs_item.clone()),
+            path: CppPath::from_item(abs_item),
             member: None,
             operator: None,
             return_type: CppType::TemplateParameter(CppTemplateParameter {
@@ -629,7 +629,7 @@ fn template_class_method() {
     assert_eq!(
         data.methods[1].return_type,
         CppType::Class(CppPath::from_items(vec![
-            my_vector_item.clone(),
+            my_vector_item,
             CppPathItem::from_good_str("Iterator")
         ]))
     );
@@ -825,7 +825,7 @@ fn template_instantiation() {
     let int = CppType::BuiltInNumeric(CppBuiltInNumericType::Int);
     let vector_int_item = CppPathItem {
         name: "Vector".to_string(),
-        template_arguments: Some(vec![int.clone()]),
+        template_arguments: Some(vec![int]),
     };
     assert_eq!(
         data.methods[0].return_type,
@@ -971,7 +971,7 @@ fn complex_const_types() {
     );
     assert_eq!(
         &data.methods[9].return_type,
-        &CppType::new_pointer(true, CppType::new_pointer(true, base.clone()))
+        &CppType::new_pointer(true, CppType::new_pointer(true, base))
     );
 }
 
@@ -1053,7 +1053,7 @@ fn fixed_size_integers() {
 
     let vector_gluint64_item = CppPathItem {
         name: "QVector".to_string(),
-        template_arguments: Some(vec![type1.clone()]),
+        template_arguments: Some(vec![type1]),
     };
     assert_eq!(
         &data.methods[1].return_type,

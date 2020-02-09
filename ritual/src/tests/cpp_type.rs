@@ -260,7 +260,7 @@ fn class_with_template_args() {
             true,
             CppType::Class(CppPath::from_item(CppPathItem {
                 name: "QVector".into(),
-                template_arguments: args.clone()
+                template_arguments: args,
             }))
         )
     );
@@ -281,12 +281,12 @@ fn nested_template_cpp_code() {
         CppType::Class(CppPath::from_good_str("QString")),
         CppType::Class(CppPath::from_item(CppPathItem {
             name: "QList".into(),
-            template_arguments: qlist_args.clone(),
+            template_arguments: qlist_args,
         })),
     ]);
     let type1 = CppType::Class(CppPath::from_item(CppPathItem {
         name: "QHash".into(),
-        template_arguments: qhash_args.clone(),
+        template_arguments: qhash_args,
     }));
     let code = type1.to_cpp_code(None).unwrap();
     assert_eq!(&code, "QHash< QString, QList< QString > >");
@@ -301,7 +301,7 @@ fn qflags() {
     ))]);
     let type1 = CppType::Class(CppPath::from_item(CppPathItem {
         name: "QFlags".into(),
-        template_arguments: args.clone(),
+        template_arguments: args,
     }));
     assert_eq!(type1.is_void(), false);
     assert_eq!(type1.is_class(), true);

@@ -25,7 +25,7 @@ fn generate_slot_wrapper(
         kind: CppPointerLikeTypeKind::Pointer,
         target: Box::new(CppType::Void),
     };
-    let func_arguments = once(void_ptr.clone())
+    let func_arguments = once(void_ptr)
         .chain(ffi_types.iter().map(|t| t.ffi_type().clone()))
         .collect();
 
@@ -37,9 +37,9 @@ fn generate_slot_wrapper(
 
     let qt_slot_wrapper = QtSlotWrapper {
         signal_arguments: arguments.to_vec(),
-        class_path: class_path.clone(),
+        class_path,
         arguments: ffi_types,
-        function_type: function_type.clone(),
+        function_type,
     };
     Ok(qt_slot_wrapper)
 }

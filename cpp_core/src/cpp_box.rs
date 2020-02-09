@@ -7,6 +7,12 @@ use std::{fmt, mem, ptr};
 /// This trait is automatically implemented for class types by `ritual`.
 pub trait CppDeletable: Sized {
     /// Calls C++'s `delete x` on `self`.
+    ///
+    /// # Safety
+    ///
+    /// The caller must make sure `self` contains a valid pointer. This function
+    /// may invoke arbitrary foreign code, so no safety guarantees can be made.
+    /// Note that deleting an object multiple times is undefined behavior.
     unsafe fn delete(&mut self);
 }
 

@@ -659,7 +659,7 @@ impl DatabaseClient {
     pub fn add_environment(&mut self, env: LibraryTarget) {
         if !self.current_database.db.targets.iter().any(|e| e == &env) {
             self.is_modified = true;
-            self.current_database.db.targets.push(env.clone());
+            self.current_database.db.targets.push(env);
         }
     }
 
@@ -965,7 +965,7 @@ impl DatabaseClient {
         for db in databases {
             if let Some(cpp_item) = db.filter_by_cpp_path(cpp_path).next() {
                 return Ok(db
-                    .filter_by_source(&Some(cpp_item.id.clone()))
+                    .filter_by_source(&Some(cpp_item.id))
                     .filter_map(|item| item.filter_map(|item| item.as_rust_item())));
             }
         }

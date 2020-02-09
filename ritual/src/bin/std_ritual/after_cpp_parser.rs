@@ -107,7 +107,7 @@ fn add_vector_from_pointers_functions(data: &mut ProcessorData<'_>) -> Result<()
                 },
                 CppFunctionArgument {
                     name: "last".into(),
-                    argument_type: CppType::new_pointer(true, t.clone()),
+                    argument_type: CppType::new_pointer(true, t),
                     has_default_value: false,
                 },
             ],

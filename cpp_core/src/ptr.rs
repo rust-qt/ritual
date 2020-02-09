@@ -209,6 +209,10 @@ impl<T: CppDeletable> MutPtr<T> {
     ///
     /// Use this function to take ownership of the object. This is
     /// the same as `CppBox::new`.
+    ///
+    /// # Safety
+    ///
+    /// See type level documentation. See also `CppBox::new` documentation.
     pub unsafe fn to_box(self) -> Option<CppBox<T>> {
         CppBox::new(self)
     }

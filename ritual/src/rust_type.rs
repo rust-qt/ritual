@@ -233,7 +233,7 @@ fn utils_ptr(ffi_type: &RustType, force_api_is_const: Option<bool>) -> Result<Ru
         "cpp_core::MutPtr"
     };
 
-    let target = ffi_type.pointer_like_to_target()?.clone();
+    let target = ffi_type.pointer_like_to_target()?;
     Ok(RustType::Common(RustCommonType {
         path: RustPath::from_good_str(name),
         generic_arguments: Some(vec![target]),
@@ -252,7 +252,7 @@ fn utils_ref(ffi_type: &RustType, force_api_is_const: Option<bool>) -> Result<Ru
         "cpp_core::MutRef"
     };
 
-    let target = ffi_type.pointer_like_to_target()?.clone();
+    let target = ffi_type.pointer_like_to_target()?;
     Ok(RustType::Common(RustCommonType {
         path: RustPath::from_good_str(name),
         generic_arguments: Some(vec![target]),
@@ -310,7 +310,7 @@ impl RustFinalType {
                 let target = ffi_type.pointer_like_to_target()?;
                 RustType::Common(RustCommonType {
                     path: RustPath::from_good_str("cpp_core::CppBox"),
-                    generic_arguments: Some(vec![target.clone()]),
+                    generic_arguments: Some(vec![target]),
                 })
             }
             RustToFfiTypeConversion::QBoxToPtr => {

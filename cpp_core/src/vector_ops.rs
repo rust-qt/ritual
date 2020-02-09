@@ -5,25 +5,59 @@ use std::slice;
 
 pub trait Data {
     type Output;
+    /// Returns a pointer to the underlying memory buffer.
+    ///
+    /// # Safety
+    ///
+    /// The caller must make sure `self` contains a valid pointer. This function
+    /// may invoke arbitrary foreign code, so no safety guarantees can be made.
     unsafe fn data(&self) -> Self::Output;
 }
 
 pub trait DataMut {
     type Output;
+    /// Returns a pointer to the underlying memory buffer.
+    ///
+    /// # Safety
+    ///
+    /// The caller must make sure `self` contains a valid pointer. This function
+    /// may invoke arbitrary foreign code, so no safety guarantees can be made.
     unsafe fn data_mut(&mut self) -> Self::Output;
 }
 
 pub trait Size {
+    /// Returns size of the underlying buffer in elements.
+    ///
+    /// # Safety
+    ///
+    /// The caller must make sure `self` contains a valid pointer. This function
+    /// may invoke arbitrary foreign code, so no safety guarantees can be made.
     unsafe fn size(&self) -> usize;
 }
 
 pub trait VectorAsSlice {
     type Item;
+    /// Returns the content of the vector as a slice.
+    ///
+    /// # Safety
+    ///
+    /// The caller must make sure `self` contains a valid pointer. The content must
+    /// not be read or modified through other ways while the returned slice exists.
+    /// This function
+    /// may invoke arbitrary foreign code, so no safety guarantees can be made.
     unsafe fn vector_as_slice(&self) -> &[Self::Item];
 }
 
 pub trait VectorAsMutSlice {
     type Item;
+    /// Returns the content of the vector as a slice.
+    ///
+    /// # Safety
+    ///
+    /// The caller must make sure `self` contains a valid pointer. The content must
+    /// not be read or modified through other ways while the returned slice exists.
+    /// This function
+    /// may invoke arbitrary foreign code, so no safety guarantees can be made.
     unsafe fn vector_as_mut_slice(&mut self) -> &mut [Self::Item];
 }
 
