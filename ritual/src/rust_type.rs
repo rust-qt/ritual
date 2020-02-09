@@ -152,7 +152,7 @@ pub enum RustToFfiTypeConversion {
     OptionUtilsRefToPtr {
         force_api_is_const: Option<bool>,
     },
-    /// `QPtr<T>` to `Ptr<T>`
+    /// `QPtr<T>` or `QMutPtr<T>` to `Ptr<T>`
     QPtrToPtr,
     /// `T` to `*const T` (or similar mutable type)
     ValueToPtr,
@@ -322,8 +322,13 @@ impl RustFinalType {
             }
             RustToFfiTypeConversion::QPtrToPtr => {
                 let target = ffi_type.pointer_like_to_target()?;
+                let name = if ffi_type.is_const_pointer_like()? {
+                    "QPtr"
+                } else {
+                    "QMutPtr"
+                };
                 RustType::Common(RustCommonType {
-                    path: class_type_to_qt_core_crate_path(&target)?.join("QPtr"),
+                    path: class_type_to_qt_core_crate_path(&target)?.join(name),
                     generic_arguments: Some(vec![target.clone()]),
                 })
             }

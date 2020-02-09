@@ -8,6 +8,7 @@ mod q_box;
 mod q_debug_shim;
 mod q_flags;
 mod q_message_logger_macros;
+mod q_mut_ptr;
 mod q_ptr;
 
 pub use crate::connect::{ArgumentsCompatible, AsReceiver, Receiver, Signal};
@@ -17,4 +18,5 @@ pub use crate::impl_q_string::qs;
 pub use crate::q_box::QBox;
 pub use crate::q_debug_shim::{qdebug, QDebugShim};
 pub use crate::q_flags::QFlags;
+pub use crate::q_mut_ptr::QMutPtr;
 pub use crate::q_ptr::QPtr;

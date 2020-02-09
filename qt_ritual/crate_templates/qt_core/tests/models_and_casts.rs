@@ -32,13 +32,15 @@ fn models_and_casts() {
         let abstract_model = string_list_model.static_upcast::<QAbstractItemModel>();
         assert_eq!(abstract_model.row_count_0a(), 2);
 
-        let string_list_model_back = abstract_model
-            .dynamic_cast::<QStringListModel>()
-            .expect("dynamic_cast should be successful");
+        let string_list_model_back = abstract_model.dynamic_cast::<QStringListModel>();
+        assert!(
+            !string_list_model_back.is_null(),
+            "dynamic_cast should be successful"
+        );
         assert_eq!(string_list_model_back.row_count_0a(), 2);
 
         assert!(abstract_model
             .dynamic_cast::<QAbstractTableModel>()
-            .is_none());
+            .is_null());
     }
 }

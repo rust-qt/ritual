@@ -16,11 +16,19 @@ use ritual_common::string_utils::CaseOperations;
 pub fn core_config(config: &mut Config) -> Result<()> {
     let crate_name = config.crate_properties().name().to_string();
     let crate_name2 = crate_name.clone();
-    let namespace = CppPath::from_good_str("Qt");
+
+    let qt_namespace = CppPath::from_good_str("Qt");
+    let moqt_ignored_namespace = CppPath::from_good_str("ignored_ns");
     config.set_rust_path_scope_hook(move |path| {
-        if path == &namespace {
+        if path == &qt_namespace {
             return Ok(Some(RustPathScope {
                 path: RustPath::from_good_str(&crate_name),
+                prefix: None,
+            }));
+        }
+        if path == &moqt_ignored_namespace {
+            return Ok(Some(RustPathScope {
+                path: RustPath::from_good_str("moqt_core"),
                 prefix: None,
             }));
         }
@@ -362,17 +370,6 @@ pub fn core_config(config: &mut Config) -> Result<()> {
         add_extra_cpp_items,
     )?;
 
-    // for moqt_core
-    let namespace = CppPath::from_good_str("ignored_ns");
-    config.set_rust_path_scope_hook(move |path| {
-        if path == &namespace {
-            return Ok(Some(RustPathScope {
-                path: RustPath::from_good_str("moqt_core"),
-                prefix: None,
-            }));
-        }
-        Ok(None)
-    });
     Ok(())
 }
 

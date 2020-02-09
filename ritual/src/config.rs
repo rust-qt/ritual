@@ -397,6 +397,10 @@ impl Config {
         &mut self,
         hook: impl Fn(&CppPath) -> Result<MovableTypesHookOutput> + 'static,
     ) {
+        assert!(
+            self.movable_types_hook.is_none(),
+            "only one hook can be set"
+        );
         self.movable_types_hook = Some(Box::new(hook));
     }
 
@@ -417,6 +421,10 @@ impl Config {
     /// All class methods with names matching the blocked name
     /// will be skipped, regardless of class name.
     pub fn set_cpp_parser_path_hook(&mut self, hook: impl Fn(&CppPath) -> Result<bool> + 'static) {
+        assert!(
+            self.cpp_parser_path_hook.is_none(),
+            "only one hook can be set"
+        );
         self.cpp_parser_path_hook = Some(Box::new(hook));
     }
 
@@ -428,6 +436,10 @@ impl Config {
         &mut self,
         hook: impl Fn(&CppPath) -> Result<Option<RustPathScope>> + 'static,
     ) {
+        assert!(
+            self.rust_path_scope_hook.is_none(),
+            "only one hook can be set"
+        );
         self.rust_path_scope_hook = Some(Box::new(hook));
     }
 
@@ -439,6 +451,7 @@ impl Config {
         &mut self,
         hook: impl Fn(&CppPath, NameType<'_>, &ProcessorData<'_>) -> Result<Option<RustPath>> + 'static,
     ) {
+        assert!(self.rust_path_hook.is_none(), "only one hook can be set");
         self.rust_path_hook = Some(Box::new(hook));
     }
 
@@ -450,6 +463,7 @@ impl Config {
         &mut self,
         hook: impl Fn(&mut RustItem, &ProcessorData<'_>) -> Result<()> + 'static,
     ) {
+        assert!(self.rust_item_hook.is_none(), "only one hook can be set");
         self.rust_item_hook = Some(Box::new(hook));
     }
 
@@ -469,6 +483,10 @@ impl Config {
     }
 
     pub fn set_cpp_item_filter_hook(&mut self, hook: impl Fn(&CppItem) -> Result<bool> + 'static) {
+        assert!(
+            self.cpp_item_filter_hook.is_none(),
+            "only one hook can be set"
+        );
         self.cpp_item_filter_hook = Some(Box::new(hook));
     }
 
@@ -516,6 +534,10 @@ impl GlobalConfig {
         &mut self,
         f: F,
     ) {
+        assert!(
+            self.create_config_hook.is_none(),
+            "only one hook can be set"
+        );
         self.create_config_hook = Some(Box::new(f));
     }
 

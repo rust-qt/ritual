@@ -1,5 +1,5 @@
 use cpp_core::{CppBox, MutPtr};
-use moqt_core::{BasicClass, QBox, QPoint, QPtr, QVectorOfInt};
+use moqt_core::{BasicClass, QBox, QMutPtr, QPoint, QVectorOfInt};
 use moqt_gui::{get_window, QVectorOfQWindow, QWindow};
 
 #[test]
@@ -24,7 +24,7 @@ fn test_qwindow() {
 #[test]
 fn test_get_window() {
     unsafe {
-        let window: QPtr<QWindow> = get_window();
+        let window: QMutPtr<QWindow> = get_window();
         assert!(window.is_null());
     }
 }

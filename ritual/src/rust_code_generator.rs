@@ -607,7 +607,12 @@ impl Generator<'_> {
                 wrap_unsafe(in_unsafe_context, &code)
             }
             RustToFfiTypeConversion::QPtrToPtr => {
-                let code = format!("{}::QPtr::from_raw({})", self.qt_core_prefix(), source_expr);
+                let ptr_wrapper_path = &type1.api_type().as_common()?.path;
+                let code = format!(
+                    "{}::from_raw({})",
+                    self.rust_path_to_string(ptr_wrapper_path),
+                    source_expr
+                );
                 wrap_unsafe(in_unsafe_context, &code)
             }
             RustToFfiTypeConversion::UtilsPtrToPtr { .. }
@@ -719,7 +724,9 @@ impl Generator<'_> {
             | RustToFfiTypeConversion::QPtrToPtr { .. } => {
                 let api_type_path = &type1.api_type().as_common()?.path;
                 let api_is_const = api_type_path == &RustPath::from_good_str("cpp_core::Ptr")
-                    || api_type_path == &RustPath::from_good_str("cpp_core::Ref");
+                    || api_type_path == &RustPath::from_good_str("cpp_core::Ref")
+                    || api_type_path == &RustPath::from_good_str("qt_core::QPtr")
+                    || api_type_path == &RustPath::from_good_str("moqt_core::QPtr");
                 let ffi_is_const = type1.ffi_type().is_const_pointer_like()?;
                 let call = if !api_is_const && !ffi_is_const {
                     format!("{}.as_mut_raw_ptr()", expr)
