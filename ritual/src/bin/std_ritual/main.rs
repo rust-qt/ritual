@@ -150,7 +150,6 @@ fn create_config(mut crate_properties: CrateProperties) -> Result<Config> {
         Ok(None)
     });
 
-    config.add_cpp_parser_argument("-std=c++11");
     let mut data = CppBuildConfigData::new();
     data.set_library_type(CppLibraryType::Static);
     config

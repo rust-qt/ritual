@@ -270,6 +270,7 @@ fn run_clang<R, F: FnMut(Entity<'_>) -> Result<R>>(
     let mut args = vec![
         "-Xclang".to_string(),
         "-detailed-preprocessing-record".to_string(),
+        "-std=c++11".to_string(),
     ];
     args.extend_from_slice(config.cpp_parser_arguments());
     let mut cpp_build_paths = config.cpp_build_paths().clone();
