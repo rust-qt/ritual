@@ -16,7 +16,7 @@ fn qobject() {
         assert_eq!(args.receiver().as_raw_ptr(), obj2.as_raw_ptr());
 
         let signal = args.signal().to_c_str().to_str().unwrap();
-        assert_eq!(signal, "2destroyed(QObject*)");
+        assert_eq!(signal, "2destroyed(QObject *)");
 
         let method = args.method().to_c_str().to_str().unwrap();
         assert_eq!(method, "1deleteLater()");

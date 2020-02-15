@@ -32,7 +32,7 @@ fn void_ptr() {
     assert_eq!(type1.is_void(), false);
     assert_eq!(type1.is_class(), false);
     assert_eq!(type1.is_template_parameter(), false);
-    assert_eq!(type1.to_cpp_code(None).unwrap(), "void*");
+    assert_eq!(type1.to_cpp_code(None).unwrap(), "void *");
     assert!(type1.to_cpp_code(Some(&String::new())).is_err());
     assert_type_to_ffi_unchanged(&type1);
 }
@@ -54,7 +54,7 @@ fn bool_ptr() {
     assert_eq!(type1.is_void(), false);
     assert_eq!(type1.is_class(), false);
     assert_eq!(type1.is_template_parameter(), false);
-    assert_eq!(type1.to_cpp_code(None).unwrap(), "bool*");
+    assert_eq!(type1.to_cpp_code(None).unwrap(), "bool *");
     assert!(type1.to_cpp_code(Some(&String::new())).is_err());
     assert_type_to_ffi_unchanged(&type1);
 }
@@ -68,7 +68,7 @@ fn char_ptr_ptr() {
     assert_eq!(type1.is_void(), false);
     assert_eq!(type1.is_class(), false);
     assert_eq!(type1.is_template_parameter(), false);
-    assert_eq!(type1.to_cpp_code(None).unwrap(), "char**");
+    assert_eq!(type1.to_cpp_code(None).unwrap(), "char * *");
     assert!(type1.to_cpp_code(Some(&String::new())).is_err());
     assert_type_to_ffi_unchanged(&type1);
 }
@@ -132,7 +132,7 @@ fn class_value() {
     );
     assert_eq!(
         ffi_return_type.ffi_type().to_cpp_code(None).unwrap(),
-        "QPoint*"
+        "QPoint *"
     );
     assert_eq!(
         ffi_return_type.conversion(),
@@ -149,7 +149,7 @@ fn class_value() {
     );
     assert_eq!(
         ffi_arg.ffi_type().to_cpp_code(None).unwrap(),
-        "const QPoint*"
+        "QPoint const *"
     );
     assert_eq!(
         ffi_arg.conversion(),
@@ -163,7 +163,7 @@ fn class_const_ref() {
     assert_eq!(type1.is_void(), false);
     assert_eq!(type1.is_class(), false);
     assert_eq!(type1.is_template_parameter(), false);
-    assert_eq!(type1.to_cpp_code(None).unwrap(), "const QRectF&");
+    assert_eq!(type1.to_cpp_code(None).unwrap(), "QRectF const &");
     assert!(type1.to_cpp_code(Some(&String::new())).is_err());
 
     for role in &[CppTypeRole::NotReturnType, CppTypeRole::ReturnType] {
@@ -173,7 +173,7 @@ fn class_const_ref() {
             ffi1.ffi_type(),
             &CppType::new_pointer(true, CppType::Class(CppPath::from_good_str("QRectF")))
         );
-        assert_eq!(ffi1.ffi_type().to_cpp_code(None).unwrap(), "const QRectF*");
+        assert_eq!(ffi1.ffi_type().to_cpp_code(None).unwrap(), "QRectF const *");
         assert_eq!(
             ffi1.conversion(),
             &CppToFfiTypeConversion::ReferenceToPointer
@@ -187,7 +187,7 @@ fn class_mut_ref() {
     assert_eq!(type1.is_void(), false);
     assert_eq!(type1.is_class(), false);
     assert_eq!(type1.is_template_parameter(), false);
-    assert_eq!(type1.to_cpp_code(None).unwrap(), "QRectF&");
+    assert_eq!(type1.to_cpp_code(None).unwrap(), "QRectF &");
     assert!(type1.to_cpp_code(Some(&String::new())).is_err());
 
     for role in &[CppTypeRole::NotReturnType, CppTypeRole::ReturnType] {
@@ -197,7 +197,7 @@ fn class_mut_ref() {
             ffi1.ffi_type(),
             &CppType::new_pointer(false, CppType::Class(CppPath::from_good_str("QRectF")))
         );
-        assert_eq!(ffi1.ffi_type().to_cpp_code(None).unwrap(), "QRectF*");
+        assert_eq!(ffi1.ffi_type().to_cpp_code(None).unwrap(), "QRectF *");
         assert_eq!(
             ffi1.conversion(),
             &CppToFfiTypeConversion::ReferenceToPointer
@@ -211,7 +211,7 @@ fn class_mut_ptr() {
     assert_eq!(type1.is_void(), false);
     assert_eq!(type1.is_class(), false);
     assert_eq!(type1.is_template_parameter(), false);
-    assert_eq!(type1.to_cpp_code(None).unwrap(), "QObject*");
+    assert_eq!(type1.to_cpp_code(None).unwrap(), "QObject *");
     assert!(type1.to_cpp_code(Some(&String::new())).is_err());
     assert_type_to_ffi_unchanged(&type1);
 }
@@ -243,7 +243,7 @@ fn class_with_template_args() {
     );
     assert_eq!(
         ffi_return_type.ffi_type().to_cpp_code(None).unwrap(),
-        "QVector< QString >*"
+        "QVector< QString > *"
     );
     assert_eq!(
         ffi_return_type.conversion(),
@@ -266,7 +266,7 @@ fn class_with_template_args() {
     );
     assert_eq!(
         ffi_arg.ffi_type().to_cpp_code(None).unwrap(),
-        "const QVector< QString >*"
+        "QVector< QString > const *"
     );
     assert_eq!(
         ffi_arg.conversion(),

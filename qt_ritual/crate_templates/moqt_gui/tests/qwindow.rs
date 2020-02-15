@@ -1,4 +1,4 @@
-use cpp_core::{CppBox, MutPtr};
+use cpp_core::{CppBox, MutPtr, Ref};
 use moqt_core::{BasicClass, QBox, QMutPtr, QPoint, QVectorOfInt};
 use moqt_gui::{get_window, QVectorOfQWindow, QWindow};
 
@@ -35,16 +35,16 @@ fn test_with_vectors() {
         let mut window: QBox<QWindow> = QWindow::new();
 
         let mut vec = QVectorOfInt::new();
-        vec.push(10);
-        vec.push(12);
-        vec.push(14);
-        vec.push(16);
+        vec.push(Ref::from_raw_ref(&10));
+        vec.push(Ref::from_raw_ref(&12));
+        vec.push(Ref::from_raw_ref(&14));
+        vec.push(Ref::from_raw_ref(&16));
         let r = window.show_vector_of_int(vec.as_ref());
         assert_eq!(r, 4);
 
         let mut vec2 = QVectorOfQWindow::new();
-        vec2.push(get_window());
-        vec2.push(get_window());
+        vec2.push(Ref::from_raw_ref(&get_window().as_mut_raw_ptr()));
+        vec2.push(Ref::from_raw_ref(&get_window().as_mut_raw_ptr()));
         let r = window.show_vector_of_windows(vec2.as_ref());
         assert_eq!(r, 2);
     }

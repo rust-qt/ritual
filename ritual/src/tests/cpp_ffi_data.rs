@@ -39,7 +39,7 @@ fn argument_int_ptr() {
         .unwrap(),
         meaning: CppFfiArgumentMeaning::Argument(0),
     };
-    assert_eq!(arg.to_cpp_code().unwrap(), "int* arg1");
+    assert_eq!(arg.to_cpp_code().unwrap(), "int * arg1");
 }
 
 #[test]
@@ -58,7 +58,7 @@ fn argument_func() {
         argument_type: CppFfiType::new(type1, CppToFfiTypeConversion::NoChange).unwrap(),
         meaning: CppFfiArgumentMeaning::Argument(0),
     };
-    assert_eq!(arg.to_cpp_code().unwrap(), "int (*arg1)(int, bool*)");
+    assert_eq!(arg.to_cpp_code().unwrap(), "int (*arg1)(int, bool *)");
 }
 
 #[test]
