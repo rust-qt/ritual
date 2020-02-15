@@ -26,6 +26,7 @@ use ritual_common::file_utils::{
     remove_dir_all, remove_file,
 };
 use ritual_common::target::{current_env, current_target, Env, LibraryTarget};
+use ritual_common::utils::MapIfOk;
 use std::io::Write;
 use std::mem;
 use std::path::{Path, PathBuf};
@@ -339,14 +340,18 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     debug!("clang version: {}", get_version());
     debug!("Initializing clang");
     let mut parser = CppParser {
-        current_target_paths: data.config.target_include_paths().to_vec(),
+        current_target_paths: data
+            .config
+            .target_include_paths()
+            .iter()
+            .map_if_ok(canonicalize)?,
         source_id: None,
         data,
         output: Default::default(),
     };
     parser
         .current_target_paths
-        .push(parser.data.workspace.tmp_path().join("extra"));
+        .push(canonicalize(parser.data.workspace.tmp_path())?.join("extra"));
     run_clang(
         &parser.data.config,
         &parser.data.workspace.tmp_path(),
@@ -376,7 +381,7 @@ pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
         }
         let code = ffi_item.item.source_item_cpp_code(data.db)?;
         let mut parser = CppParser {
-            current_target_paths: vec![data.workspace.tmp_path().join("1.cpp")],
+            current_target_paths: vec![canonicalize(data.workspace.tmp_path().join("1.cpp"))?],
             source_id: Some(ffi_item_id),
             data,
             output: Default::default(),
@@ -1458,7 +1463,7 @@ impl CppParser<'_, '_> {
             return Ok(true);
         }
         if let Ok(file_path) = self.entity_include_path(entity) {
-            let file_path = Path::new(&file_path);
+            let file_path = canonicalize(Path::new(&file_path))?;
             if !self.current_target_paths.is_empty()
                 && !self
                     .current_target_paths
