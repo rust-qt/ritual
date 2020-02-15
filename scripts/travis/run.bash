@@ -25,7 +25,7 @@ elif [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
     curl -o "$TEMP/sqlite.zip" "https://www.sqlite.org/2016/sqlite-dll-win64-x64-3150100.zip"
     export SQLITE3_LIB_DIR=$TEMP/sqlite
     7z x "$TEMP/sqlite.zip" -o"$SQLITE3_LIB_DIR"
-    cmd.exe /C '"C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvarsall.bat" amd64 && lib /def:%SQLITE3_LIB_DIR%\sqlite3.def /out:%SQLITE3_LIB_DIR%\sqlite3.lib'
+    cmd.exe //C 'C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvarsall.bat' amd64 '&&' lib "//def:$SQLITE3_LIB_DIR\sqlite3.def" "//out:$SQLITE3_LIB_DIR\sqlite3.lib"
     export PATH=$PATH:$SQLITE3_LIB_DIR
 fi
 
@@ -35,8 +35,7 @@ cargo clippy --color=always --all-targets -- -D warnings
 
 function build() {
     if [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
-        COMMAND="$@"
-        cmd.exe /C "\"C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvarsall.bat\" amd64 && $COMMAND"
+        cmd.exe //C 'C:\Program Files (x86)\Microsoft Visual Studio\2017\BuildTools\VC\Auxiliary\Build\vcvarsall.bat' amd64 '&&' "$@"
     else
         "$@"
     fi
