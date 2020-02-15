@@ -345,9 +345,9 @@ impl CppType {
                 is_const,
                 target,
             } => Ok(format!(
-                "{}{}{}",
-                if *is_const { "const " } else { "" },
+                "{}{} {}",
                 target.to_cpp_code(function_pointer_inner_text)?,
+                if *is_const { " const" } else { "" },
                 match *kind {
                     CppPointerLikeTypeKind::Pointer => "*",
                     CppPointerLikeTypeKind::Reference => "&",
