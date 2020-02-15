@@ -25,7 +25,7 @@ use ritual_common::file_utils::{
     canonicalize, copy_recursively, create_file, open_file, os_str_to_str, path_to_str,
     remove_dir_all, remove_file,
 };
-use ritual_common::target::{current_target, LibraryTarget};
+use ritual_common::target::{current_env, current_target, Env, LibraryTarget};
 use std::io::Write;
 use std::mem;
 use std::path::{Path, PathBuf};
@@ -270,8 +270,10 @@ fn run_clang<R, F: FnMut(Entity<'_>) -> Result<R>>(
     let mut args = vec![
         "-Xclang".to_string(),
         "-detailed-preprocessing-record".to_string(),
-        "-std=c++11".to_string(),
     ];
+    if current_env() != Env::Msvc {
+        args.push("-std=c++11".to_string());
+    }
     args.extend_from_slice(config.cpp_parser_arguments());
     let mut cpp_build_paths = config.cpp_build_paths().clone();
     cpp_build_paths.apply_env();
