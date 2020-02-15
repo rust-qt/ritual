@@ -278,48 +278,6 @@ pub fn core_config(config: &mut Config) -> Result<()> {
         Ok(())
     });
 
-    let qobject_ptr =
-        CppType::new_pointer(false, CppType::Class(CppPath::from_good_str("QObject")));
-    config.set_cpp_item_filter_hook(move |item| {
-        if let CppItem::Function(function) = &item {
-            if let Ok(class_type) = function.class_path() {
-                let class_text = class_type.to_templateless_string();
-                if class_text == "QFlags" {
-                    return Ok(false);
-                }
-            }
-            if function.is_operator() {
-                if let CppType::Class(path) = &function.return_type {
-                    if path.to_templateless_string() == "QFlags" {
-                        return Ok(false);
-                    }
-                    if path.to_templateless_string() == "QDebug" && function.arguments.len() == 2 {
-                        if let CppType::Class(path2) = &function.arguments[1].argument_type {
-                            if path2.to_templateless_string() == "QFlags" {
-                                return Ok(false);
-                            }
-                        }
-                    }
-                }
-            }
-            let path = function.path.to_templateless_string();
-            if path == "QObject::findChild" || path == "QObject::findChildren" {
-                if let Some(arg) = function
-                    .path
-                    .last()
-                    .template_arguments
-                    .as_ref()
-                    .and_then(|args| args.get(0))
-                {
-                    if arg != &qobject_ptr && !arg.is_template_parameter() {
-                        return Ok(false);
-                    }
-                }
-            }
-        }
-        Ok(true)
-    });
-
     let tests = if config.crate_properties().name().starts_with("moqt") {
         vec![PreliminaryTest::new(
             "moqt_abs",

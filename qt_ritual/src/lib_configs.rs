@@ -27,6 +27,8 @@ use self::_3d::{
 };
 use self::{charts::charts_config, core::core_config, gui::gui_config, widgets::widgets_config};
 use crate::lib_configs::qml::qml_config;
+use ritual::cpp_data::{CppItem, CppPath};
+use ritual::cpp_type::CppType;
 use std::env;
 
 pub const MOQT_INSTALL_DIR_ENV_VAR_NAME: &str = "MOQT_INSTALL_DIR";
@@ -243,6 +245,8 @@ pub fn create_config(
     };
     lib_config(&mut config)?;
 
+    config.set_cpp_item_filter_hook(cpp_item_hook);
+
     Ok(config)
 }
 
@@ -251,4 +255,47 @@ pub fn global_config() -> GlobalConfig {
     config.set_all_crate_names(all_crate_names().iter().map(|&s| s.to_string()).collect());
     config.set_create_config_hook(|crate_name| create_config(crate_name, None));
     config
+}
+
+fn cpp_item_hook(item: &CppItem) -> Result<bool> {
+    if let CppItem::Function(function) = &item {
+        if let Ok(class_type) = function.class_path() {
+            let class_text = class_type.to_templateless_string();
+            if class_text == "QFlags" {
+                return Ok(false);
+            }
+        }
+        if function.is_operator() {
+            if let CppType::Class(path) = &function.return_type {
+                if path.to_templateless_string() == "QFlags" {
+                    return Ok(false);
+                }
+                if path.to_templateless_string() == "QDebug" && function.arguments.len() == 2 {
+                    if let CppType::Class(path2) = &function.arguments[1].argument_type {
+                        if path2.to_templateless_string() == "QFlags" {
+                            return Ok(false);
+                        }
+                    }
+                }
+            }
+        }
+        let path = function.path.to_templateless_string();
+        if path == "QObject::findChild" || path == "QObject::findChildren" {
+            if let Some(arg) = function
+                .path
+                .last()
+                .template_arguments
+                .as_ref()
+                .and_then(|args| args.get(0))
+            {
+                let qobject_ptr =
+                    CppType::new_pointer(false, CppType::Class(CppPath::from_good_str("QObject")));
+
+                if arg != &qobject_ptr && !arg.is_template_parameter() {
+                    return Ok(false);
+                }
+            }
+        }
+    }
+    Ok(true)
 }
