@@ -279,6 +279,16 @@ impl DatabaseItemData {
             None
         }
     }
+
+    pub fn short_text(&self) -> String {
+        match self {
+            DatabaseItemData::CppItem(item) => item.short_text(),
+            DatabaseItemData::FfiItem(item) => item.short_text(),
+            DatabaseItemData::RustItem(item) => item.short_text(),
+            DatabaseItemData::CppChecksItem(_) => "CppChecksItem".into(),
+            DatabaseItemData::DocItem(_) => "DocItem".into(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

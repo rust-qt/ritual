@@ -16,7 +16,7 @@ use ritual_common::errors::{bail, err_msg, format_err, Result, ResultExt};
 use ritual_common::target::LibraryTarget;
 use ritual_common::utils::{run_command, MapIfOk};
 use std::cmp::Ordering;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::Bound;
 use std::path::PathBuf;
 use std::process::Command;
@@ -139,6 +139,7 @@ impl Default for ProcessingSteps {
         });
         s.add_custom("show_non_portable", show_non_portable);
         s.add_custom("migrate", migrate);
+        s.add_custom("delete_orphans", delete_orphans);
         s.add_custom("delete_blacklisted_items", delete_blacklisted_items);
         s
     }
@@ -297,6 +298,21 @@ fn migrate(data: &mut ProcessorData<'_>) -> Result<()> {
             .as_ffi_item()
             .map_or(false, |item| item.is_slot_wrapper())
     });
+    Ok(())
+}
+
+fn delete_orphans(data: &mut ProcessorData<'_>) -> Result<()> {
+    let mut ids = HashSet::new();
+    for item in data.db.items() {
+        if let Some(source_id) = &item.source_id {
+            if data.db.item(source_id).is_err() {
+                info!("deleting {}: {}", item.id, item.item.short_text());
+                ids.insert(item.id.clone());
+            }
+        }
+    }
+
+    data.db.delete_items(|item| ids.contains(&item.id));
     Ok(())
 }
 
