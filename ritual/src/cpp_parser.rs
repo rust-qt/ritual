@@ -381,7 +381,7 @@ pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
         }
         let code = ffi_item.item.source_item_cpp_code(data.db)?;
         let mut parser = CppParser {
-            current_target_paths: vec![canonicalize(data.workspace.tmp_path().join("1.cpp"))?],
+            current_target_paths: vec![canonicalize(data.workspace.tmp_path())?.join("1.cpp")],
             source_id: Some(ffi_item_id),
             data,
             output: Default::default(),
