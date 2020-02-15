@@ -1911,9 +1911,7 @@ impl State<'_, '_> {
                 .map_if_ok(|item| self.cpp_path_item_to_name(item, &scope.path, &name_type))?
                 .join("_"),
             NameType::ApiFunction(function) => {
-                let s = if is_second_slot_constructor(self.data, function)? {
-                    "with".to_string()
-                } else if let Some(last_name_override) =
+                let s = if let Some(last_name_override) =
                     self.special_function_rust_name(function.clone(), &scope.path)?
                 {
                     last_name_override
@@ -2795,35 +2793,6 @@ fn operator_function_name(operator: &CppOperator) -> Result<&'static str> {
         Delete => "delete",
         DeleteArray => "delete_array",
     })
-}
-
-fn is_second_slot_constructor(
-    data: &ProcessorData<'_>,
-    function: &DbItem<&CppFfiFunction>,
-) -> Result<bool> {
-    if function.item.arguments.len() != 3 {
-        return Ok(false);
-    }
-
-    let cpp_function = if let Some(f) = data
-        .db
-        .source_cpp_item(&function.id)?
-        .and_then(|i| i.item.as_function_ref())
-    {
-        f
-    } else {
-        return Ok(false);
-    };
-
-    if !cpp_function.is_constructor() {
-        return Ok(false);
-    }
-
-    let from_slot_wrapper = data
-        .db
-        .source_ffi_item(&function.id)?
-        .map_or(false, |x| x.item.is_slot_wrapper());
-    Ok(from_slot_wrapper)
 }
 
 #[allow(dead_code)]

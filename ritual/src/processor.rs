@@ -295,7 +295,7 @@ fn migrate(data: &mut ProcessorData<'_>) -> Result<()> {
     data.db.delete_items(|item| {
         item.item
             .as_ffi_item()
-            .map_or(false, |item| item.is_signal_wrapper())
+            .map_or(false, |item| item.is_slot_wrapper())
     });
     Ok(())
 }

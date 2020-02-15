@@ -307,13 +307,6 @@ pub fn function_doc(function: DbItem<&RustFunction>, database: &DatabaseClient) 
                 "new" => {
                     writeln!(output, "Creates a new object.\n")?;
                 }
-                "with" => {
-                    writeln!(
-                        output,
-                        "Creates a new object and assigns `callback` \
-                         as the signal handler.\n"
-                    )?;
-                }
                 "set" => {
                     writeln!(output, "Assigns `callback` as the signal handler.\n")?;
                     writeln!(

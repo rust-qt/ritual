@@ -1,10 +1,11 @@
+use cpp_core::NullPtr;
 use qt_core::{QCoreApplication, QVariant, QVariantAnimation, SlotOfQVariant};
 
 #[test]
 fn variant_animation2() {
     QCoreApplication::init(|app| unsafe {
         let mut next_value = 1;
-        let slot1 = SlotOfQVariant::with(move |value| {
+        let slot1 = SlotOfQVariant::new(NullPtr, move |value| {
             assert_eq!(next_value, value.to_int_0a());
             assert_eq!(next_value.to_string(), value.to_string().to_std_string());
             next_value += 1;

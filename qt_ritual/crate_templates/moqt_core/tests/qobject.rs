@@ -1,3 +1,4 @@
+use cpp_core::NullPtr;
 use moqt_core::{QMutPtr, QObject, SlotOfInt};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -28,7 +29,7 @@ fn closure_slot_connect() {
         let obj1 = QObject::new_0a();
         let counter = Rc::new(RefCell::new(0));
         let counter_handle = Rc::clone(&counter);
-        let mut slot = SlotOfInt::with(move |arg| {
+        let mut slot = SlotOfInt::new(NullPtr, move |arg| {
             *counter_handle.borrow_mut() += arg;
         });
         let c = obj1.object_name_changed().connect(&slot);

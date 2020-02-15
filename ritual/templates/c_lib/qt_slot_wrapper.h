@@ -3,9 +3,9 @@
 class {class_name} : public QObject {{
     Q_OBJECT
 public:
-    {class_name}() {{ }}
-
-    {class_name}({callback_arg}, void (*deleter)(void*), void* data) {{
+    {class_name}(QObject* parent, {callback_arg}, void (*deleter)(void*), void* data)
+    : QObject(parent)
+    {{
         set(callback, deleter, data);
     }}
 
