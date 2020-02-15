@@ -1,4 +1,4 @@
-use cpp_core::cpp_iter;
+use cpp_core::{cpp_iter, Ref};
 use moqt_core::{BasicClassField, QVectorOfBasicClassField, QVectorOfInt};
 use std::os::raw::c_int;
 
@@ -6,10 +6,10 @@ use std::os::raw::c_int;
 fn qvector_int() {
     unsafe {
         let mut vec = QVectorOfInt::new();
-        vec.push(10);
-        vec.push(12);
-        vec.push(14);
-        vec.push(16);
+        vec.push(Ref::from_raw_ref(&10));
+        vec.push(Ref::from_raw_ref(&12));
+        vec.push(Ref::from_raw_ref(&14));
+        vec.push(Ref::from_raw_ref(&16));
         assert_eq!(vec.count(), 4);
         assert_eq!(*vec.at(2), 14);
     }
@@ -34,10 +34,10 @@ fn qvector_class() {
 fn qvector_iter() {
     unsafe {
         let mut vec = QVectorOfInt::new();
-        vec.push(10);
-        vec.push(12);
-        vec.push(14);
-        vec.push(16);
+        vec.push(Ref::from_raw_ref(&10));
+        vec.push(Ref::from_raw_ref(&12));
+        vec.push(Ref::from_raw_ref(&14));
+        vec.push(Ref::from_raw_ref(&16));
 
         let collected: Vec<c_int> = cpp_iter(vec.begin(), vec.end())
             .map(|mut_ref| *mut_ref)

@@ -11,7 +11,7 @@ template<typename T>
 class MOQT_CORE_EXPORT QVector {
 public:
     QVector() {}
-    void push(T value) {
+    void push(const T& value) {
         m_data[m_size] = value;
         m_size++;
     }

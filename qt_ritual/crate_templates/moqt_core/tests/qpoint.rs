@@ -1,4 +1,4 @@
-use cpp_core::CppBox;
+use cpp_core::{CppBox, Ref};
 use moqt_core::{QPoint, QVectorOfInt};
 
 #[test]
@@ -66,8 +66,8 @@ fn operators() {
         assert!(!(c < 4));
 
         let mut vec = QVectorOfInt::new();
-        vec.push(10);
-        vec.push(12);
+        vec.push(Ref::from_raw_ref(&10));
+        vec.push(Ref::from_raw_ref(&12));
         let _ = &b << vec.as_ref();
     }
 }
