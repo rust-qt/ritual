@@ -114,7 +114,9 @@ impl Default for ProcessingSteps {
                 &format!("cpp_ffi_generator{}", suffix),
                 cpp_ffi_generator::run,
             );
-            s.push(&format!("cpp_checker{}", suffix), cpp_checker::run);
+            s.push(&format!("cpp_checker{}", suffix), |data| {
+                cpp_checker::run(data, false)
+            });
         };
 
         s.push("cpp_parser", cpp_parser::run);
@@ -141,6 +143,7 @@ impl Default for ProcessingSteps {
         s.add_custom("migrate", migrate);
         s.add_custom("delete_orphans", delete_orphans);
         s.add_custom("delete_blacklisted_items", delete_blacklisted_items);
+        s.add_custom("force_cpp_checker", |data| cpp_checker::run(data, true));
         s
     }
 }

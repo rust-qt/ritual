@@ -199,6 +199,7 @@ impl CppCheckerInstance {
 
 struct CppChecker<'b, 'a> {
     data: &'b mut ProcessorData<'a>,
+    force: bool,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -523,16 +524,21 @@ impl CppChecker<'_, '_> {
         let mut old_items_count = 0;
 
         for ffi_item in self.data.db.ffi_items() {
-            let checks = self.data.db.cpp_checks(&ffi_item.id)?;
-            if checks.has_all_envs(library_targets) {
-                old_items_count += 1;
-                continue;
-            }
+            let checks = if self.force {
+                None
+            } else {
+                let checks = self.data.db.cpp_checks(&ffi_item.id)?;
+                if checks.has_all_envs(library_targets) {
+                    old_items_count += 1;
+                    continue;
+                }
+                Some(checks)
+            };
 
             match snippet_for_item(ffi_item.clone(), &self.data.db) {
                 Ok(snippet) => {
                     for library_target in library_targets {
-                        if checks.has_env(library_target) {
+                        if !self.force && checks.as_ref().unwrap().has_env(library_target) {
                             continue;
                         }
                         snippets.push(SnippetTask {
@@ -579,24 +585,56 @@ impl CppChecker<'_, '_> {
 
         for snippet in snippets {
             let ffi_item = self.data.db.ffi_item_mut(&snippet.data.ffi_item_id)?;
+            let short_text = ffi_item.item.short_text();
             if let Some(output) = snippet.output {
                 if output.is_success() {
-                    debug!("success: {} {}", ffi_item.id, ffi_item.item.short_text());
+                    debug!("success: {} {}", ffi_item.id, short_text);
                     success_count += 1;
                 } else {
-                    debug!(
-                        "error: {} {}: {:?}",
-                        ffi_item.id,
-                        ffi_item.item.short_text(),
-                        output
-                    );
+                    debug!("error: {} {}: {:?}", ffi_item.id, short_text, output);
                     error_count += 1;
                 }
                 let ffi_item_id = ffi_item.id;
+                let ffi_item_source_id = ffi_item.source_id;
+                let env = snippet.data.library_target;
+
+                if self.force {
+                    let old_checks = self.data.db.cpp_checks(&ffi_item_id)?;
+                    if old_checks.has_env(&env)
+                        && old_checks.is_success(&env) != output.is_success()
+                    {
+                        let source_text = ffi_item_source_id
+                            .as_ref()
+                            .and_then(|id| self.data.db.item(id).ok())
+                            .map_or_else(
+                                || "<none>".to_string(),
+                                |item| format!("{} {}", item.id, item.item.short_text()),
+                            );
+
+                        info!(
+                            "Check now {} for {} {} (source: {})",
+                            if output.is_success() {
+                                "succeeds"
+                            } else {
+                                "fails"
+                            },
+                            ffi_item_id,
+                            short_text,
+                            source_text
+                        );
+                        self.data.db.delete_items(|item| {
+                            item.source_id.as_ref() == Some(&ffi_item_id)
+                                && item
+                                    .item
+                                    .as_cpp_checks_item()
+                                    .map_or(false, |item| item.env == env)
+                        });
+                    }
+                }
                 self.data.db.add_cpp_checks_item(
                     ffi_item_id,
                     CppChecksItem {
-                        env: snippet.data.library_target,
+                        env,
                         is_success: output.is_success(),
                     },
                 );
@@ -615,8 +653,8 @@ impl CppChecker<'_, '_> {
     }
 }
 
-pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
-    let mut checker = CppChecker { data };
+pub fn run(data: &mut ProcessorData<'_>, force: bool) -> Result<()> {
+    let mut checker = CppChecker { data, force };
     checker.run()?;
     Ok(())
 }
