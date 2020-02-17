@@ -35,7 +35,7 @@ pub fn detect_signals_and_slots(
 
         if let CppItem::Type(type1) = &cpp_item.item {
             if type1.kind.is_class() {
-                if type1.path == qobject_path || inherits(&data.db, &type1.path, &qobject_path) {
+                if inherits(&data.db, &type1.path, &qobject_path) {
                     if !files.contains(&item.origin_location.include_file_path) {
                         files.insert(item.origin_location.include_file_path.clone());
                     }

@@ -628,15 +628,15 @@ pub fn inherits(
     derived_class_name: &CppPath,
     base_class_name: &CppPath,
 ) -> bool {
+    if derived_class_name == base_class_name {
+        return true;
+    }
     for item in db.all_cpp_items() {
         if let CppItem::ClassBase(base_data) = &item.item {
-            if &base_data.derived_class_type == derived_class_name {
-                if &base_data.base_class_type == base_class_name {
-                    return true;
-                }
-                if inherits(db, &base_data.base_class_type, base_class_name) {
-                    return true;
-                }
+            if &base_data.derived_class_type == derived_class_name
+                && inherits(db, &base_data.base_class_type, base_class_name)
+            {
+                return true;
             }
         }
     }
