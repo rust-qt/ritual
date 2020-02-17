@@ -1,11 +1,11 @@
 use crate::QUiLoader;
-use cpp_core::{CastInto, CppBox, MutPtr, NullPtr};
-use qt_core::{QBuffer, QByteArray};
+use cpp_core::{CastInto, MutPtr, NullPtr};
+use qt_core::{QBox, QBuffer, QByteArray};
 use qt_widgets::QWidget;
 
 impl QUiLoader {
     #[inline]
-    pub unsafe fn load_bytes(&mut self, bytes: &[u8]) -> Option<CppBox<QWidget>> {
+    pub unsafe fn load_bytes(&mut self, bytes: &[u8]) -> QBox<QWidget> {
         self.load_bytes_with_parent(bytes, NullPtr)
     }
 
@@ -13,9 +13,9 @@ impl QUiLoader {
         &mut self,
         bytes: &[u8],
         parent: impl CastInto<MutPtr<QWidget>>,
-    ) -> Option<CppBox<QWidget>> {
+    ) -> QBox<QWidget> {
         let mut byte_array = QByteArray::from_slice(bytes);
         let mut buffer = QBuffer::from_q_byte_array(&mut byte_array);
-        CppBox::new(self.load_2a(&mut buffer, parent))
+        self.load_2a(&mut buffer, parent).into_q_box()
     }
 }

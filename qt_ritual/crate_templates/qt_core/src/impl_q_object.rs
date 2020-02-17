@@ -1,5 +1,5 @@
-use crate::{QObject, QString};
-use cpp_core::{DynamicCast, MutRef};
+use crate::{QMutPtr, QObject, QString};
+use cpp_core::{DynamicCast, StaticUpcast};
 use std::error::Error;
 use std::fmt;
 
@@ -37,20 +37,25 @@ impl fmt::Debug for FindChildError {
 impl Error for FindChildError {}
 
 impl QObject {
-    pub unsafe fn find_child<T>(&self, name: &str) -> Result<MutRef<T>, FindChildError>
+    pub unsafe fn find_child<T>(&self, name: &str) -> Result<QMutPtr<T>, FindChildError>
     where
         QObject: DynamicCast<T>,
+        T: StaticUpcast<QObject>,
     {
-        let r = self
-            .find_child_q_object_1a(&QString::from_std_str(name))
-            .as_mut_ref()
-            .ok_or_else(|| FindChildError(FindChildErrorInner::NotFound { name: name.into() }))?;
+        let mut ptr = self.find_child_q_object_1a(&QString::from_std_str(name));
+        if ptr.is_null() {
+            return Err(FindChildError(FindChildErrorInner::NotFound {
+                name: name.into(),
+            }));
+        }
 
-        r.dynamic_cast_mut().ok_or_else(|| {
-            FindChildError(FindChildErrorInner::TypeMismatch {
+        let ptr = ptr.dynamic_cast_mut();
+        if ptr.is_null() {
+            return Err(FindChildError(FindChildErrorInner::TypeMismatch {
                 name: name.into(),
                 target_type: std::any::type_name::<T>(),
-            })
-        })
+            }));
+        }
+        Ok(ptr)
     }
 }
