@@ -3,10 +3,10 @@ use qt_core::{QBox, QObject};
 #[test]
 fn qbox1() {
     unsafe {
-        let mut obj = QBox::new(QObject::new_0a().into_ptr());
+        let mut obj: QBox<QObject> = QObject::new_0a();
         assert_eq!(obj.children().length(), 0);
         {
-            let _obj2 = QBox::new(QObject::new_1a(&mut obj).into_ptr());
+            let _obj2: QBox<QObject> = QObject::new_1a(&mut obj);
             assert_eq!(obj.children().length(), 1);
         }
         assert_eq!(obj.children().length(), 1);
@@ -16,8 +16,8 @@ fn qbox1() {
 #[test]
 fn qbox2() {
     unsafe {
-        let mut obj = QBox::new(QObject::new_0a().into_ptr());
-        let obj2 = QBox::new(QObject::new_1a(&mut obj).into_ptr());
+        let mut obj = QObject::new_0a();
+        let obj2 = QObject::new_1a(&mut obj);
         assert!(!obj2.is_null());
         drop(obj);
         assert!(obj2.is_null());
@@ -27,8 +27,8 @@ fn qbox2() {
 #[test]
 fn qbox3() {
     unsafe {
-        let mut obj = QBox::new(QObject::new_0a().into_ptr());
-        let obj2 = QBox::new(QObject::new_1a(&mut obj).into_ptr());
+        let mut obj = QObject::new_0a();
+        let obj2 = QObject::new_1a(&mut obj);
         assert!(!obj2.is_null());
         let _obj1 = obj.into_q_ptr();
         assert!(!obj2.is_null());
