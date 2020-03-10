@@ -1,4 +1,4 @@
-use crate::{q_meta_object::Connection, QBox, QObject, QPtr};
+use crate::{q_meta_object::Connection, ConnectionType, QBox, QObject, QPtr};
 use cpp_core::{CastInto, CppBox, CppDeletable, MutPtr, MutRef, Ptr, Ref, StaticUpcast};
 use std::ffi::CStr;
 use std::fmt;
@@ -176,20 +176,31 @@ where
 }
 
 impl<SignalArguments> Signal<SignalArguments> {
-    pub unsafe fn connect<R>(&self, receiver: R) -> CppBox<Connection>
+    pub unsafe fn connect_with_type<R>(
+        &self,
+        connection_type: ConnectionType,
+        receiver: R,
+    ) -> CppBox<Connection>
     where
         R: AsReceiver,
         SignalArguments: ArgumentsCompatible<R::Arguments>,
     {
         let receiver = receiver.as_receiver();
-        // TODO: allow to change connection type
-        // TODO: meta_object::Connection should have operator bool()
 
-        crate::QObject::connect_4a(
+        crate::QObject::connect_5a(
             self.0.q_object.as_ptr(),
             Ptr::from_raw(self.0.receiver_id.as_ptr()),
             receiver.q_object.as_ptr(),
             Ptr::from_raw(receiver.receiver_id.as_ptr()),
+            connection_type,
         )
+    }
+
+    pub unsafe fn connect<R>(&self, receiver: R) -> CppBox<Connection>
+    where
+        R: AsReceiver,
+        SignalArguments: ArgumentsCompatible<R::Arguments>,
+    {
+        self.connect_with_type(ConnectionType::AutoConnection, receiver)
     }
 }
