@@ -1,6 +1,7 @@
 use cpp_core::NullPtr;
 use moqt_core::{QObject, QPtr, SlotOfInt};
 use std::cell::RefCell;
+use std::ffi::CStr;
 use std::rc::Rc;
 
 #[test]
@@ -15,10 +16,10 @@ fn qobject() {
         assert_eq!(args.sender().as_raw_ptr(), obj1.as_raw_ptr());
         assert_eq!(args.receiver().as_raw_ptr(), obj2.as_raw_ptr());
 
-        let signal = args.signal().to_c_str().to_str().unwrap();
+        let signal = CStr::from_ptr(args.signal()).to_str().unwrap();
         assert_eq!(signal, "2destroyed(QObject *)");
 
-        let method = args.method().to_c_str().to_str().unwrap();
+        let method = CStr::from_ptr(args.method()).to_str().unwrap();
         assert_eq!(method, "1deleteLater()");
     }
 }
@@ -38,13 +39,13 @@ fn closure_slot_connect() {
         let args = QObject::next_connect_args();
         assert_eq!(args.sender().as_raw_ptr(), obj1.as_raw_ptr());
 
-        let signal = args.signal().to_c_str().to_str().unwrap();
+        let signal = CStr::from_ptr(args.signal()).to_str().unwrap();
         assert_eq!(signal, "2objectNameChanged(int)");
 
         let slot_as_qobject: QPtr<QObject> = slot.static_upcast();
         assert_eq!(args.receiver().as_raw_ptr(), slot_as_qobject.as_raw_ptr());
 
-        let method = args.method().to_c_str().to_str().unwrap();
+        let method = CStr::from_ptr(args.method()).to_str().unwrap();
         assert_eq!(method, "1slot_(int)");
 
         assert_eq!(*counter.borrow(), 0);

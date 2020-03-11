@@ -82,19 +82,19 @@ pub trait SliceAsBeginEnd {
 impl<'a, T> SliceAsBeginEnd for &'a [T] {
     type Item = T;
     fn begin_ptr(&self) -> Ptr<T> {
-        unsafe { Ptr::from_raw(self.as_ptr() as *mut T) }
+        unsafe { Ptr::from_raw(self.as_ptr()) }
     }
     fn end_ptr(&self) -> Ptr<T> {
-        unsafe { Ptr::from_raw((self.as_ptr() as *mut T).add(self.len())) }
+        unsafe { Ptr::from_raw((self.as_ptr()).add(self.len())) }
     }
 }
 
 impl<'a> SliceAsBeginEnd for &'a str {
     type Item = c_char;
     fn begin_ptr(&self) -> Ptr<c_char> {
-        unsafe { Ptr::from_raw(self.as_ptr() as *mut c_char) }
+        unsafe { Ptr::from_raw(self.as_ptr() as *const c_char) }
     }
     fn end_ptr(&self) -> Ptr<c_char> {
-        unsafe { Ptr::from_raw(self.as_ptr().add(self.len()) as *mut c_char) }
+        unsafe { Ptr::from_raw(self.as_ptr().add(self.len()) as *const c_char) }
     }
 }

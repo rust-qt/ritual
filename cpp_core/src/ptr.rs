@@ -3,9 +3,7 @@ use crate::vector_ops::{Data, DataMut, Size};
 use crate::{
     cpp_iter, CppBox, CppDeletable, CppIterator, DynamicCast, Ref, StaticDowncast, StaticUpcast,
 };
-use std::ffi::CStr;
 use std::ops::Deref;
-use std::os::raw::c_char;
 use std::{fmt, slice};
 
 /// A pointer to a C++ object (similar to a C++ pointer).
@@ -64,8 +62,8 @@ impl<T> Ptr<T> {
     /// ### Safety
     ///
     /// See type level documentation.
-    pub unsafe fn from_raw(ptr: *mut T) -> Self {
-        Ptr(ptr)
+    pub unsafe fn from_raw(ptr: *const T) -> Self {
+        Ptr(ptr as *mut T)
     }
 
     /// Creates a null pointer.
@@ -173,7 +171,7 @@ impl<T> Ptr<T> {
 
 impl<V, T> Ptr<V>
 where
-    V: Data<Output = Ptr<T>> + Size,
+    V: Data<Output = *const T> + Size,
 {
     /// Returns the content of the object as a slice, based on `data()` and `size()` methods.
     ///
@@ -184,7 +182,7 @@ where
     /// This function
     /// may invoke arbitrary foreign code, so no safety guarantees can be made.
     pub unsafe fn as_slice<'a>(self) -> &'a [T] {
-        let ptr = self.data().as_raw_ptr();
+        let ptr = self.data();
         let size = self.size();
         slice::from_raw_parts(ptr, size)
     }
@@ -192,7 +190,7 @@ where
 
 impl<V, T> Ptr<V>
 where
-    V: DataMut<Output = Ptr<T>> + Size,
+    V: DataMut<Output = *mut T> + Size,
 {
     /// Returns the content of the vector as a mutable slice,
     /// based on `data()` and `size()` methods.
@@ -204,7 +202,7 @@ where
     /// This function
     /// may invoke arbitrary foreign code, so no safety guarantees can be made.
     pub unsafe fn as_mut_slice<'a>(self) -> &'a mut [T] {
-        let ptr = self.data_mut().as_mut_raw_ptr();
+        let ptr = self.data_mut();
         let size = self.size();
         slice::from_raw_parts_mut(ptr, size)
     }
@@ -264,34 +262,6 @@ impl<T> Deref for Ptr<T> {
     }
 }
 
-/// Allows to call member functions of `T` and its base classes directly on the pointer.
-impl Ptr<c_char> {
-    /// Creates a `Ptr<c_char>`, i.e. C++'s `const char*` from a `CStr`.
-    ///
-    /// ### Safety
-    ///
-    /// The source `str` must be valid
-    /// while `Ptr` exists and while
-    /// it's used by the C++ library.
-    ///
-    /// After passing `str` to `Ptr`, it's unsafe to use `str` and
-    /// any references to the same buffer from Rust because
-    /// the memory can be modified through `Ptr`.
-    pub unsafe fn from_c_str(str: &CStr) -> Self {
-        Self::from_raw(str.as_ptr() as *mut c_char)
-    }
-
-    /// Converts `Ptr<c_char>`, i.e. C++'s `const char*` to a `&CStr`.
-    ///
-    /// ### Safety
-    ///
-    /// No guarantees can be made about the validity and lifetime of
-    /// the buffer, since it could be produced by a C++ library.
-    pub unsafe fn to_c_str<'a>(self) -> &'a CStr {
-        CStr::from_ptr(self.0)
-    }
-}
-
 impl<T: CppDeletable> Ptr<T> {
     /// Converts this pointer to a `CppBox`. Returns `None` if `self`
     /// is a null pointer.
@@ -316,9 +286,9 @@ pub struct NullPtr;
 
 #[test]
 fn ptr_deref() {
-    let mut i = 42;
+    let i = 42;
     unsafe {
-        let ptr: Ptr<i32> = Ptr::from_raw(&mut i);
+        let ptr: Ptr<i32> = Ptr::from_raw(&i);
         assert_eq!(*ptr, 42);
     }
 }

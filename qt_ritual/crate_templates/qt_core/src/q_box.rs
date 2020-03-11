@@ -59,7 +59,7 @@ impl<T: StaticUpcast<QObject> + CppDeletable> QBox<T> {
     ///
     /// `target` must be either a valid pointer to an object or a null pointer.
     /// See type level documentation.
-    pub unsafe fn from_raw(target: *mut T) -> Self {
+    pub unsafe fn from_raw(target: *const T) -> Self {
         QBox::from_q_ptr(QPtr::from_raw(target))
     }
 

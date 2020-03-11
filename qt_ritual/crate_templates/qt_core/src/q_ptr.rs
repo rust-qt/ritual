@@ -53,7 +53,7 @@ impl<T: StaticUpcast<QObject>> QPtr<T> {
                 None
             } else {
                 Some(QPointerOfQObject::new_1a(Ptr::from_raw(
-                    target.as_raw_ptr() as *mut T,
+                    target.as_raw_ptr(),
                 )))
             },
             target,
@@ -66,7 +66,7 @@ impl<T: StaticUpcast<QObject>> QPtr<T> {
     ///
     /// `target` must be either a valid pointer to an object or a null pointer.
     /// See type level documentation.
-    pub unsafe fn from_raw(target: *mut T) -> Self {
+    pub unsafe fn from_raw(target: *const T) -> Self {
         Self::new(Ptr::from_raw(target))
     }
 

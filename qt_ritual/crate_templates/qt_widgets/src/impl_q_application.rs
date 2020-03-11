@@ -1,5 +1,4 @@
 use crate::QApplication;
-use cpp_core::{Ptr, Ref};
 use qt_core::QCoreApplicationArgs;
 use std::process;
 
@@ -28,7 +27,7 @@ impl QApplication {
             unsafe {
                 let mut args = QCoreApplicationArgs::new();
                 let (argc, argv) = args.get();
-                let app = QApplication::new_2a(Ref::from_raw(argc).unwrap(), Ptr::from_raw(argv));
+                let app = QApplication::new_2a(argc, argv);
                 f(app.as_ptr())
             }
         }; // drop `app` and `args`

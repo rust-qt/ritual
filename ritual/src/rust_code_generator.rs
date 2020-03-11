@@ -1046,15 +1046,11 @@ impl Generator<'_> {
                     .ok_or_else(|| err_msg("invalid source cpp item type"))?;
 
                 let path = &func.item.return_type.api_type().as_common()?.path;
-                let qobject = self.rust_path_to_string(&self.qt_core_path().join("QObject"));
                 let call = format!(
-                    "{}::new(::cpp_core::Ref::from_raw(self as &{} as *const {} as *mut {}) \
+                    "{}::new(::cpp_core::Ref::from_raw(self) \
                         .expect(\"attempted to construct a null Ref\"), \
                      ::std::ffi::CStr::from_bytes_with_nul_unchecked(b\"{}\\0\"))",
                     self.rust_path_to_string(&path),
-                    qobject,
-                    qobject,
-                    qobject,
                     cpp_item.receiver_id()?,
                 );
                 Some(wrap_unsafe(func.item.is_unsafe, &call))

@@ -1,14 +1,14 @@
-use cpp_core::{CppBox, Ptr, Ref};
+use cpp_core::{CppBox, Ptr};
 use moqt_core::{BasicClass, QBox, QPoint, QPtr, QVectorOfInt};
 use moqt_gui::{get_window, QVectorOfQWindow, QWindow};
 
 #[test]
 fn test_qwindow() {
     unsafe {
-        let mut window = QWindow::new();
-        let mut object: CppBox<BasicClass> = window.get_basic_class();
+        let window = QWindow::new();
+        let object: CppBox<BasicClass> = window.get_basic_class();
         assert_eq!(object.foo(), 42);
-        let mut object_ptr: Ptr<BasicClass> = window.get_basic_class_ptr();
+        let object_ptr: Ptr<BasicClass> = window.get_basic_class_ptr();
         assert_eq!(object_ptr.foo(), 43);
 
         let point: CppBox<QPoint> = window.pos();
@@ -32,19 +32,19 @@ fn test_get_window() {
 #[test]
 fn test_with_vectors() {
     unsafe {
-        let mut window: QBox<QWindow> = QWindow::new();
+        let window: QBox<QWindow> = QWindow::new();
 
         let vec = QVectorOfInt::new();
-        vec.push(Ref::from_raw_ref(&mut 10));
-        vec.push(Ref::from_raw_ref(&mut 12));
-        vec.push(Ref::from_raw_ref(&mut 14));
-        vec.push(Ref::from_raw_ref(&mut 16));
+        vec.push(&10);
+        vec.push(&12);
+        vec.push(&14);
+        vec.push(&16);
         let r = window.show_vector_of_int(vec.as_ref());
         assert_eq!(r, 4);
 
-        let mut vec2 = QVectorOfQWindow::new();
-        vec2.push(Ref::from_raw_ref(&mut get_window().as_mut_raw_ptr()));
-        vec2.push(Ref::from_raw_ref(&mut get_window().as_mut_raw_ptr()));
+        let vec2 = QVectorOfQWindow::new();
+        vec2.push(&get_window().as_mut_raw_ptr());
+        vec2.push(&get_window().as_mut_raw_ptr());
         let r = window.show_vector_of_windows(vec2.as_ref());
         assert_eq!(r, 2);
     }
@@ -65,11 +65,11 @@ fn template_classes() {
         let _b: CppBox<moqt_core::ns1::class_ns::Templated2OfBool> = moqt_gui::get_same_template2();
         let _c: CppBox<moqt_core::Templated3OfInt> = moqt_gui::get_same_template3();
 
-        let mut d: CppBox<moqt_gui::Templated1OfFloat> = moqt_gui::get_new_template1();
+        let d: CppBox<moqt_gui::Templated1OfFloat> = moqt_gui::get_new_template1();
         d.x();
-        let mut e: CppBox<moqt_gui::Templated2OfFloat> = moqt_gui::get_new_template2();
+        let e: CppBox<moqt_gui::Templated2OfFloat> = moqt_gui::get_new_template2();
         e.y();
-        let mut f: CppBox<moqt_gui::Templated3OfFloat> = moqt_gui::get_new_template3();
+        let f: CppBox<moqt_gui::Templated3OfFloat> = moqt_gui::get_new_template3();
         f.get();
     }
 }

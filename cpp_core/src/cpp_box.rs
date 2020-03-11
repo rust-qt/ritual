@@ -84,7 +84,7 @@ impl<T: CppDeletable> CppBox<T> {
     /// The object must not be deleted by other means while `CppBox` exists.
     /// Any other pointers to the object must not be used after `CppBox` is dropped.
     pub unsafe fn new(ptr: Ptr<T>) -> Option<Self> {
-        Self::from_raw(ptr.as_mut_raw_ptr())
+        Self::from_raw(ptr.as_raw_ptr())
     }
 
     /// Encapsulates the object into a `CppBox`. Returns `None` if the pointer is null.
@@ -97,12 +97,10 @@ impl<T: CppDeletable> CppBox<T> {
     /// safely deleted using C++'s `delete` operator.
     /// The object must not be deleted by other means while `CppBox` exists.
     /// Any other pointers to the object must not be used after `CppBox` is dropped.
-    pub unsafe fn from_raw(ptr: *mut T) -> Option<Self> {
-        ptr::NonNull::new(ptr).map(CppBox)
+    pub unsafe fn from_raw(ptr: *const T) -> Option<Self> {
+        ptr::NonNull::new(ptr as *mut T).map(CppBox)
     }
-}
 
-impl<T: CppDeletable> CppBox<T> {
     /// Returns a constant pointer to the value in the box.
     ///
     /// ### Safety
@@ -225,7 +223,7 @@ impl<T: CppDeletable> CppBox<T> {
 
 impl<V, T> CppBox<V>
 where
-    V: Data<Output = Ptr<T>> + Size + CppDeletable,
+    V: Data<Output = *const T> + Size + CppDeletable,
 {
     /// Returns the content of the object as a slice, based on `data()` and `size()` methods.
     ///
@@ -236,7 +234,7 @@ where
     /// This function
     /// may invoke arbitrary foreign code, so no safety guarantees can be made.
     pub unsafe fn as_slice<'a>(&self) -> &'a [T] {
-        let ptr = self.data().as_raw_ptr();
+        let ptr = self.data();
         let size = self.size();
         slice::from_raw_parts(ptr, size)
     }
@@ -244,7 +242,7 @@ where
 
 impl<V, T> CppBox<V>
 where
-    V: DataMut<Output = Ptr<T>> + Size + CppDeletable,
+    V: DataMut<Output = *mut T> + Size + CppDeletable,
 {
     /// Returns the content of the vector as a mutable slice,
     /// based on `data()` and `size()` methods.
@@ -256,7 +254,7 @@ where
     /// This function
     /// may invoke arbitrary foreign code, so no safety guarantees can be made.
     pub unsafe fn as_mut_slice<'a>(&self) -> &'a mut [T] {
-        let ptr = self.data_mut().as_mut_raw_ptr();
+        let ptr = self.data_mut();
         let size = self.size();
         slice::from_raw_parts_mut(ptr, size)
     }
@@ -348,12 +346,12 @@ mod tests {
     #[test]
     fn test_drop_calls_deleter() {
         let value1 = Rc::new(RefCell::new(10));
-        let mut object1 = Struct1 {
+        let object1 = Struct1 {
             value: value1.clone(),
         };
         assert!(*value1.borrow() == 10);
         unsafe {
-            CppBox::new(Ptr::from_raw(&mut object1));
+            CppBox::new(Ptr::from_raw(&object1));
         }
         assert!(*value1.borrow() == 42);
     }

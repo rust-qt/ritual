@@ -1,5 +1,4 @@
 use crate::{QCoreApplication, QString};
-use cpp_core::{Ptr, Ref};
 use std::iter::once;
 use std::os::raw::{c_char, c_int};
 use std::process;
@@ -83,8 +82,7 @@ impl QCoreApplication {
             unsafe {
                 let mut args = QCoreApplicationArgs::new();
                 let (argc, argv) = args.get();
-                let app =
-                    QCoreApplication::new_2a(Ref::from_raw(argc).unwrap(), Ptr::from_raw(argv));
+                let app = QCoreApplication::new_2a(argc, argv);
                 f(app.as_ptr())
             }
         }; // drop `app` and `args`

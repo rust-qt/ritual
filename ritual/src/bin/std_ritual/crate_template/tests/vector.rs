@@ -9,9 +9,9 @@ fn vector_push_pop_slice() {
     unsafe {
         let mut x = VectorOfI32::new();
         assert!(x.empty());
-        x.push_back(Ref::from_raw_ref(&1));
-        x.push_back(Ref::from_raw_ref(&2));
-        x.push_back(Ref::from_raw_ref(&3));
+        x.push_back(Ref::from_raw(&1));
+        x.push_back(Ref::from_raw(&2));
+        x.push_back(Ref::from_raw(&3));
         assert!(!x.empty());
 
         assert_eq!(x.vector_as_slice(), &[1, 2, 3]);
@@ -30,7 +30,7 @@ fn vector_push_pop_slice() {
 fn vector_as_mut_slice() {
     unsafe {
         let mut x = VectorOfInt::new();
-        x.resize_2a(10, Ref::from_raw_ref(&5));
+        x.resize_2a(10, Ref::from_raw(&5));
         assert_eq!(x.size(), 10);
 
         let slice = x.vector_as_mut_slice();

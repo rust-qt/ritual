@@ -2,11 +2,13 @@
 macro_rules! q_message_logger {
     () => {
         $crate::QMessageLogger::new_3a(
-            ::std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(file!(), "\0").as_bytes()),
+            ::std::ffi::CStr::from_bytes_with_nul_unchecked(concat!(file!(), "\0").as_bytes())
+                .as_ptr(),
             line!() as i32,
             ::std::ffi::CStr::from_bytes_with_nul_unchecked(
                 concat!(module_path!(), "\0").as_bytes(),
-            ),
+            )
+            .as_ptr(),
         )
     };
 }

@@ -169,9 +169,9 @@ impl<SignalArguments> Signal<SignalArguments> {
 
         crate::QObject::connect_5a(
             self.0.q_object.as_ptr(),
-            Ptr::from_c_str(self.0.receiver_id),
+            self.0.receiver_id.as_ptr(),
             receiver.q_object.as_ptr(),
-            Ptr::from_c_str(receiver.receiver_id),
+            receiver.receiver_id.as_ptr(),
             connection_type,
         )
     }

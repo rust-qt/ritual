@@ -805,32 +805,40 @@ impl State<'_, '_> {
                 if argument_meaning == &CppFfiArgumentMeaning::This {
                     api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr { lifetime: None };
                 } else if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
-                    api_to_ffi_conversion =
-                        if let CppToFfiTypeConversion::ReferenceToPointer { .. } =
-                            cpp_ffi_type.conversion()
-                        {
-                            RustToFfiTypeConversion::UtilsRefToPtr {}
-                        } else {
-                            if inherits_qobject {
-                                RustToFfiTypeConversion::QPtrToPtr
+                    if target.is_class() {
+                        api_to_ffi_conversion =
+                            if let CppToFfiTypeConversion::ReferenceToPointer { .. } =
+                                cpp_ffi_type.conversion()
+                            {
+                                RustToFfiTypeConversion::UtilsRefToPtr {}
                             } else {
-                                RustToFfiTypeConversion::UtilsPtrToPtr {}
-                            }
-                        };
+                                if inherits_qobject {
+                                    RustToFfiTypeConversion::QPtrToPtr
+                                } else {
+                                    RustToFfiTypeConversion::UtilsPtrToPtr {}
+                                }
+                            };
+                    } else {
+                        api_to_ffi_conversion = RustToFfiTypeConversion::None;
+                    }
                 } else {
                     // argument
-                    api_to_ffi_conversion =
-                        if let CppToFfiTypeConversion::ReferenceToPointer { .. } =
-                            cpp_ffi_type.conversion()
-                        {
-                            RustToFfiTypeConversion::ImplCastInto(Box::new(
-                                RustToFfiTypeConversion::UtilsRefToPtr {},
-                            ))
-                        } else {
-                            RustToFfiTypeConversion::ImplCastInto(Box::new(
-                                RustToFfiTypeConversion::UtilsPtrToPtr {},
-                            ))
-                        };
+                    if target.is_class() {
+                        api_to_ffi_conversion =
+                            if let CppToFfiTypeConversion::ReferenceToPointer { .. } =
+                                cpp_ffi_type.conversion()
+                            {
+                                RustToFfiTypeConversion::ImplCastInto(Box::new(
+                                    RustToFfiTypeConversion::UtilsRefToPtr {},
+                                ))
+                            } else {
+                                RustToFfiTypeConversion::ImplCastInto(Box::new(
+                                    RustToFfiTypeConversion::UtilsPtrToPtr {},
+                                ))
+                            };
+                    } else {
+                        api_to_ffi_conversion = RustToFfiTypeConversion::None;
+                    }
                 }
             }
         }

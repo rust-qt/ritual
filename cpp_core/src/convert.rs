@@ -1,7 +1,5 @@
 use crate::ptr::NullPtr;
 use crate::{CppBox, CppDeletable, Ptr, Ref, StaticUpcast};
-use std::ffi::CStr;
-use std::os::raw::c_char;
 
 /// Performs some of the conversions that are available implicitly in C++.
 ///
@@ -90,18 +88,12 @@ impl<T> CastFrom<NullPtr> for Ptr<T> {
     }
 }
 
-impl<'a> CastFrom<&'a CStr> for Ptr<c_char> {
-    unsafe fn cast_from(value: &'a CStr) -> Self {
-        Ptr::from_c_str(value)
-    }
-}
-
 impl<T, U> CastFrom<*const U> for Ptr<T>
 where
     U: StaticUpcast<T>,
 {
     unsafe fn cast_from(value: *const U) -> Self {
-        Self::cast_from(Ptr::from_raw(value as *mut T))
+        Self::cast_from(Ptr::from_raw(value))
     }
 }
 

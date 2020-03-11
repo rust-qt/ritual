@@ -5,7 +5,7 @@ use qt_core::{
 #[test]
 fn models_and_casts() {
     unsafe {
-        let mut string_list = QStringList::new();
+        let string_list = QStringList::new();
         string_list.append_q_string(&QString::from_std_str("text1"));
         string_list.append_q_string(&QString::from_std_str("text2"));
         let string_list_model = QStringListModel::from_q_string_list(&string_list);

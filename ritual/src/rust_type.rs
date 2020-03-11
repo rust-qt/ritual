@@ -524,22 +524,19 @@ impl RustType {
                 .map_if_ok(|t| t.caption(context, strategy))?
                 .join("_"),
             RustType::Primitive(type1) | RustType::GenericParameter(type1) => type1.to_string(),
-            RustType::PointerLike {
-                kind,
-                is_const,
-                target,
-            } => {
-                let const_text = if *is_const { "_const" } else { "" };
-                let kind_text = match *kind {
-                    RustPointerLikeTypeKind::Pointer => "_ptr",
-                    RustPointerLikeTypeKind::Reference { .. } => "_ref",
-                };
-                format!(
-                    "{}{}{}",
-                    target.caption(context, strategy)?,
-                    const_text,
-                    kind_text
-                )
+            RustType::PointerLike { target, .. } => {
+                // let const_text = if *is_const { "_const" } else { "" };
+                // let kind_text = match *kind {
+                //     RustPointerLikeTypeKind::Pointer => "_ptr",
+                //     RustPointerLikeTypeKind::Reference { .. } => "_ref",
+                // };
+                // format!(
+                //     "{}{}{}",
+                //     target.caption(context, strategy)?,
+                //     const_text,
+                //     kind_text
+                // )
+                target.caption(context, strategy)?
             }
             RustType::Common(RustCommonType {
                 path,

@@ -57,7 +57,7 @@ impl<T> Ref<T> {
     ///
     /// `ptr` must be valid. See type level documentation.
     pub unsafe fn new(ptr: Ptr<T>) -> Option<Self> {
-        Self::from_raw(ptr.as_mut_raw_ptr())
+        Self::from_raw(ptr.as_raw_ptr())
     }
 
     /// Creates a `Ref` from a raw pointer. Returns `None` if `ptr` is null.
@@ -65,18 +65,8 @@ impl<T> Ref<T> {
     /// ### Safety
     ///
     /// `ptr` must be valid. See type level documentation.
-    pub unsafe fn from_raw(ptr: *mut T) -> Option<Self> {
-        ptr::NonNull::new(ptr).map(Ref)
-    }
-
-    /// Creates a `Ref` from a raw reference.
-    ///
-    /// ### Safety
-    ///
-    /// `value` must be alive as long as `Ref` or pointers derived from it are used.
-    /// See type level documentation.
-    pub unsafe fn from_raw_ref(value: &mut T) -> Self {
-        Ref(ptr::NonNull::new(value as *mut T).unwrap())
+    pub unsafe fn from_raw(ptr: *const T) -> Option<Self> {
+        ptr::NonNull::new(ptr as *mut T).map(Ref)
     }
 
     /// Creates a `Ref` from a non-null pointer.
@@ -94,7 +84,7 @@ impl<T> Ref<T> {
     ///
     /// `self` must be valid. See type level documentation.
     pub unsafe fn as_ptr(self) -> Ptr<T> {
-        Ptr::from_raw(self.as_mut_raw_ptr())
+        Ptr::from_raw(self.as_raw_ptr())
     }
 
     /// Returns a reference to the value.
@@ -175,7 +165,7 @@ impl<T> Ref<T> {
 
 impl<V, T> Ref<V>
 where
-    V: Data<Output = Ptr<T>> + Size,
+    V: Data<Output = *const T> + Size,
 {
     /// Returns the content of the object as a slice, based on `data()` and `size()` methods.
     ///
@@ -186,7 +176,7 @@ where
     /// This function
     /// may invoke arbitrary foreign code, so no safety guarantees can be made.
     pub unsafe fn as_slice<'a>(self) -> &'a [T] {
-        let ptr = self.data().as_raw_ptr();
+        let ptr = self.data();
         let size = self.size();
         slice::from_raw_parts(ptr, size)
     }
@@ -194,7 +184,7 @@ where
 
 impl<V, T> Ref<V>
 where
-    V: DataMut<Output = Ptr<T>> + Size,
+    V: DataMut<Output = *mut T> + Size,
 {
     /// Returns the content of the vector as a mutable slice,
     /// based on `data()` and `size()` methods.
@@ -206,7 +196,7 @@ where
     /// This function
     /// may invoke arbitrary foreign code, so no safety guarantees can be made.
     pub unsafe fn as_mut_slice<'a>(self) -> &'a mut [T] {
-        let ptr = self.data_mut().as_mut_raw_ptr();
+        let ptr = self.data_mut();
         let size = self.size();
         slice::from_raw_parts_mut(ptr, size)
     }
