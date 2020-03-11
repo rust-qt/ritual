@@ -1,5 +1,5 @@
-use cpp_core::{CppBox, MutPtr, Ref};
-use moqt_core::{BasicClass, QBox, QMutPtr, QPoint, QVectorOfInt};
+use cpp_core::{CppBox, Ptr, Ref};
+use moqt_core::{BasicClass, QBox, QPoint, QPtr, QVectorOfInt};
 use moqt_gui::{get_window, QVectorOfQWindow, QWindow};
 
 #[test]
@@ -8,7 +8,7 @@ fn test_qwindow() {
         let mut window = QWindow::new();
         let mut object: CppBox<BasicClass> = window.get_basic_class();
         assert_eq!(object.foo(), 42);
-        let mut object_ptr: MutPtr<BasicClass> = window.get_basic_class_ptr();
+        let mut object_ptr: Ptr<BasicClass> = window.get_basic_class_ptr();
         assert_eq!(object_ptr.foo(), 43);
 
         let point: CppBox<QPoint> = window.pos();
@@ -24,7 +24,7 @@ fn test_qwindow() {
 #[test]
 fn test_get_window() {
     unsafe {
-        let window: QMutPtr<QWindow> = get_window();
+        let window: QPtr<QWindow> = get_window();
         assert!(window.is_null());
     }
 }
@@ -34,17 +34,17 @@ fn test_with_vectors() {
     unsafe {
         let mut window: QBox<QWindow> = QWindow::new();
 
-        let mut vec = QVectorOfInt::new();
-        vec.push(Ref::from_raw_ref(&10));
-        vec.push(Ref::from_raw_ref(&12));
-        vec.push(Ref::from_raw_ref(&14));
-        vec.push(Ref::from_raw_ref(&16));
+        let vec = QVectorOfInt::new();
+        vec.push(Ref::from_raw_ref(&mut 10));
+        vec.push(Ref::from_raw_ref(&mut 12));
+        vec.push(Ref::from_raw_ref(&mut 14));
+        vec.push(Ref::from_raw_ref(&mut 16));
         let r = window.show_vector_of_int(vec.as_ref());
         assert_eq!(r, 4);
 
         let mut vec2 = QVectorOfQWindow::new();
-        vec2.push(Ref::from_raw_ref(&get_window().as_mut_raw_ptr()));
-        vec2.push(Ref::from_raw_ref(&get_window().as_mut_raw_ptr()));
+        vec2.push(Ref::from_raw_ref(&mut get_window().as_mut_raw_ptr()));
+        vec2.push(Ref::from_raw_ref(&mut get_window().as_mut_raw_ptr()));
         let r = window.show_vector_of_windows(vec2.as_ref());
         assert_eq!(r, 2);
     }

@@ -1,9 +1,8 @@
-use crate::{QMutPtr, QObject, QPtr};
+use crate::{QObject, QPtr};
 use cpp_core::{
-    CastFrom, CastInto, CppBox, CppDeletable, DynamicCast, MutPtr, MutRef, Ptr, Ref,
-    StaticDowncast, StaticUpcast,
+    CastFrom, CastInto, CppBox, CppDeletable, DynamicCast, Ptr, Ref, StaticDowncast, StaticUpcast,
 };
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 use std::{fmt, mem};
 
 /// An owning pointer for `QObject`-based objects.
@@ -11,10 +10,10 @@ use std::{fmt, mem};
 /// `QBox` will delete its object on drop if it has no parent. If the object has a parent,
 /// it's assumed that the parent is responsible for deleting the object, as per Qt ownership system.
 /// Additionally, `QBox` will be automatically set to null when the object is deleted, similar
-/// to `QMutPtr` (or `QPointer<T>` in C++). `QBox` will not attempt to delete null pointers.
+/// to `QPtr` (or `QPointer<T>` in C++). `QBox` will not attempt to delete null pointers.
 ///
 /// Note that dereferencing a null `QBox` will panic, so if it's known that the object may
-/// already have been deleted, you should use `is_null()`, `as_mut_ref()`,
+/// already have been deleted, you should use `is_null()`, `as_ref()`,
 /// or a similar method to check
 /// if the object is still alive before calling its methods.
 ///
@@ -23,7 +22,7 @@ use std::{fmt, mem};
 /// automatically if the object is deleted.
 ///
 /// To prevent the object from being deleted, convert `QBox` to another type of pointer using
-/// `into_q_mut_ptr()` or `into_ptr()`. Alternatively, setting a parent for the object will prevent
+/// `into_q_ptr()` or `into_ptr()`. Alternatively, setting a parent for the object will prevent
 /// `QBox` from deleting it.
 ///
 /// To make sure the object is deleted regardless of its parent, convert `QBox` to `CppBox` using
@@ -31,27 +30,27 @@ use std::{fmt, mem};
 ///
 /// # Safety
 ///
-/// `QBox` has the same safety issues as `QMutPtr`. See `QMutPtr` documentation.
-pub struct QBox<T: StaticUpcast<QObject> + CppDeletable>(QMutPtr<T>);
+/// `QBox` has the same safety issues as `QPtr`. See `QPtr` documentation.
+pub struct QBox<T: StaticUpcast<QObject> + CppDeletable>(QPtr<T>);
 
 impl<T: StaticUpcast<QObject> + CppDeletable> QBox<T> {
-    /// Creates a `QBox` from a `QMutPtr`.
+    /// Creates a `QBox` from a `QPtr`.
     ///
     /// ### Safety
     ///
     /// See type level documentation.
-    pub unsafe fn from_q_mut_ptr(target: QMutPtr<T>) -> Self {
+    pub unsafe fn from_q_ptr(target: QPtr<T>) -> Self {
         QBox(target)
     }
 
-    /// Creates a `QBox` from a `MutPtr`.
+    /// Creates a `QBox` from a `Ptr`.
     ///
     /// ### Safety
     ///
     /// `target` must be either a valid pointer to an object or a null pointer.
     /// See type level documentation.
-    pub unsafe fn new(target: impl CastInto<MutPtr<T>>) -> Self {
-        QBox::from_q_mut_ptr(QMutPtr::new(target))
+    pub unsafe fn new(target: impl CastInto<Ptr<T>>) -> Self {
+        QBox::from_q_ptr(QPtr::new(target))
     }
 
     /// Creates a `QBox` from a raw pointer.
@@ -61,37 +60,28 @@ impl<T: StaticUpcast<QObject> + CppDeletable> QBox<T> {
     /// `target` must be either a valid pointer to an object or a null pointer.
     /// See type level documentation.
     pub unsafe fn from_raw(target: *mut T) -> Self {
-        QBox::from_q_mut_ptr(QMutPtr::from_raw(target))
+        QBox::from_q_ptr(QPtr::from_raw(target))
     }
 
     /// Creates a null pointer.
     ///
     /// Note that you can also use `NullPtr` to specify a null pointer to a function accepting
-    /// `impl CastInto<MutPtr<_>>`. Unlike `MutPtr`, `NullPtr` is not a generic type, so it will
+    /// `impl CastInto<Ptr<_>>`. Unlike `Ptr`, `NullPtr` is not a generic type, so it will
     /// not cause type inference issues.
     ///
-    /// Note that accessing the content of a null `QBox` through `Deref` or `DerefMut` will result
+    /// Note that accessing the content of a null `QBox` through `Deref` will result
     /// in a panic.
     ///
     /// ### Safety
     ///
     /// Null pointers must not be dereferenced. See type level documentation.
     pub unsafe fn null() -> Self {
-        QBox::from_q_mut_ptr(QMutPtr::<T>::null())
+        QBox::from_q_ptr(QPtr::<T>::null())
     }
 
     /// Returns true if the pointer is null.
     pub unsafe fn is_null(&self) -> bool {
         self.0.is_null()
-    }
-
-    /// Returns the content as a `MutPtr`.
-    ///
-    /// ### Safety
-    ///
-    /// See type level documentation.
-    pub unsafe fn as_mut_ptr(&mut self) -> MutPtr<T> {
-        self.0.as_mut_ptr()
     }
 
     /// Returns the content as a const `Ptr`.
@@ -117,7 +107,7 @@ impl<T: StaticUpcast<QObject> + CppDeletable> QBox<T> {
     /// ### Safety
     ///
     /// See type level documentation.
-    pub unsafe fn as_mut_raw_ptr(&mut self) -> *mut T {
+    pub unsafe fn as_mut_raw_ptr(&self) -> *mut T {
         self.0.as_mut_raw_ptr()
     }
 
@@ -130,26 +120,26 @@ impl<T: StaticUpcast<QObject> + CppDeletable> QBox<T> {
         self.0.as_ref()
     }
 
-    /// Returns the content as a `MutRef`. Returns `None` if `self` is a null pointer.
+    /// Returns a reference to the value. Returns `None` if the pointer is null.
     ///
     /// ### Safety
     ///
-    /// See type level documentation.
-    pub unsafe fn as_mut_ref(&mut self) -> Option<MutRef<T>> {
-        self.0.as_mut_ref()
+    /// `self` must be valid.
+    /// The content must not be read or modified through other ways while the returned reference
+    /// exists.See type level documentation.
+    pub unsafe fn as_raw_ref<'a>(&self) -> Option<&'a T> {
+        self.as_ref().map(|r| r.as_raw_ref())
     }
 
-    /// Converts the pointer to the base class type `U`.
+    /// Returns a mutable reference to the value. Returns `None` if the pointer is null.
     ///
     /// ### Safety
     ///
-    /// This operation is safe as long as `self` is valid or null. See type level documentation.
-    pub unsafe fn static_upcast_mut<U>(&mut self) -> QMutPtr<U>
-    where
-        T: StaticUpcast<U>,
-        U: StaticUpcast<QObject>,
-    {
-        self.0.static_upcast_mut()
+    /// `self` must be valid.
+    /// The content must not be read or modified through other ways while the returned reference
+    /// exists.See type level documentation.
+    pub unsafe fn as_mut_raw_ref<'a>(&self) -> Option<&'a mut T> {
+        self.as_ref().map(|r| r.as_mut_raw_ref())
     }
 
     /// Converts the pointer to the base class type `U`.
@@ -173,42 +163,12 @@ impl<T: StaticUpcast<QObject> + CppDeletable> QBox<T> {
     ///
     /// This operation is safe as long as `self` is valid and it's type is `U` or inherits from `U`,
     /// of if `self` is a null pointer. See type level documentation.
-    pub unsafe fn static_downcast_mut<U>(&mut self) -> QMutPtr<U>
-    where
-        T: StaticDowncast<U>,
-        U: StaticUpcast<QObject>,
-    {
-        self.0.static_downcast_mut()
-    }
-
-    /// Converts the pointer to the derived class type `U`.
-    ///
-    /// It's recommended to use `dynamic_cast` instead because it performs a checked conversion.
-    ///
-    /// ### Safety
-    ///
-    /// This operation is safe as long as `self` is valid and it's type is `U` or inherits from `U`,
-    /// of if `self` is a null pointer. See type level documentation.
     pub unsafe fn static_downcast<U>(&self) -> QPtr<U>
     where
         T: StaticDowncast<U>,
         U: StaticUpcast<QObject>,
     {
         QPtr::<U>::new(self.as_ptr().static_downcast())
-    }
-
-    /// Converts the pointer to the derived class type `U`. Returns `None` if the object's type
-    /// is not `U` and doesn't inherit `U`.
-    ///
-    /// ### Safety
-    ///
-    /// This operation is safe as long as `self` is valid or null. See type level documentation.
-    pub unsafe fn dynamic_cast_mut<U>(&mut self) -> QMutPtr<U>
-    where
-        T: DynamicCast<U>,
-        U: StaticUpcast<QObject>,
-    {
-        self.0.dynamic_cast_mut()
     }
 
     /// Converts the pointer to the derived class type `U`. Returns `None` if the object's type
@@ -236,23 +196,19 @@ impl<T: StaticUpcast<QObject> + CppDeletable> QBox<T> {
     /// delete this object before or after that, the behavior is undefined.
     /// See type level documentation.
     pub unsafe fn into_box(self) -> Option<CppBox<T>> {
-        self.into_q_mut_ptr().to_box()
+        self.into_q_ptr().to_box()
     }
 
-    pub unsafe fn into_q_mut_ptr(mut self) -> QMutPtr<T> {
-        mem::replace(&mut self.0, QMutPtr::null())
+    pub unsafe fn into_q_ptr(mut self) -> QPtr<T> {
+        mem::replace(&mut self.0, QPtr::null())
     }
 
-    pub unsafe fn into_q_ptr(self) -> QPtr<T> {
-        self.into_q_mut_ptr().to_q_ptr()
-    }
-
-    pub unsafe fn into_ptr(self) -> MutPtr<T> {
-        self.into_q_mut_ptr().as_mut_ptr()
+    pub unsafe fn into_ptr(self) -> Ptr<T> {
+        self.into_q_ptr().as_ptr()
     }
 
     pub unsafe fn into_raw_ptr(self) -> *mut T {
-        self.into_q_mut_ptr().as_mut_raw_ptr()
+        self.into_q_ptr().as_mut_raw_ptr()
     }
 }
 
@@ -279,21 +235,6 @@ impl<T: StaticUpcast<QObject> + CppDeletable> Deref for QBox<T> {
     }
 }
 
-/// Allows to call member functions of `T` and its base classes directly on the pointer.
-///
-/// Panics if the pointer is null.
-impl<T: StaticUpcast<QObject> + CppDeletable> DerefMut for QBox<T> {
-    fn deref_mut(&mut self) -> &mut T {
-        unsafe {
-            let ptr = self.as_mut_raw_ptr();
-            if ptr.is_null() {
-                panic!("attempted to deref a null QBox<T>");
-            }
-            &mut *ptr
-        }
-    }
-}
-
 impl<'a, T, U> CastFrom<&'a QBox<U>> for Ptr<T>
 where
     U: StaticUpcast<T> + StaticUpcast<QObject> + CppDeletable,
@@ -303,21 +244,12 @@ where
     }
 }
 
-impl<'a, T, U> CastFrom<&'a mut QBox<U>> for MutPtr<T>
-where
-    U: StaticUpcast<T> + StaticUpcast<QObject> + CppDeletable,
-{
-    unsafe fn cast_from(value: &'a mut QBox<U>) -> Self {
-        CastFrom::cast_from(value.as_mut_ptr())
-    }
-}
-
 impl<T: StaticUpcast<QObject> + CppDeletable> Drop for QBox<T> {
     fn drop(&mut self) {
         unsafe {
-            let ptr = self.as_mut_ptr();
-            if !ptr.is_null() && ptr.static_upcast_mut().parent().is_null() {
-                T::delete(&mut *ptr.as_mut_raw_ptr());
+            let ptr = self.as_ptr();
+            if !ptr.is_null() && ptr.static_upcast().parent().is_null() {
+                T::delete(&*ptr.as_raw_ptr());
             }
         }
     }

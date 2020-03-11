@@ -2,7 +2,7 @@
 //!
 //! C++'s comparison operators have different semantics from Rust's `PartialOrd` and `Ord` traits.
 //! If all the operators (`Lt`, `Le`, `Gt`, `Ge`) are implemented for a type, the pointer types
-//! (`CppBox`, `Ptr`, `MutPtr`, `Ref`, `MutRef`) automatically implement `PartialOrd`.
+//! (`CppBox`, `Ptr`, `Ref`) automatically implement `PartialOrd`.
 
 /// Represents C++'s `operator<`.
 pub trait Lt<Rhs: ?Sized = Self> {

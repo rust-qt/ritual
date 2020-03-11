@@ -23,10 +23,10 @@ fn namespaces() {
 #[test]
 fn namespaces2() {
     unsafe {
-        let mut x: CppBox<ns1::Templated1OfInt> = moqt_core::func1();
+        let x: CppBox<ns1::Templated1OfInt> = moqt_core::func1();
         x.x();
 
-        let mut y: CppBox<ns1::class_ns::Templated2OfBool> = moqt_core::func2();
+        let y: CppBox<ns1::class_ns::Templated2OfBool> = moqt_core::func2();
         y.y();
 
         let _z = ns1::class_ns::Class1::new();

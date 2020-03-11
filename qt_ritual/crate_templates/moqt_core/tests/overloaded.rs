@@ -5,7 +5,7 @@ fn overloaded() {
     unsafe {
         Overloaded::from_float(1.0);
         Overloaded::from_q_string(QString::from_std_str("text1").as_ref());
-        let mut a = Overloaded::from_int(1);
+        let a = Overloaded::from_int(1);
 
         a.at(6);
         a.at_mut(6);

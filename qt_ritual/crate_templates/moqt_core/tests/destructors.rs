@@ -1,14 +1,14 @@
-use cpp_core::{CppBox, CppDeletable, MutPtr};
+use cpp_core::{CppBox, CppDeletable, Ptr};
 use moqt_core::{BaseHandle, HandleFactory};
 
 #[test]
 fn basic_destructors() {
     unsafe {
-        let mut factory = HandleFactory::new();
+        let factory = HandleFactory::new();
         assert_eq!(factory.counter(), 0);
 
         let h1 = CppBox::new(factory.create());
-        let mut h2 = factory.create();
+        let h2 = factory.create();
         assert_eq!(factory.counter(), 2);
         drop(h1);
         assert_eq!(factory.counter(), 1);
@@ -20,7 +20,7 @@ fn basic_destructors() {
 #[test]
 fn virtual_destructors() {
     unsafe {
-        let mut factory = HandleFactory::new();
+        let factory = HandleFactory::new();
         assert_eq!(factory.counter(), 0);
 
         let h1 = CppBox::new(factory.create_derived());
@@ -29,7 +29,7 @@ fn virtual_destructors() {
         assert_eq!(factory.counter(), 5);
         drop(h1);
         assert_eq!(factory.counter(), 3);
-        let mut h2_base: MutPtr<BaseHandle> = h2.static_upcast_mut();
+        let h2_base: Ptr<BaseHandle> = h2.static_upcast();
         h2_base.delete();
         assert_eq!(factory.counter(), 0);
 

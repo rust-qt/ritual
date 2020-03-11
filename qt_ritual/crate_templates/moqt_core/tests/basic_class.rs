@@ -1,11 +1,11 @@
-use cpp_core::{MutRef, Ref};
+use cpp_core::Ref;
 use moqt_core::basic_class::{inner_struct::InnerEnum, UpdateType};
 use moqt_core::{BasicClass, BasicClassField};
 
 #[test]
 fn basic_class() {
     unsafe {
-        let mut v = BasicClass::new(1);
+        let v = BasicClass::new(1);
         assert_eq!(v.foo(), 1);
         v.set_foo(5);
         assert_eq!(v.foo(), 5);
@@ -16,18 +16,18 @@ fn basic_class() {
 
         assert!(v.int_pointer_field().is_null());
         let p = v.int_reference_field();
-        v.set_int_pointer_field(p.as_mut_ptr());
+        v.set_int_pointer_field(p.as_ptr());
         v.set_int_field(4);
         assert_eq!(*v.int_pointer_field(), 4);
 
         assert_eq!(*v.int_reference_field(), 4);
         v.set_int_field(7);
         assert_eq!(*v.int_reference_field(), 7);
-        *v.int_reference_field() = 8;
+        *v.int_reference_field().as_mut_raw_ref() = 8;
         assert_eq!(v.int_field(), 8);
 
         // TODO: set_int_reference_field should have int arg
-        v.set_int_reference_field(MutRef::from_raw(&mut 9).unwrap());
+        v.set_int_reference_field(Ref::from_raw(&mut 9).unwrap());
         assert_eq!(v.int_field(), 9);
 
         assert_eq!(v.class_field().get(), 42);
@@ -41,11 +41,11 @@ fn basic_class() {
         assert_eq!(v.class_field().get(), 42);
 
         assert_eq!(v.to_int(), 3);
-        let mut converted = v.to_q_vector_of_int();
+        let converted = v.to_q_vector_of_int();
         assert_eq!(converted.count(), 1);
         assert_eq!(*converted.at(0), 7);
 
-        v.set_ref(Ref::from_raw_ref(&11));
+        v.set_ref(Ref::from_raw_ref(&mut 11));
     }
 }
 
@@ -57,7 +57,7 @@ fn nested_enum() {
     assert_eq!(UpdateType::Div5.to_int(), 4);
 
     unsafe {
-        let mut v = BasicClass::new(1);
+        let v = BasicClass::new(1);
         v.set_foo(1);
         v.update_foo(UpdateType::Mul3.into());
         assert_eq!(v.foo(), 3);
@@ -73,13 +73,13 @@ fn nested_enum() {
 fn vector_getters() {
     unsafe {
         let v = BasicClass::new(2);
-        let mut vec = v.get_vector_int();
+        let vec = v.get_vector_int();
         assert_eq!(vec.count(), 3);
         assert_eq!(*vec.at(0), 1);
         assert_eq!(*vec.at(1), 3);
         assert_eq!(*vec.at(2), 5);
 
-        let mut vec2 = v.get_vector_class();
+        let vec2 = v.get_vector_class();
         assert_eq!(vec2.count(), 3);
         assert_eq!(vec2.at(0).get(), 2);
         assert_eq!(vec2.at(1).get(), 4);

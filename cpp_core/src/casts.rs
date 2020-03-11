@@ -1,14 +1,14 @@
 //! `static_cast` and `dynamic_cast`.
 
-use crate::{MutPtr, Ptr};
+use crate::Ptr;
 
 /// Converts a class pointer to a base class pointer.
 ///
 /// A null pointer is always converted to a null pointer.
 /// Otherwise, the provided pointer must be valid.
 ///
-/// It's recommended to perform the conversion by calling `static_upcast` and
-/// `static_upcast_mut` methods on pointer types (`CppBox`, `Ptr`, `MutPtr`, `Ref`, `MutRef`)
+/// It's recommended to perform the conversion by calling `static_upcast`
+/// method on pointer types (`CppBox`, `Ptr`, `Ref`)
 /// instead of importing the trait directly.
 ///
 /// Provides access to C++ `static_cast` conversion from derived class to base class.
@@ -30,20 +30,10 @@ pub trait StaticUpcast<T>: Sized {
     ///
     /// This operation is safe as long as `ptr` is either valid or null.
     unsafe fn static_upcast(ptr: Ptr<Self>) -> Ptr<T>;
-    /// Convert type of a mutable pointer.
-    ///
-    /// ### Safety
-    ///
-    /// This operation is safe as long as `ptr` is either valid or null.
-    unsafe fn static_upcast_mut(ptr: MutPtr<Self>) -> MutPtr<T>;
 }
 
 impl<T> StaticUpcast<T> for T {
     unsafe fn static_upcast(ptr: Ptr<T>) -> Ptr<T> {
-        ptr
-    }
-
-    unsafe fn static_upcast_mut(ptr: MutPtr<T>) -> MutPtr<T> {
         ptr
     }
 }
@@ -56,8 +46,8 @@ impl<T> StaticUpcast<T> for T {
 /// It's generally safer to use `DynamicCast` instead because it performs a checked conversion.
 /// This trait should only be used if the type of the object is known.
 ///
-/// It's recommended to perform the conversion by calling `static_downcast` and
-/// `static_downcast_mut` methods on pointer types (`CppBox`, `Ptr`, `MutPtr`, `Ref`, `MutRef`)
+/// It's recommended to perform the conversion by calling `static_downcast`
+/// method on pointer types (`CppBox`, `Ptr`, `Ref`)
 /// instead of importing the trait directly.
 ///
 /// Provides access to C++ `static_cast` conversion from base class to derived class.
@@ -80,13 +70,6 @@ pub trait StaticDowncast<T>: Sized {
     /// This operation is safe as long as `ptr` is either null or points to an object
     /// of the `T` class or a class inherited by `T`.
     unsafe fn static_downcast(ptr: Ptr<Self>) -> Ptr<T>;
-    /// Convert type of a mutable pointer.
-    ///
-    /// ### Safety
-    ///
-    /// This operation is safe as long as `ptr` is either null or points to an object
-    /// of the `T` class or a class inherited by `T`.
-    unsafe fn static_downcast_mut(ptr: MutPtr<Self>) -> MutPtr<T>;
 }
 
 /// Converts a class pointer to a base class pointer.
@@ -94,8 +77,8 @@ pub trait StaticDowncast<T>: Sized {
 /// A null pointer is always converted to a null pointer.
 /// If the object can't be converted to the requested type, a null pointer is returned.
 ///
-/// It's recommended to perform the conversion by calling `dynamic_cast` and
-/// `dynamic_cast_mut` methods on pointer types (`CppBox`, `Ptr`, `MutPtr`, `Ref`, `MutRef`)
+/// It's recommended to perform the conversion by calling `dynamic_cast`
+/// method on pointer types (`CppBox`, `Ptr`, `Ref`)
 /// instead of importing the trait directly.
 ///
 /// Provides access to C++ `dynamic_cast` conversion from base class to derived class.
@@ -113,12 +96,4 @@ pub trait DynamicCast<T>: Sized {
     ///
     /// This operation is safe as long as `ptr` is either valid or null.
     unsafe fn dynamic_cast(ptr: Ptr<Self>) -> Ptr<T>;
-    /// Convert type of a mutable pointer.
-    ///
-    /// Returns a null pointer if the object doesn't have the requested type.
-    ///
-    /// ### Safety
-    ///
-    /// This operation is safe as long as `ptr` is either valid or null.
-    unsafe fn dynamic_cast_mut(ptr: MutPtr<Self>) -> MutPtr<T>;
 }

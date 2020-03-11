@@ -1,6 +1,6 @@
-use crate::{QObject, QPointerOfQObject};
+use crate::{QBox, QObject, QPointerOfQObject};
 use cpp_core::{
-    CastFrom, CastInto, CppBox, DynamicCast, MutPtr, Ptr, Ref, StaticDowncast, StaticUpcast,
+    CastFrom, CastInto, CppBox, CppDeletable, DynamicCast, Ptr, Ref, StaticDowncast, StaticUpcast,
 };
 use std::fmt;
 use std::ops::Deref;
@@ -52,7 +52,7 @@ impl<T: StaticUpcast<QObject>> QPtr<T> {
             q_pointer: if target.is_null() {
                 None
             } else {
-                Some(QPointerOfQObject::new_1a(MutPtr::from_raw(
+                Some(QPointerOfQObject::new_1a(Ptr::from_raw(
                     target.as_raw_ptr() as *mut T,
                 )))
             },
@@ -66,7 +66,7 @@ impl<T: StaticUpcast<QObject>> QPtr<T> {
     ///
     /// `target` must be either a valid pointer to an object or a null pointer.
     /// See type level documentation.
-    pub unsafe fn from_raw(target: *const T) -> Self {
+    pub unsafe fn from_raw(target: *mut T) -> Self {
         Self::new(Ptr::from_raw(target))
     }
 
@@ -113,6 +113,15 @@ impl<T: StaticUpcast<QObject>> QPtr<T> {
         self.as_ptr().as_raw_ptr()
     }
 
+    /// Returns the content as a raw pointer.
+    ///
+    /// ### Safety
+    ///
+    /// See type level documentation.
+    pub unsafe fn as_mut_raw_ptr(&self) -> *mut T {
+        self.as_ptr().as_mut_raw_ptr()
+    }
+
     /// Returns the content as a const `Ref`. Returns `None` if `self` is a null pointer.
     ///
     /// ### Safety
@@ -120,6 +129,28 @@ impl<T: StaticUpcast<QObject>> QPtr<T> {
     /// See type level documentation.
     pub unsafe fn as_ref(&self) -> Option<Ref<T>> {
         self.as_ptr().as_ref()
+    }
+
+    /// Returns a reference to the value. Returns `None` if the pointer is null.
+    ///
+    /// ### Safety
+    ///
+    /// `self` must be valid.
+    /// The content must not be read or modified through other ways while the returned reference
+    /// exists.See type level documentation.
+    pub unsafe fn as_raw_ref<'a>(&self) -> Option<&'a T> {
+        self.as_ref().map(|r| r.as_raw_ref())
+    }
+
+    /// Returns a mutable reference to the value. Returns `None` if the pointer is null.
+    ///
+    /// ### Safety
+    ///
+    /// `self` must be valid.
+    /// The content must not be read or modified through other ways while the returned reference
+    /// exists.See type level documentation.
+    pub unsafe fn as_mut_raw_ref<'a>(&self) -> Option<&'a mut T> {
+        self.as_ref().map(|r| r.as_mut_raw_ref())
     }
 
     /// Converts the pointer to the base class type `U`.
@@ -163,6 +194,42 @@ impl<T: StaticUpcast<QObject>> QPtr<T> {
         U: StaticUpcast<QObject>,
     {
         QPtr::<U>::new(self.as_ptr().dynamic_cast())
+    }
+
+    /// Converts this pointer to a `CppBox`. Returns `None` if `self`
+    /// is a null pointer.
+    ///
+    /// Use this function to take ownership of the object. This is
+    /// the same as `CppBox::new`. `CppBox` will delete the object when dropped.
+    ///
+    /// You can also use `into_qbox` to convert the pointer to a `QBox`.
+    /// Unlike `CppBox`, `QBox` will only delete the object if it has no parent.
+    ///
+    /// ### Safety
+    ///
+    /// `CppBox` will attempt to delete the object on drop. If something else also tries to
+    /// delete this object before or after that, the behavior is undefined.
+    /// See type level documentation.
+    pub unsafe fn to_box(&self) -> Option<CppBox<T>>
+    where
+        T: CppDeletable,
+    {
+        self.as_ptr().to_box()
+    }
+
+    /// Converts this pointer to a `QBox`.
+    ///
+    /// Use this function to take ownership of the object. This is
+    /// the same as `QBox::from_q_mut_ptr`.
+    ///
+    /// ### Safety
+    ///
+    /// See type level documentation.
+    pub unsafe fn into_q_box(self) -> QBox<T>
+    where
+        T: CppDeletable,
+    {
+        QBox::from_q_ptr(self)
     }
 }
 

@@ -9,8 +9,8 @@
 //! `cpp_core` provides three kinds of pointers:
 //!
 //! - `CppBox`: owned, non-null (corresponds to C++ objects passed by value)
-//! - `Ptr` and `MutPtr`: possibly owned, possibly null (correspond to C++ pointers)
-//! - `Ref` and `MutRef`: not owned, non-null (correspond to C++ references)
+//! - `Ptr`: possibly owned, possibly null (correspond to C++ pointers)
+//! - `Ref`: not owned, non-null (correspond to C++ references)
 //!
 //! Accessing objects through these pointers is inherently unsafe,
 //! as the compiler cannot make any guarantee about the validity of pointers to objects
@@ -23,7 +23,7 @@
 //! Pointer types implement operator traits and delegate them to the corresponding C++ operators.
 //! This means that you can use `ptr1 + ptr2` to access the object's `operator+`.
 //!
-//! Pointer types implement `Deref` and `DerefMut`, allowing to call the object's methods
+//! Pointer types implement `Deref`, allowing to call the object's methods
 //! directly. In addition, methods of the object's first base class are also directly available
 //! thanks to nested `Deref` implementations.
 //!
@@ -46,7 +46,7 @@
 //!
 //! The `CastFrom` and `CastInto` traits represent some of the implicit coercions
 //! available in C++. For example, if a method accepts `impl CastInto<Ptr<SomeClass>>`,
-//! you can pass a `Ptr<SomeClass>`, `MutPtr<SomeClass>`, `&CppBox<SomeClass>`,
+//! you can pass a `Ptr<SomeClass>`, `&CppBox<SomeClass>`,
 //! or even `Ptr<DerivedClass>` (where `DerivedClass` inherits `SomeClass`). You can also
 //! pass a null pointer object (`NullPtr`) if you don't have a value
 //! (`Ptr::null()` is also an option but it can cause type inference issues).
@@ -57,8 +57,8 @@ pub use crate::casts::{DynamicCast, StaticDowncast, StaticUpcast};
 pub use crate::convert::{CastFrom, CastInto};
 pub use crate::cpp_box::{CppBox, CppDeletable};
 pub use crate::iterator::{cpp_iter, CppIterator, SliceAsBeginEnd};
-pub use crate::ptr::{MutPtr, NullPtr, Ptr};
-pub use crate::ref_::{MutRef, Ref};
+pub use crate::ptr::{NullPtr, Ptr};
+pub use crate::ref_::Ref;
 pub use libc::wchar_t;
 
 mod casts;

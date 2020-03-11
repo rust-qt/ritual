@@ -11,8 +11,8 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         unsafe {
-            let mut string = QString::new();
-            let q_debug = QDebug::from_q_string(string.as_mut_ptr());
+            let string = QString::new();
+            let q_debug = QDebug::from_q_string(&string);
             let _ = &q_debug << self.0;
             drop(q_debug);
             write!(f, "{}", string.to_std_string())

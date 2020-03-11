@@ -606,16 +606,8 @@ impl Generator<'_> {
                 let code = format!("{}::QBox::from_raw({})", self.qt_core_prefix(), source_expr);
                 wrap_unsafe(in_unsafe_context, &code)
             }
-            RustToFfiTypeConversion::QPtrToPtr => {
-                let ptr_wrapper_path = &type1.api_type().as_common()?.path;
-                let code = format!(
-                    "{}::from_raw({})",
-                    self.rust_path_to_string(ptr_wrapper_path),
-                    source_expr
-                );
-                wrap_unsafe(in_unsafe_context, &code)
-            }
-            RustToFfiTypeConversion::UtilsPtrToPtr { .. }
+            RustToFfiTypeConversion::QPtrToPtr
+            | RustToFfiTypeConversion::UtilsPtrToPtr { .. }
             | RustToFfiTypeConversion::UtilsRefToPtr { .. }
             | RustToFfiTypeConversion::OptionUtilsRefToPtr { .. } => {
                 let is_option = type1.conversion().is_option_utils_ref_to_ptr();
@@ -635,10 +627,21 @@ impl Generator<'_> {
                 let ptr_wrapper_path = &ptr_wrapper_type.as_common()?.path;
 
                 let need_unwrap = type1.conversion().is_utils_ref_to_ptr();
+                let arg = if type1.ffi_type().is_const_pointer_like()? {
+                    let mut intermediate = type1.ffi_type().clone();
+                    intermediate.set_const(false)?;
+                    format!(
+                        "{} as {}",
+                        source_expr,
+                        self.rust_type_to_code(&intermediate)
+                    )
+                } else {
+                    source_expr
+                };
                 let code = format!(
                     "{}::from_raw({}){}",
                     self.rust_path_to_string(ptr_wrapper_path),
-                    source_expr,
+                    arg,
                     if need_unwrap {
                         ".expect(\"attempted to construct a null Ref\")"
                     } else {
@@ -1043,10 +1046,15 @@ impl Generator<'_> {
                     .ok_or_else(|| err_msg("invalid source cpp item type"))?;
 
                 let path = &func.item.return_type.api_type().as_common()?.path;
+                let qobject = self.rust_path_to_string(&self.qt_core_path().join("QObject"));
                 let call = format!(
-                    "{}::new(::cpp_core::Ref::from_raw_ref(self), \
+                    "{}::new(::cpp_core::Ref::from_raw(self as &{} as *const {} as *mut {}) \
+                        .expect(\"attempted to construct a null Ref\"), \
                      ::std::ffi::CStr::from_bytes_with_nul_unchecked(b\"{}\\0\"))",
                     self.rust_path_to_string(&path),
+                    qobject,
+                    qobject,
+                    qobject,
                     cpp_item.receiver_id()?,
                 );
                 Some(wrap_unsafe(func.item.is_unsafe, &call))

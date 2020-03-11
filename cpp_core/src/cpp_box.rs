@@ -1,6 +1,8 @@
-use crate::{DynamicCast, MutPtr, MutRef, Ptr, Ref, StaticDowncast, StaticUpcast};
-use std::ops::{Deref, DerefMut};
-use std::{fmt, mem, ptr};
+use crate::ops::{Begin, BeginMut, End, EndMut, Increment, Indirection};
+use crate::vector_ops::{Data, DataMut, Size};
+use crate::{cpp_iter, CppIterator, DynamicCast, Ptr, Ref, StaticDowncast, StaticUpcast};
+use std::ops::Deref;
+use std::{fmt, mem, ptr, slice};
 
 /// Objects that can be deleted using C++'s `delete` operator.
 ///
@@ -13,7 +15,7 @@ pub trait CppDeletable: Sized {
     /// The caller must make sure `self` contains a valid pointer. This function
     /// may invoke arbitrary foreign code, so no safety guarantees can be made.
     /// Note that deleting an object multiple times is undefined behavior.
-    unsafe fn delete(&mut self);
+    unsafe fn delete(&self);
 }
 
 /// An owning pointer to a C++ object.
@@ -38,7 +40,7 @@ pub trait CppDeletable: Sized {
 /// to the corresponding C++ operators.
 /// This means that you can use `&box1 + value` to access the object's `operator+`.
 ///
-/// `CppBox` implements `Deref` and `DerefMut`, allowing to call the object's methods
+/// `CppBox` implements `Deref`, allowing to call the object's methods
 /// directly. In addition, methods of the object's first base class are also directly available
 /// thanks to nested `Deref` implementations.
 ///
@@ -60,7 +62,7 @@ pub struct CppBox<T: CppDeletable>(ptr::NonNull<T>);
 impl<T: CppDeletable> CppBox<T> {
     /// Encapsulates the object into a `CppBox`. Returns `None` if the pointer is null.
     ///
-    /// The same operation can be done by calling `to_box` function on `MutPtr`.
+    /// The same operation can be done by calling `to_box` function on `Ptr`.
     ///
     /// You should use this function only for
     /// pointers that were created on C++ side and passed through
@@ -81,7 +83,7 @@ impl<T: CppDeletable> CppBox<T> {
     /// safely deleted using C++'s `delete` operator.
     /// The object must not be deleted by other means while `CppBox` exists.
     /// Any other pointers to the object must not be used after `CppBox` is dropped.
-    pub unsafe fn new(ptr: MutPtr<T>) -> Option<Self> {
+    pub unsafe fn new(ptr: Ptr<T>) -> Option<Self> {
         Self::from_raw(ptr.as_mut_raw_ptr())
     }
 
@@ -110,17 +112,8 @@ impl<T: CppDeletable> CppBox<T> {
         Ptr::from_raw(self.0.as_ptr())
     }
 
-    /// Returns a mutable pointer to the value in the box.
-    ///
-    /// ### Safety
-    ///
-    /// This operation is safe as long as `self` is valid.
-    pub unsafe fn as_mut_ptr(&mut self) -> MutPtr<T> {
-        MutPtr::from_raw(self.0.as_ptr())
-    }
-
     /// Returns a constant raw pointer to the value in the box.
-    pub fn as_mut_raw_ptr(&mut self) -> *mut T {
+    pub fn as_mut_raw_ptr(&self) -> *mut T {
         self.0.as_ptr()
     }
 
@@ -145,8 +138,8 @@ impl<T: CppDeletable> CppBox<T> {
     /// ### Safety
     ///
     /// This operation is safe as long as `self` is valid.
-    pub unsafe fn into_ptr(self) -> MutPtr<T> {
-        let ptr = MutPtr::from_raw(self.0.as_ptr());
+    pub unsafe fn into_ptr(self) -> Ptr<T> {
+        let ptr = Ptr::from_raw(self.0.as_ptr());
         mem::forget(self);
         ptr
     }
@@ -161,14 +154,26 @@ impl<T: CppDeletable> CppBox<T> {
         Ref::from_raw_non_null(self.0)
     }
 
-    /// Returns a mutable reference to the value in the box.
+    /// Returns a reference to the value.
     ///
     /// ### Safety
     ///
-    /// This operation is safe as long as `self` is valid.
-    #[allow(clippy::should_implement_trait)]
-    pub unsafe fn as_mut_ref(&mut self) -> MutRef<T> {
-        MutRef::from_raw_non_null(self.0)
+    /// `self` must be valid.
+    /// The content must not be read or modified through other ways while the returned reference
+    /// exists.See type level documentation.
+    pub unsafe fn as_raw_ref<'a>(&self) -> &'a T {
+        &*self.0.as_ptr()
+    }
+
+    /// Returns a mutable reference to the value.
+    ///
+    /// ### Safety
+    ///
+    /// `self` must be valid.
+    /// The content must not be read or modified through other ways while the returned reference
+    /// exists.See type level documentation.
+    pub unsafe fn as_mut_raw_ref<'a>(&self) -> &'a mut T {
+        &mut *self.0.as_ptr()
     }
 
     /// Returns a non-owning reference to the content converted to the base class type `U`.
@@ -216,51 +221,84 @@ impl<T: CppDeletable> CppBox<T> {
     {
         DynamicCast::dynamic_cast(self.as_ptr()).as_ref()
     }
+}
 
-    /// Returns a non-owning reference to the content converted to the base class type `U`.
-    /// `CppBox` retains the ownership of the object.
+impl<V, T> CppBox<V>
+where
+    V: Data<Output = Ptr<T>> + Size + CppDeletable,
+{
+    /// Returns the content of the object as a slice, based on `data()` and `size()` methods.
     ///
-    /// ### Safety
+    /// # Safety
     ///
-    /// This operation is safe as long as `self` is valid.
-    pub unsafe fn static_upcast_mut<U>(&mut self) -> MutRef<U>
-    where
-        T: StaticUpcast<U>,
-    {
-        StaticUpcast::static_upcast_mut(self.as_mut_ptr())
-            .as_mut_ref()
-            .expect("StaticUpcast returned null on CppBox input")
+    /// The caller must make sure `self` contains a valid pointer. The content must
+    /// not be read or modified through other ways while the returned slice exists.
+    /// This function
+    /// may invoke arbitrary foreign code, so no safety guarantees can be made.
+    pub unsafe fn as_slice<'a>(&self) -> &'a [T] {
+        let ptr = self.data().as_raw_ptr();
+        let size = self.size();
+        slice::from_raw_parts(ptr, size)
     }
+}
 
-    /// Returns a non-owning reference to the content converted to the derived class type `U`.
-    /// `CppBox` retains the ownership of the object.
+impl<V, T> CppBox<V>
+where
+    V: DataMut<Output = Ptr<T>> + Size + CppDeletable,
+{
+    /// Returns the content of the vector as a mutable slice,
+    /// based on `data()` and `size()` methods.
     ///
-    /// It's recommended to use `dynamic_cast` instead because it performs a checked conversion.
+    /// # Safety
     ///
-    /// ### Safety
-    ///
-    /// This operation is safe as long as `self` is valid and it's type is `U` or inherits from `U`.
-    pub unsafe fn static_downcast_mut<U>(&mut self) -> MutRef<U>
-    where
-        T: StaticDowncast<U>,
-    {
-        StaticDowncast::static_downcast_mut(self.as_mut_ptr())
-            .as_mut_ref()
-            .expect("StaticDowncast returned null on CppBox input")
+    /// The caller must make sure `self` contains a valid pointer. The content must
+    /// not be read or modified through other ways while the returned slice exists.
+    /// This function
+    /// may invoke arbitrary foreign code, so no safety guarantees can be made.
+    pub unsafe fn as_mut_slice<'a>(&self) -> &'a mut [T] {
+        let ptr = self.data_mut().as_mut_raw_ptr();
+        let size = self.size();
+        slice::from_raw_parts_mut(ptr, size)
     }
+}
 
-    /// Returns a non-owning reference to the content converted to the derived class type `U`.
-    /// `CppBox` retains the ownership of the object. Returns `None` if the object's type is not `U`
-    /// and doesn't inherit `U`.
+impl<T, T1, T2> CppBox<T>
+where
+    T: Begin<Output = CppBox<T1>> + End<Output = CppBox<T2>> + CppDeletable,
+    T1: CppDeletable + PartialEq<Ref<T2>> + Increment + Indirection,
+    T2: CppDeletable,
+{
+    /// Returns an iterator over the content of the object,
+    /// based on `begin()` and `end()` methods.
     ///
-    /// ### Safety
+    /// # Safety
     ///
-    /// This operation is safe as long as `self` is valid.
-    pub unsafe fn dynamic_cast_mut<U>(&mut self) -> Option<MutRef<U>>
-    where
-        T: DynamicCast<U>,
-    {
-        DynamicCast::dynamic_cast_mut(self.as_mut_ptr()).as_mut_ref()
+    /// The caller must make sure `self` contains a valid pointer. The content must
+    /// not be read or modified through other ways while the returned slice exists.
+    /// This function
+    /// may invoke arbitrary foreign code, so no safety guarantees can be made.
+    pub unsafe fn iter(&self) -> CppIterator<T1, T2> {
+        cpp_iter(self.begin(), self.end())
+    }
+}
+
+impl<T, T1, T2> CppBox<T>
+where
+    T: BeginMut<Output = CppBox<T1>> + EndMut<Output = CppBox<T2>> + CppDeletable,
+    T1: CppDeletable + PartialEq<Ref<T2>> + Increment + Indirection,
+    T2: CppDeletable,
+{
+    /// Returns a mutable iterator over the content of the object,
+    /// based on `begin()` and `end()` methods.
+    ///
+    /// # Safety
+    ///
+    /// The caller must make sure `self` contains a valid pointer. The content must
+    /// not be read or modified through other ways while the returned slice exists.
+    /// This function
+    /// may invoke arbitrary foreign code, so no safety guarantees can be made.
+    pub unsafe fn iter_mut(&self) -> CppIterator<T1, T2> {
+        cpp_iter(self.begin_mut(), self.end_mut())
     }
 }
 
@@ -272,18 +310,11 @@ impl<T: CppDeletable> Deref for CppBox<T> {
     }
 }
 
-/// Allows to call member functions of `T` and its base classes directly on the pointer.
-impl<T: CppDeletable> DerefMut for CppBox<T> {
-    fn deref_mut(&mut self) -> &mut T {
-        unsafe { self.0.as_mut() }
-    }
-}
-
 /// Deletes the stored object using C++'s `delete` operator.
 impl<T: CppDeletable> Drop for CppBox<T> {
     fn drop(&mut self) {
         unsafe {
-            T::delete(self.0.as_mut());
+            T::delete(self.0.as_ref());
         }
     }
 }
@@ -296,7 +327,7 @@ impl<T: CppDeletable> fmt::Debug for CppBox<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{CppBox, CppDeletable, MutPtr};
+    use crate::{CppBox, CppDeletable, Ptr};
     use std::cell::RefCell;
     use std::rc::Rc;
 
@@ -304,12 +335,12 @@ mod tests {
         value: Rc<RefCell<i32>>,
     }
 
-    unsafe extern "C" fn struct1_delete(this_ptr: *mut Struct1) {
+    unsafe extern "C" fn struct1_delete(this_ptr: *const Struct1) {
         (*this_ptr).value.borrow_mut().clone_from(&42);
     }
 
     impl CppDeletable for Struct1 {
-        unsafe fn delete(&mut self) {
+        unsafe fn delete(&self) {
             struct1_delete(self);
         }
     }
@@ -322,8 +353,7 @@ mod tests {
         };
         assert!(*value1.borrow() == 10);
         unsafe {
-            // TODO: remove all "as *mut _" because it's automatic
-            CppBox::new(MutPtr::from_raw(&mut object1));
+            CppBox::new(Ptr::from_raw(&mut object1));
         }
         assert!(*value1.borrow() == 42);
     }

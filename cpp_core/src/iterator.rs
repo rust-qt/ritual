@@ -1,11 +1,11 @@
-use crate::ops::{Begin, BeginMut, Decrement, End, EndMut, Increment, Indirection};
-use crate::{CppBox, CppDeletable, MutPtr, MutRef, Ptr, Ref};
+use crate::ops::{Decrement, Increment, Indirection};
+use crate::{CppBox, CppDeletable, Ptr, Ref};
 use std::os::raw::c_char;
 
 /// `Iterator` and `DoubleEndedIterator` backed by C++ iterators.
 ///
 /// This object is produced by `IntoIterator` implementations on  pointer types
-/// (`&CppBox`, `&mut CppBox`, `Ptr`, `MutPtr`, `Ref`, `MutRef`). You can also use
+/// (`&CppBox`, `&mut CppBox`, `Ptr`, `Ref`). You can also use
 /// `cpp_iter` function to construct it manually from two C++ iterator objects.
 pub struct CppIterator<T1, T2>
 where
@@ -73,90 +73,6 @@ where
     }
 }
 
-impl<T, T1, T2> IntoIterator for Ptr<T>
-where
-    T: Begin<Output = CppBox<T1>> + End<Output = CppBox<T2>>,
-    T1: CppDeletable + PartialEq<Ref<T2>> + Increment + Indirection,
-    T2: CppDeletable,
-{
-    type Item = <T1 as Indirection>::Output;
-    type IntoIter = CppIterator<T1, T2>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        unsafe { cpp_iter(self.begin(), self.end()) }
-    }
-}
-
-impl<T, T1, T2> IntoIterator for MutPtr<T>
-where
-    T: BeginMut<Output = CppBox<T1>> + EndMut<Output = CppBox<T2>>,
-    T1: CppDeletable + PartialEq<Ref<T2>> + Indirection + Increment,
-    T2: CppDeletable,
-{
-    type Item = <T1 as Indirection>::Output;
-    type IntoIter = CppIterator<T1, T2>;
-
-    fn into_iter(mut self) -> Self::IntoIter {
-        unsafe { cpp_iter(self.begin_mut(), self.end_mut()) }
-    }
-}
-
-impl<T, T1, T2> IntoIterator for Ref<T>
-where
-    T: Begin<Output = CppBox<T1>> + End<Output = CppBox<T2>>,
-    T1: CppDeletable + PartialEq<Ref<T2>> + Indirection + Increment,
-    T2: CppDeletable,
-{
-    type Item = <T1 as Indirection>::Output;
-    type IntoIter = CppIterator<T1, T2>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        unsafe { cpp_iter(self.begin(), self.end()) }
-    }
-}
-
-impl<T, T1, T2> IntoIterator for MutRef<T>
-where
-    T: BeginMut<Output = CppBox<T1>> + EndMut<Output = CppBox<T2>>,
-    T1: CppDeletable + PartialEq<Ref<T2>> + Indirection + Increment,
-    T2: CppDeletable,
-{
-    type Item = <T1 as Indirection>::Output;
-    type IntoIter = CppIterator<T1, T2>;
-
-    fn into_iter(mut self) -> Self::IntoIter {
-        unsafe { cpp_iter(self.begin_mut(), self.end_mut()) }
-    }
-}
-
-impl<'a, T, T1, T2> IntoIterator for &'a CppBox<T>
-where
-    T: CppDeletable + Begin<Output = CppBox<T1>> + End<Output = CppBox<T2>>,
-    T1: CppDeletable + PartialEq<Ref<T2>> + Indirection + Increment,
-    T2: CppDeletable,
-{
-    type Item = <T1 as Indirection>::Output;
-    type IntoIter = CppIterator<T1, T2>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        unsafe { cpp_iter(self.begin(), self.end()) }
-    }
-}
-
-impl<'a, T, T1, T2> IntoIterator for &'a mut CppBox<T>
-where
-    T: CppDeletable + BeginMut<Output = CppBox<T1>> + EndMut<Output = CppBox<T2>>,
-    T1: CppDeletable + PartialEq<Ref<T2>> + Indirection + Increment,
-    T2: CppDeletable,
-{
-    type Item = <T1 as Indirection>::Output;
-    type IntoIter = CppIterator<T1, T2>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        unsafe { cpp_iter(self.begin_mut(), self.end_mut()) }
-    }
-}
-
 pub trait SliceAsBeginEnd {
     type Item;
     fn begin_ptr(&self) -> Ptr<Self::Item>;
@@ -166,19 +82,19 @@ pub trait SliceAsBeginEnd {
 impl<'a, T> SliceAsBeginEnd for &'a [T] {
     type Item = T;
     fn begin_ptr(&self) -> Ptr<T> {
-        unsafe { Ptr::from_raw(self.as_ptr()) }
+        unsafe { Ptr::from_raw(self.as_ptr() as *mut T) }
     }
     fn end_ptr(&self) -> Ptr<T> {
-        unsafe { Ptr::from_raw(self.as_ptr().add(self.len())) }
+        unsafe { Ptr::from_raw((self.as_ptr() as *mut T).add(self.len())) }
     }
 }
 
 impl<'a> SliceAsBeginEnd for &'a str {
     type Item = c_char;
     fn begin_ptr(&self) -> Ptr<c_char> {
-        unsafe { Ptr::from_raw(self.as_ptr() as *const c_char) }
+        unsafe { Ptr::from_raw(self.as_ptr() as *mut c_char) }
     }
     fn end_ptr(&self) -> Ptr<c_char> {
-        unsafe { Ptr::from_raw(self.as_ptr().add(self.len()) as *const c_char) }
+        unsafe { Ptr::from_raw(self.as_ptr().add(self.len()) as *mut c_char) }
     }
 }

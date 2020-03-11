@@ -14,7 +14,7 @@ fn timer_quit() {
         let c = app.about_to_quit().connect(&slot1);
         assert!(c.is_valid());
 
-        let mut timer = QTimer::new_0a();
+        let timer = QTimer::new_0a();
         let c = timer.timeout().connect(app.slot_quit());
         assert!(c.is_valid());
         timer.start_1a(1000);

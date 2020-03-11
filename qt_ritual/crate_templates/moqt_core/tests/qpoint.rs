@@ -13,7 +13,7 @@ fn create() {
 #[test]
 fn modify() {
     unsafe {
-        let mut point: CppBox<QPoint> = QPoint::new_2a(2, 3);
+        let point: CppBox<QPoint> = QPoint::new_2a(2, 3);
         assert_eq!(point.x(), 2);
         assert_eq!(point.y(), 3);
         point.set_x(4);
@@ -46,11 +46,11 @@ fn operators() {
     unsafe {
         let a: CppBox<QPoint> = QPoint::new_2a(1, 2);
         let b: CppBox<QPoint> = QPoint::new_2a(3, 4);
-        let mut c: CppBox<QPoint> = &a + b.as_ref();
+        let c: CppBox<QPoint> = &a + b.as_ref();
         assert_eq!(c.x(), 4);
         assert_eq!(c.y(), 6);
 
-        c += a.as_ref();
+        c.add_assign(a.as_ref());
         assert_eq!(c.x(), 5);
         assert_eq!(c.y(), 8);
 
@@ -65,9 +65,9 @@ fn operators() {
         assert!(!(c > 9));
         assert!(!(c < 4));
 
-        let mut vec = QVectorOfInt::new();
-        vec.push(Ref::from_raw_ref(&10));
-        vec.push(Ref::from_raw_ref(&12));
+        let vec = QVectorOfInt::new();
+        vec.push(Ref::from_raw_ref(&mut 10));
+        vec.push(Ref::from_raw_ref(&mut 12));
         let _ = &b << vec.as_ref();
     }
 }

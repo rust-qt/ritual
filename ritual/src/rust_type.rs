@@ -137,22 +137,15 @@ pub enum RustToFfiTypeConversion {
     None,
     /// `&T` to `*const T` (or similar mutable types)
     RefToPtr {
-        force_api_is_const: Option<bool>,
         lifetime: Option<String>,
     },
     /// `Ptr<T>` to `*const T` (or similar mutable type)
-    UtilsPtrToPtr {
-        force_api_is_const: Option<bool>,
-    },
+    UtilsPtrToPtr {},
     /// `Ref<T>` to `*const T` (or similar mutable types)
-    UtilsRefToPtr {
-        force_api_is_const: Option<bool>,
-    },
+    UtilsRefToPtr {},
     /// `Option<Ref<T>>` to `*const T` (or similar mutable types)
-    OptionUtilsRefToPtr {
-        force_api_is_const: Option<bool>,
-    },
-    /// `QPtr<T>` or `QMutPtr<T>` to `Ptr<T>`
+    OptionUtilsRefToPtr {},
+    /// `QPtr<T>` to `Ptr<T>`
     QPtrToPtr,
     /// `T` to `*const T` (or similar mutable type)
     ValueToPtr,
@@ -221,40 +214,18 @@ pub struct RustFinalType {
     conversion: RustToFfiTypeConversion,
 }
 
-fn utils_ptr(ffi_type: &RustType, force_api_is_const: Option<bool>) -> Result<RustType> {
-    let is_const = if let Some(v) = force_api_is_const {
-        v
-    } else {
-        ffi_type.is_const_pointer_like()?
-    };
-    let name = if is_const {
-        "cpp_core::Ptr"
-    } else {
-        "cpp_core::MutPtr"
-    };
-
+fn utils_ptr(ffi_type: &RustType) -> Result<RustType> {
     let target = ffi_type.pointer_like_to_target()?;
     Ok(RustType::Common(RustCommonType {
-        path: RustPath::from_good_str(name),
+        path: RustPath::from_good_str("cpp_core::Ptr"),
         generic_arguments: Some(vec![target]),
     }))
 }
 
-fn utils_ref(ffi_type: &RustType, force_api_is_const: Option<bool>) -> Result<RustType> {
-    let is_const = if let Some(v) = force_api_is_const {
-        v
-    } else {
-        ffi_type.is_const_pointer_like()?
-    };
-    let name = if is_const {
-        "cpp_core::Ref"
-    } else {
-        "cpp_core::MutRef"
-    };
-
+fn utils_ref(ffi_type: &RustType) -> Result<RustType> {
     let target = ffi_type.pointer_like_to_target()?;
     Ok(RustType::Common(RustCommonType {
-        path: RustPath::from_good_str(name),
+        path: RustPath::from_good_str("cpp_core::Ref"),
         generic_arguments: Some(vec![target]),
     }))
 }
@@ -276,17 +247,10 @@ impl RustFinalType {
     pub fn new(ffi_type: RustType, api_to_ffi_conversion: RustToFfiTypeConversion) -> Result<Self> {
         let api_type = match &api_to_ffi_conversion {
             RustToFfiTypeConversion::None => ffi_type.clone(),
-            RustToFfiTypeConversion::RefToPtr {
-                force_api_is_const,
-                lifetime,
-            } => {
-                if let RustType::PointerLike {
-                    is_const, target, ..
-                } = &ffi_type
-                {
-                    let is_const = force_api_is_const.unwrap_or(*is_const);
+            RustToFfiTypeConversion::RefToPtr { lifetime } => {
+                if let RustType::PointerLike { target, .. } = &ffi_type {
                     RustType::PointerLike {
-                        is_const,
+                        is_const: true,
                         kind: RustPointerLikeTypeKind::Reference {
                             lifetime: lifetime.clone(),
                         },
@@ -296,14 +260,10 @@ impl RustFinalType {
                     bail!("not a pointer like type");
                 }
             }
-            RustToFfiTypeConversion::UtilsPtrToPtr { force_api_is_const } => {
-                utils_ptr(&ffi_type, *force_api_is_const)?
-            }
-            RustToFfiTypeConversion::UtilsRefToPtr { force_api_is_const } => {
-                utils_ref(&ffi_type, *force_api_is_const)?
-            }
-            RustToFfiTypeConversion::OptionUtilsRefToPtr { force_api_is_const } => {
-                RustType::new_option(utils_ref(&ffi_type, *force_api_is_const)?)
+            RustToFfiTypeConversion::UtilsPtrToPtr {} => utils_ptr(&ffi_type)?,
+            RustToFfiTypeConversion::UtilsRefToPtr {} => utils_ref(&ffi_type)?,
+            RustToFfiTypeConversion::OptionUtilsRefToPtr {} => {
+                RustType::new_option(utils_ref(&ffi_type)?)
             }
             RustToFfiTypeConversion::ValueToPtr => ffi_type.pointer_like_to_target()?,
             RustToFfiTypeConversion::CppBoxToPtr => {
@@ -322,13 +282,8 @@ impl RustFinalType {
             }
             RustToFfiTypeConversion::QPtrToPtr => {
                 let target = ffi_type.pointer_like_to_target()?;
-                let name = if ffi_type.is_const_pointer_like()? {
-                    "QPtr"
-                } else {
-                    "QMutPtr"
-                };
                 RustType::Common(RustCommonType {
-                    path: class_type_to_qt_core_crate_path(&target)?.join(name),
+                    path: class_type_to_qt_core_crate_path(&target)?.join("QPtr"),
                     generic_arguments: Some(vec![target.clone()]),
                 })
             }
@@ -371,14 +326,10 @@ impl RustFinalType {
     }
 
     pub fn with_lifetime(&self, lifetime: String) -> Result<Self> {
-        if let RustToFfiTypeConversion::RefToPtr {
-            force_api_is_const, ..
-        } = &self.conversion
-        {
+        if let RustToFfiTypeConversion::RefToPtr { .. } = &self.conversion {
             RustFinalType::new(
                 self.ffi_type.clone(),
                 RustToFfiTypeConversion::RefToPtr {
-                    force_api_is_const: *force_api_is_const,
                     lifetime: Some(lifetime),
                 },
             )
@@ -594,10 +545,8 @@ impl RustType {
                 path,
                 generic_arguments,
             }) => {
-                if path == &RustPath::from_good_str("cpp_core::MutPtr")
-                    || path == &RustPath::from_good_str("cpp_core::Ptr")
+                if path == &RustPath::from_good_str("cpp_core::Ptr")
                     || path == &RustPath::from_good_str("cpp_core::Ref")
-                    || path == &RustPath::from_good_str("cpp_core::MutRef")
                     || path == &RustPath::from_good_str("cpp_core::CppBox")
                 {
                     let arg = &generic_arguments.as_ref().unwrap()[0];

@@ -87,6 +87,7 @@ enum ProcessedFfiItem {
 enum ReturnTypeConstraint {
     Bool,
     Usize,
+    #[allow(dead_code)]
     Unit,
     Any,
 }
@@ -312,132 +313,12 @@ impl TraitImplInfo {
                 return_type_constraint: ReturnTypeConstraint::Any,
                 target_is_reference: true,
             },
-            CppOperator::AdditionAssignment => TraitImplInfo {
-                trait_path: "std::ops::AddAssign",
-                function_name: "add_assign",
-                is_unsafe: false,
-                is_inherent: false,
-                self_arg_kind: RustFunctionSelfArgKind::MutRef,
-                has_output_associated_type: false,
-                trait_arg_is_second_arg_type: true,
-                second_arg_is_reference: false,
-                return_type_constraint: ReturnTypeConstraint::Unit,
-                target_is_reference: false,
-            },
-            CppOperator::SubtractionAssignment => TraitImplInfo {
-                trait_path: "std::ops::SubAssign",
-                function_name: "sub_assign",
-                is_unsafe: false,
-                is_inherent: false,
-                self_arg_kind: RustFunctionSelfArgKind::MutRef,
-                has_output_associated_type: false,
-                trait_arg_is_second_arg_type: true,
-                second_arg_is_reference: false,
-                return_type_constraint: ReturnTypeConstraint::Unit,
-                target_is_reference: false,
-            },
-            CppOperator::MultiplicationAssignment => TraitImplInfo {
-                trait_path: "std::ops::MulAssign",
-                function_name: "mul_assign",
-                is_unsafe: false,
-                is_inherent: false,
-                self_arg_kind: RustFunctionSelfArgKind::MutRef,
-                has_output_associated_type: false,
-                trait_arg_is_second_arg_type: true,
-                second_arg_is_reference: false,
-                return_type_constraint: ReturnTypeConstraint::Unit,
-                target_is_reference: false,
-            },
-            CppOperator::DivisionAssignment => TraitImplInfo {
-                trait_path: "std::ops::DivAssign",
-                function_name: "div_assign",
-                is_unsafe: false,
-                is_inherent: false,
-                self_arg_kind: RustFunctionSelfArgKind::MutRef,
-                has_output_associated_type: false,
-                trait_arg_is_second_arg_type: true,
-                second_arg_is_reference: false,
-                return_type_constraint: ReturnTypeConstraint::Unit,
-                target_is_reference: false,
-            },
-            CppOperator::ModuloAssignment => TraitImplInfo {
-                trait_path: "std::ops::RemAssign",
-                function_name: "rem_assign",
-                is_unsafe: false,
-                is_inherent: false,
-                self_arg_kind: RustFunctionSelfArgKind::MutRef,
-                has_output_associated_type: false,
-                trait_arg_is_second_arg_type: true,
-                second_arg_is_reference: false,
-                return_type_constraint: ReturnTypeConstraint::Unit,
-                target_is_reference: false,
-            },
-            CppOperator::BitwiseAndAssignment => TraitImplInfo {
-                trait_path: "std::ops::BitAndAssign",
-                function_name: "bitand_assign",
-                is_unsafe: false,
-                is_inherent: false,
-                self_arg_kind: RustFunctionSelfArgKind::MutRef,
-                has_output_associated_type: false,
-                trait_arg_is_second_arg_type: true,
-                second_arg_is_reference: false,
-                return_type_constraint: ReturnTypeConstraint::Unit,
-                target_is_reference: false,
-            },
-            CppOperator::BitwiseOrAssignment => TraitImplInfo {
-                trait_path: "std::ops::BitOrAssign",
-                function_name: "bitor_assign",
-                is_unsafe: false,
-                is_inherent: false,
-                self_arg_kind: RustFunctionSelfArgKind::MutRef,
-                has_output_associated_type: false,
-                trait_arg_is_second_arg_type: true,
-                second_arg_is_reference: false,
-                return_type_constraint: ReturnTypeConstraint::Unit,
-                target_is_reference: false,
-            },
-            CppOperator::BitwiseXorAssignment => TraitImplInfo {
-                trait_path: "std::ops::BitXorAssign",
-                function_name: "bitxor_assign",
-                is_unsafe: false,
-                is_inherent: false,
-                self_arg_kind: RustFunctionSelfArgKind::MutRef,
-                has_output_associated_type: false,
-                trait_arg_is_second_arg_type: true,
-                second_arg_is_reference: false,
-                return_type_constraint: ReturnTypeConstraint::Unit,
-                target_is_reference: false,
-            },
-            CppOperator::BitwiseLeftShiftAssignment => TraitImplInfo {
-                trait_path: "std::ops::ShlAssign",
-                function_name: "shl_assign",
-                is_unsafe: false,
-                is_inherent: false,
-                self_arg_kind: RustFunctionSelfArgKind::MutRef,
-                has_output_associated_type: false,
-                trait_arg_is_second_arg_type: true,
-                second_arg_is_reference: false,
-                return_type_constraint: ReturnTypeConstraint::Unit,
-                target_is_reference: false,
-            },
-            CppOperator::BitwiseRightShiftAssignment => TraitImplInfo {
-                trait_path: "std::ops::ShrAssign",
-                function_name: "shr_assign",
-                is_unsafe: false,
-                is_inherent: false,
-                self_arg_kind: RustFunctionSelfArgKind::MutRef,
-                has_output_associated_type: false,
-                trait_arg_is_second_arg_type: true,
-                second_arg_is_reference: false,
-                return_type_constraint: ReturnTypeConstraint::Unit,
-                target_is_reference: false,
-            },
             CppOperator::PrefixIncrement => TraitImplInfo {
                 trait_path: "cpp_core::ops::Increment",
                 function_name: "inc",
                 is_unsafe: true,
                 is_inherent: true,
-                self_arg_kind: RustFunctionSelfArgKind::MutRef,
+                self_arg_kind: RustFunctionSelfArgKind::ConstRef,
                 has_output_associated_type: true,
                 trait_arg_is_second_arg_type: false,
                 second_arg_is_reference: false,
@@ -449,7 +330,7 @@ impl TraitImplInfo {
                 function_name: "dec",
                 is_unsafe: true,
                 is_inherent: true,
-                self_arg_kind: RustFunctionSelfArgKind::MutRef,
+                self_arg_kind: RustFunctionSelfArgKind::ConstRef,
                 has_output_associated_type: true,
                 trait_arg_is_second_arg_type: false,
                 second_arg_is_reference: false,
@@ -486,7 +367,17 @@ impl TraitImplInfo {
             | CppOperator::New
             | CppOperator::NewArray
             | CppOperator::Delete
-            | CppOperator::DeleteArray => return None,
+            | CppOperator::DeleteArray
+            | CppOperator::AdditionAssignment
+            | CppOperator::SubtractionAssignment
+            | CppOperator::MultiplicationAssignment
+            | CppOperator::DivisionAssignment
+            | CppOperator::ModuloAssignment
+            | CppOperator::BitwiseAndAssignment
+            | CppOperator::BitwiseOrAssignment
+            | CppOperator::BitwiseXorAssignment
+            | CppOperator::BitwiseLeftShiftAssignment
+            | CppOperator::BitwiseRightShiftAssignment => return None,
         })
     }
 
@@ -520,7 +411,7 @@ impl TraitImplInfo {
                                 function_name: "begin_mut",
                                 is_unsafe: true,
                                 is_inherent: true,
-                                self_arg_kind: RustFunctionSelfArgKind::MutRef,
+                                self_arg_kind: RustFunctionSelfArgKind::ConstRef,
                                 has_output_associated_type: true,
                                 trait_arg_is_second_arg_type: false,
                                 second_arg_is_reference: false,
@@ -550,7 +441,7 @@ impl TraitImplInfo {
                                 function_name: "end_mut",
                                 is_unsafe: true,
                                 is_inherent: true,
-                                self_arg_kind: RustFunctionSelfArgKind::MutRef,
+                                self_arg_kind: RustFunctionSelfArgKind::ConstRef,
                                 has_output_associated_type: true,
                                 trait_arg_is_second_arg_type: false,
                                 second_arg_is_reference: false,
@@ -581,7 +472,7 @@ impl TraitImplInfo {
                                     function_name: "data_mut",
                                     is_unsafe: true,
                                     is_inherent: true,
-                                    self_arg_kind: RustFunctionSelfArgKind::MutRef,
+                                    self_arg_kind: RustFunctionSelfArgKind::ConstRef,
                                     has_output_associated_type: true,
                                     trait_arg_is_second_arg_type: false,
                                     second_arg_is_reference: false,
@@ -897,9 +788,7 @@ impl State<'_, '_> {
                                     RustToFfiTypeConversion::CppBoxToPtr
                                 }
                             } else {
-                                RustToFfiTypeConversion::UtilsRefToPtr {
-                                    force_api_is_const: None,
-                                }
+                                RustToFfiTypeConversion::UtilsRefToPtr {}
                             };
                         }
                         ReturnValueAllocationPlace::NotApplicable => {
@@ -909,32 +798,23 @@ impl State<'_, '_> {
                 } else {
                     // argument passed by value is represented as a reference on Rust side
                     api_to_ffi_conversion = RustToFfiTypeConversion::ImplCastInto(Box::new(
-                        RustToFfiTypeConversion::UtilsRefToPtr {
-                            force_api_is_const: None,
-                        },
+                        RustToFfiTypeConversion::UtilsRefToPtr {},
                     ));
                 }
             } else {
                 if argument_meaning == &CppFfiArgumentMeaning::This {
-                    api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr {
-                        force_api_is_const: None,
-                        lifetime: None,
-                    };
+                    api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr { lifetime: None };
                 } else if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
                     api_to_ffi_conversion =
                         if let CppToFfiTypeConversion::ReferenceToPointer { .. } =
                             cpp_ffi_type.conversion()
                         {
-                            RustToFfiTypeConversion::UtilsRefToPtr {
-                                force_api_is_const: None,
-                            }
+                            RustToFfiTypeConversion::UtilsRefToPtr {}
                         } else {
                             if inherits_qobject {
                                 RustToFfiTypeConversion::QPtrToPtr
                             } else {
-                                RustToFfiTypeConversion::UtilsPtrToPtr {
-                                    force_api_is_const: None,
-                                }
+                                RustToFfiTypeConversion::UtilsPtrToPtr {}
                             }
                         };
                 } else {
@@ -944,15 +824,11 @@ impl State<'_, '_> {
                             cpp_ffi_type.conversion()
                         {
                             RustToFfiTypeConversion::ImplCastInto(Box::new(
-                                RustToFfiTypeConversion::UtilsRefToPtr {
-                                    force_api_is_const: None,
-                                },
+                                RustToFfiTypeConversion::UtilsRefToPtr {},
                             ))
                         } else {
                             RustToFfiTypeConversion::ImplCastInto(Box::new(
-                                RustToFfiTypeConversion::UtilsPtrToPtr {
-                                    force_api_is_const: None,
-                                },
+                                RustToFfiTypeConversion::UtilsPtrToPtr {},
                             ))
                         };
                 }
@@ -1040,14 +916,10 @@ impl State<'_, '_> {
     fn fix_cast_function(
         mut unnamed_function: UnnamedRustFunction,
         _cast: &CppCast,
-        is_const: bool,
     ) -> Result<UnnamedRustFunction> {
-        let force_const = if is_const { Some(true) } else { None };
         unnamed_function.return_type = RustFinalType::new(
             unnamed_function.return_type.ffi_type().clone(),
-            RustToFfiTypeConversion::UtilsPtrToPtr {
-                force_api_is_const: force_const,
-            },
+            RustToFfiTypeConversion::UtilsPtrToPtr {},
         )?;
 
         unnamed_function.arguments[0].argument_type = RustFinalType::new(
@@ -1055,9 +927,7 @@ impl State<'_, '_> {
                 .argument_type
                 .ffi_type()
                 .clone(),
-            RustToFfiTypeConversion::UtilsPtrToPtr {
-                force_api_is_const: force_const,
-            },
+            RustToFfiTypeConversion::UtilsPtrToPtr {},
         )?;
         //unnamed_function.arguments[0].name = "self".to_string();
         Ok(unnamed_function)
@@ -1080,12 +950,6 @@ impl State<'_, '_> {
             .clone();
 
         let self_value_type = self_type.pointer_like_to_target()?;
-
-        let is_self_const = match operator_info.self_arg_kind {
-            RustFunctionSelfArgKind::ConstRef | RustFunctionSelfArgKind::Value => true,
-            RustFunctionSelfArgKind::MutRef => false,
-            RustFunctionSelfArgKind::None => unreachable!(),
-        };
 
         let target_type = if operator_info.target_is_reference {
             RustType::new_reference(true, self_value_type.clone())
@@ -1146,10 +1010,7 @@ impl State<'_, '_> {
         function.is_unsafe = operator_info.is_unsafe;
         function.arguments[0].argument_type = RustFinalType::new(
             function.arguments[0].argument_type.ffi_type().clone(),
-            RustToFfiTypeConversion::RefToPtr {
-                force_api_is_const: Some(is_self_const),
-                lifetime: None,
-            },
+            RustToFfiTypeConversion::RefToPtr { lifetime: None },
         )?;
         function.arguments[0].name = "self".to_string();
         if let Some(other_type) = other_type {
@@ -1270,7 +1131,6 @@ impl State<'_, '_> {
 
         let trait_path;
         let derived_type;
-        let cast_function_name;
         let cast_function_name_mut;
         unnamed_function.is_unsafe = true;
         match &cast {
@@ -1278,35 +1138,26 @@ impl State<'_, '_> {
                 if *is_unsafe {
                     trait_path = RustPath::from_good_str("cpp_core::StaticDowncast");
                     derived_type = to_type;
-                    cast_function_name = "static_downcast";
-                    cast_function_name_mut = "static_downcast_mut";
+                    cast_function_name_mut = "static_downcast";
                 } else {
                     trait_path = RustPath::from_good_str("cpp_core::StaticUpcast");
                     derived_type = from_type;
-                    cast_function_name = "static_upcast";
-                    cast_function_name_mut = "static_upcast_mut";
+                    cast_function_name_mut = "static_upcast";
                 }
             }
             CppCast::Dynamic => {
                 trait_path = RustPath::from_good_str("cpp_core::DynamicCast");
                 derived_type = to_type;
-                cast_function_name = "dynamic_cast";
-                cast_function_name_mut = "dynamic_cast_mut";
+                cast_function_name_mut = "dynamic_cast";
             }
             CppCast::QObject => {
                 trait_path = RustPath::from_good_str("qt_core::QObjectCast");
                 derived_type = to_type;
-                cast_function_name = "qobject_cast";
-                cast_function_name_mut = "qobject_cast_mut";
+                cast_function_name_mut = "qobject_cast";
             }
         };
 
-        let fixed_function = State::fix_cast_function(unnamed_function.clone(), cast, true)?;
-        let cast_function = fixed_function
-            .clone()
-            .with_path(trait_path.join(cast_function_name));
-
-        let fixed_function_mut = State::fix_cast_function(unnamed_function.clone(), cast, false)?;
+        let fixed_function_mut = State::fix_cast_function(unnamed_function.clone(), cast)?;
         let cast_function_mut = fixed_function_mut
             .clone()
             .with_path(trait_path.join(cast_function_name_mut));
@@ -1329,18 +1180,15 @@ impl State<'_, '_> {
                 generic_arguments: Some(vec![to_type_value.clone()]),
             },
             associated_types: Vec::new(),
-            functions: vec![cast_function, cast_function_mut],
+            functions: vec![cast_function_mut],
             extra_kind: RustTraitImplExtraKind::Normal,
         });
 
         if cast.is_first_static_cast() && !cast.is_unsafe_static_cast() {
-            let make_type_ref = |type1: &mut RustFinalType, is_const: bool| -> Result<()> {
+            let make_type_ref = |type1: &mut RustFinalType| -> Result<()> {
                 *type1 = RustFinalType::new(
                     type1.ffi_type().clone(),
-                    RustToFfiTypeConversion::RefToPtr {
-                        force_api_is_const: if is_const { Some(true) } else { None },
-                        lifetime: None,
-                    },
+                    RustToFfiTypeConversion::RefToPtr { lifetime: None },
                 )?;
                 Ok(())
             };
@@ -1353,14 +1201,14 @@ impl State<'_, '_> {
             match check_trait_impl_uniqueness(trait_types, &target_type, &deref_trait_type) {
                 Ok(_) => {
                     let mut deref_function =
-                        fixed_function.with_path(deref_trait_path.join("deref"));
+                        fixed_function_mut.with_path(deref_trait_path.join("deref"));
                     deref_function.is_unsafe = false;
-                    make_type_ref(&mut deref_function.return_type, true)?;
-                    make_type_ref(&mut deref_function.arguments[0].argument_type, true)?;
+                    make_type_ref(&mut deref_function.return_type)?;
+                    make_type_ref(&mut deref_function.arguments[0].argument_type)?;
                     deref_function.arguments[0].name = "self".into();
                     results.push(RustTraitImpl {
                         target_type: target_type.clone(),
-                        parent_path: parent_path.clone(),
+                        parent_path,
                         trait_type: deref_trait_type,
                         associated_types: vec![RustTraitAssociatedType {
                             name: "Target".to_string(),
@@ -1368,25 +1216,6 @@ impl State<'_, '_> {
                         }],
                         functions: vec![deref_function],
                         extra_kind: RustTraitImplExtraKind::Deref,
-                    });
-
-                    let deref_mut_trait_path = RustPath::from_good_str("std::ops::DerefMut");
-                    let mut deref_mut_function =
-                        fixed_function_mut.with_path(deref_mut_trait_path.join("deref_mut"));
-                    deref_mut_function.is_unsafe = false;
-                    make_type_ref(&mut deref_mut_function.return_type, false)?;
-                    make_type_ref(&mut deref_mut_function.arguments[0].argument_type, false)?;
-                    deref_mut_function.arguments[0].name = "self".into();
-                    results.push(RustTraitImpl {
-                        target_type,
-                        parent_path,
-                        trait_type: RustCommonType {
-                            path: deref_mut_trait_path,
-                            generic_arguments: None,
-                        },
-                        associated_types: Vec::new(),
-                        functions: vec![deref_mut_function],
-                        extra_kind: RustTraitImplExtraKind::DerefMut,
                     });
                 }
                 Err(err) => {
@@ -1627,10 +1456,7 @@ impl State<'_, '_> {
                                 arg0.name = "self".into();
                                 arg0.argument_type = RustFinalType::new(
                                     arg0.argument_type.ffi_type().clone(),
-                                    RustToFfiTypeConversion::RefToPtr {
-                                        force_api_is_const: None,
-                                        lifetime: None,
-                                    },
+                                    RustToFfiTypeConversion::RefToPtr { lifetime: None },
                                 )?;
 
                                 let name = self

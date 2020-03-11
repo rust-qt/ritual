@@ -3,7 +3,7 @@ use qt_core::{QCoreApplication, QTimer, SignalOfInt};
 #[test]
 fn timer_quit() {
     QCoreApplication::init(|_app| unsafe {
-        let mut signal = SignalOfInt::new();
+        let signal = SignalOfInt::new();
 
         let timer = QTimer::new_0a();
         let c = signal.connect(timer.slot_start());

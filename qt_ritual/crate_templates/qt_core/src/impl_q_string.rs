@@ -15,7 +15,7 @@ impl QString {
         let slice = s.as_ref().as_bytes();
         unsafe {
             QString::from_utf8_char_int(
-                Ptr::from_raw(slice.as_ptr() as *const c_char),
+                Ptr::from_raw(slice.as_ptr() as *mut c_char),
                 slice.len() as c_int,
             )
         }

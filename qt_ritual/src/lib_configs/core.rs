@@ -265,10 +265,7 @@ pub fn core_config(config: &mut Config) -> Result<()> {
                     .ok_or_else(|| err_msg("missing argument"))?;
                 arg.argument_type = RustFinalType::new(
                     arg.argument_type.ffi_type().clone(),
-                    RustToFfiTypeConversion::RefToPtr {
-                        force_api_is_const: None,
-                        lifetime: None,
-                    },
+                    RustToFfiTypeConversion::RefToPtr { lifetime: None },
                 )?;
                 arg.name = "self".into();
             } else {

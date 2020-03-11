@@ -9,7 +9,7 @@ fn reserved_ids() {
     assert_eq!(Impl::Last.to_int(), -1);
 
     unsafe {
-        let mut obj = Unsafe::new();
+        let obj = Unsafe::new();
         assert_eq!(obj.loop_(), 1);
         obj.yield_(1);
         assert_eq!(obj.pub_().loop_(), 1);

@@ -1,5 +1,5 @@
 use crate::{q_meta_object::Connection, ConnectionType, QBox, QObject, QPtr};
-use cpp_core::{CastInto, CppBox, CppDeletable, MutPtr, MutRef, Ptr, Ref, StaticUpcast};
+use cpp_core::{CastInto, CppBox, CppDeletable, Ptr, Ref, StaticUpcast};
 use std::ffi::CStr;
 use std::fmt;
 use std::marker::PhantomData;
@@ -105,27 +105,7 @@ impl<A> AsReceiver for Signal<A> {
     }
 }
 
-impl<T> AsReceiver for MutPtr<T>
-where
-    T: AsReceiver,
-{
-    type Arguments = <T as AsReceiver>::Arguments;
-    fn as_receiver(&self) -> Receiver<Self::Arguments> {
-        (**self).as_receiver()
-    }
-}
-
 impl<T> AsReceiver for Ptr<T>
-where
-    T: AsReceiver,
-{
-    type Arguments = <T as AsReceiver>::Arguments;
-    fn as_receiver(&self) -> Receiver<Self::Arguments> {
-        (**self).as_receiver()
-    }
-}
-
-impl<T> AsReceiver for MutRef<T>
 where
     T: AsReceiver,
 {
@@ -189,9 +169,9 @@ impl<SignalArguments> Signal<SignalArguments> {
 
         crate::QObject::connect_5a(
             self.0.q_object.as_ptr(),
-            Ptr::from_raw(self.0.receiver_id.as_ptr()),
+            Ptr::from_c_str(self.0.receiver_id),
             receiver.q_object.as_ptr(),
-            Ptr::from_raw(receiver.receiver_id.as_ptr()),
+            Ptr::from_c_str(receiver.receiver_id),
             connection_type,
         )
     }

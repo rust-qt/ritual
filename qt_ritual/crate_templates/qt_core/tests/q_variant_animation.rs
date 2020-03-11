@@ -11,7 +11,7 @@ fn variant_animation2() {
             next_value += 1;
         });
 
-        let mut animation = QVariantAnimation::new_0a();
+        let animation = QVariantAnimation::new_0a();
         let c = animation.value_changed().connect(&slot1);
         assert!(c.is_valid());
         let c = animation.finished().connect(app.slot_quit());

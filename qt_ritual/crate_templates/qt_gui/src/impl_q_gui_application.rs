@@ -1,5 +1,5 @@
 use crate::QGuiApplication;
-use cpp_core::{MutPtr, MutRef};
+use cpp_core::{Ptr, Ref};
 use qt_core::QCoreApplicationArgs;
 use std::process;
 
@@ -23,16 +23,14 @@ impl QGuiApplication {
     ///     })
     /// }
     /// ```
-    pub fn init<F: FnOnce(::cpp_core::MutPtr<QGuiApplication>) -> i32>(f: F) -> ! {
+    pub fn init<F: FnOnce(::cpp_core::Ptr<QGuiApplication>) -> i32>(f: F) -> ! {
         let exit_code = {
             unsafe {
                 let mut args = QCoreApplicationArgs::new();
                 let (argc, argv) = args.get();
-                let mut app = QGuiApplication::new_2a(
-                    MutRef::from_raw(argc).unwrap(),
-                    MutPtr::from_raw(argv),
-                );
-                f(app.as_mut_ptr())
+                let app =
+                    QGuiApplication::new_2a(Ref::from_raw(argc).unwrap(), Ptr::from_raw(argv));
+                f(app.as_ptr())
             }
         }; // drop `app` and `args`
         process::exit(exit_code)

@@ -15,7 +15,7 @@ pub trait Increment {
     ///
     /// The caller must make sure `self` contains a valid pointer. This function
     /// may invoke arbitrary foreign code, so no safety guarantees can be made.
-    unsafe fn inc(&mut self) -> Self::Output;
+    unsafe fn inc(&self) -> Self::Output;
 }
 
 /// Represents C++'s prefix decrement (`--a`).
@@ -29,7 +29,7 @@ pub trait Decrement {
     ///
     /// The caller must make sure `self` contains a valid pointer. This function
     /// may invoke arbitrary foreign code, so no safety guarantees can be made.
-    unsafe fn dec(&mut self) -> Self::Output;
+    unsafe fn dec(&self) -> Self::Output;
 }
 
 /// Represents C++'s indirection operator (`*a`).
@@ -71,7 +71,7 @@ pub trait BeginMut {
     ///
     /// The caller must make sure `self` contains a valid pointer. This function
     /// may invoke arbitrary foreign code, so no safety guarantees can be made.
-    unsafe fn begin_mut(&mut self) -> Self::Output;
+    unsafe fn begin_mut(&self) -> Self::Output;
 }
 
 /// Represents C++'s `end() const` function.
@@ -99,5 +99,5 @@ pub trait EndMut {
     ///
     /// The caller must make sure `self` contains a valid pointer. This function
     /// may invoke arbitrary foreign code, so no safety guarantees can be made.
-    unsafe fn end_mut(&mut self) -> Self::Output;
+    unsafe fn end_mut(&self) -> Self::Output;
 }

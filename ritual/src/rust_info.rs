@@ -207,12 +207,12 @@ impl UnnamedRustFunction {
         if let Some(arg) = self.arguments.get(0) {
             if arg.name == "self" {
                 match arg.argument_type.api_type() {
-                    RustType::PointerLike { kind, is_const, .. } => match *kind {
+                    RustType::PointerLike { kind, .. } => match *kind {
                         RustPointerLikeTypeKind::Pointer => {
                             bail!("pointer self arg is not supported")
                         }
                         RustPointerLikeTypeKind::Reference { .. } => {
-                            if *is_const {
+                            if arg.argument_type.ffi_type().is_const_pointer_like()? {
                                 return Ok(RustFunctionSelfArgKind::ConstRef);
                             } else {
                                 return Ok(RustFunctionSelfArgKind::MutRef);

@@ -1,5 +1,5 @@
 use crate::{QCoreApplication, QString};
-use cpp_core::{vector_ops::VectorAsSlice, MutPtr, MutRef};
+use cpp_core::{Ptr, Ref};
 use std::iter::once;
 use std::os::raw::{c_char, c_int};
 use std::process;
@@ -33,7 +33,7 @@ impl QCoreApplicationArgs {
             .map(|arg| unsafe {
                 QString::from_std_str(&arg)
                     .to_local8_bit()
-                    .vector_as_slice()
+                    .as_slice()
                     .iter()
                     .map(|&c| c as u8)
                     .chain(once(0))
@@ -78,16 +78,14 @@ impl QCoreApplication {
     ///     })
     /// }
     /// ```
-    pub fn init<F: FnOnce(::cpp_core::MutPtr<QCoreApplication>) -> i32>(f: F) -> ! {
+    pub fn init<F: FnOnce(::cpp_core::Ptr<QCoreApplication>) -> i32>(f: F) -> ! {
         let exit_code = {
             unsafe {
                 let mut args = QCoreApplicationArgs::new();
                 let (argc, argv) = args.get();
-                let mut app = QCoreApplication::new_2a(
-                    MutRef::from_raw(argc).unwrap(),
-                    MutPtr::from_raw(argv),
-                );
-                f(app.as_mut_ptr())
+                let app =
+                    QCoreApplication::new_2a(Ref::from_raw(argc).unwrap(), Ptr::from_raw(argv));
+                f(app.as_ptr())
             }
         }; // drop `app` and `args`
         process::exit(exit_code)

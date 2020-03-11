@@ -1,12 +1,9 @@
 use crate::{
     cmp::{Ge, Gt, Le, Lt},
-    CppBox, CppDeletable, MutPtr, MutRef, Ptr, Ref,
+    CppBox, CppDeletable, Ptr, Ref,
 };
 use std::cmp::{Ordering, PartialEq, PartialOrd};
-use std::ops::{
-    Add, AddAssign, BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Div, DivAssign,
-    Mul, MulAssign, Rem, RemAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
-};
+use std::ops::{Add, BitAnd, BitOr, BitXor, Div, Mul, Rem, Shl, Shr, Sub};
 
 macro_rules! define_op {
     ($trait1:ident, $func:ident) => {
@@ -32,29 +29,7 @@ macro_rules! define_op {
             }
         }
 
-        impl<T: 'static, U> $trait1<U> for MutPtr<T>
-        where
-            &'static T: $trait1<U>,
-        {
-            type Output = <&'static T as $trait1<U>>::Output;
-
-            fn $func(self, rhs: U) -> Self::Output {
-                unsafe { (*self.as_raw_ptr()).$func(rhs) }
-            }
-        }
-
         impl<T: 'static, U> $trait1<U> for Ref<T>
-        where
-            &'static T: $trait1<U>,
-        {
-            type Output = <&'static T as $trait1<U>>::Output;
-
-            fn $func(self, rhs: U) -> Self::Output {
-                unsafe { (*self.as_raw_ptr()).$func(rhs) }
-            }
-        }
-
-        impl<T: 'static, U> $trait1<U> for MutRef<T>
         where
             &'static T: $trait1<U>,
         {
@@ -77,48 +52,6 @@ define_op!(BitOr, bitor);
 define_op!(BitXor, bitxor);
 define_op!(Shl, shl);
 define_op!(Shr, shr);
-
-macro_rules! define_assign_op {
-    ($trait1:ident, $func:ident) => {
-        impl<T: CppDeletable, U> $trait1<U> for CppBox<T>
-        where
-            T: $trait1<U>,
-        {
-            fn $func(&mut self, rhs: U) {
-                (**self).$func(rhs);
-            }
-        }
-
-        impl<T: 'static, U> $trait1<U> for MutPtr<T>
-        where
-            T: $trait1<U>,
-        {
-            fn $func(&mut self, rhs: U) {
-                unsafe { (&mut *self.as_mut_raw_ptr()).$func(rhs) };
-            }
-        }
-
-        impl<T: 'static, U> $trait1<U> for MutRef<T>
-        where
-            T: $trait1<U>,
-        {
-            fn $func(&mut self, rhs: U) {
-                unsafe { (&mut *self.as_mut_raw_ptr()).$func(rhs) };
-            }
-        }
-    };
-}
-
-define_assign_op!(AddAssign, add_assign);
-define_assign_op!(SubAssign, sub_assign);
-define_assign_op!(MulAssign, mul_assign);
-define_assign_op!(DivAssign, div_assign);
-define_assign_op!(RemAssign, rem_assign);
-define_assign_op!(BitAndAssign, bitand_assign);
-define_assign_op!(BitOrAssign, bitor_assign);
-define_assign_op!(BitXorAssign, bitxor_assign);
-define_assign_op!(ShlAssign, shl_assign);
-define_assign_op!(ShrAssign, shr_assign);
 
 macro_rules! define_comparison_op {
     ($container:ident) => {
@@ -169,9 +102,7 @@ macro_rules! define_comparison_op {
 }
 
 define_comparison_op!(Ptr);
-define_comparison_op!(MutPtr);
 define_comparison_op!(Ref);
-define_comparison_op!(MutRef);
 
 impl<T: CppDeletable, U> PartialEq<U> for CppBox<T>
 where
