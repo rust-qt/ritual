@@ -9,10 +9,18 @@
 
 use itertools::Itertools;
 use qt_ritual_common::get_full_build_config;
-use ritual_build::common::errors::{FancyUnwrap, Result};
-use ritual_build::common::utils::MapIfOk;
+use ritual_build::common::errors::{bail, FancyUnwrap, Result, ResultExt};
+use ritual_build::common::file_utils::{create_file, path_to_str};
+use ritual_build::common::target;
+use ritual_build::common::utils::{run_command, MapIfOk};
 use ritual_build::Config;
 use semver::Version;
+use sha1::{Digest, Sha1};
+use std::env;
+use std::fs::create_dir_all;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 
 #[allow(clippy::op_ref)] // false positive
 fn detect_closest_version(known: &[&str], current: &str) -> Result<Option<String>> {
@@ -104,6 +112,51 @@ pub fn try_run(crate_name: &str) -> Result<()> {
 pub fn run(crate_name: &str) -> ! {
     try_run(crate_name).fancy_unwrap();
     std::process::exit(0);
+}
+
+pub fn try_add_resources(paths: impl IntoIterator<Item = impl AsRef<Path>>) -> Result<()> {
+    let paths = paths
+        .into_iter()
+        .map(|path| path.as_ref().to_path_buf())
+        .collect_vec();
+    for path in &paths {
+        if !path.is_file() {
+            bail!("not a file: {}", path.display());
+        }
+    }
+    let mut hasher = Sha1::new();
+    hasher.input(format!("{:?}", paths));
+    let project_name = format!("qt_resources_{:x}", hasher.result());
+
+    let out_dir =
+        PathBuf::from(env::var("OUT_DIR").with_context(|_| "OUT_DIR env var is missing")?);
+    let dir = out_dir.join(&project_name);
+    create_dir_all(&dir)?;
+
+    let pro_file_path = dir.join(format!("{}.pro", project_name));
+    let mut pro_file = create_file(&pro_file_path)?;
+    writeln!(pro_file, "TEMPLATE = lib")?;
+    writeln!(pro_file, "CONFIG += staticlib")?;
+    writeln!(
+        pro_file,
+        "RESOURCES += {}",
+        paths.iter().map_if_ok(|path| path_to_str(path))?.join(" ")
+    )?;
+    drop(pro_file);
+    run_command(Command::new("qmake").arg(pro_file_path).current_dir(&dir))?;
+    let make_command = if target::current_env() == target::Env::Msvc {
+        "nmake"
+    } else {
+        "make"
+    };
+    run_command(Command::new(make_command).current_dir(&dir))?;
+    println!("cargo:rustc-link-lib=static={}", project_name);
+    println!("cargo:rustc-link-search={}", path_to_str(&dir)?);
+    Ok(())
+}
+
+pub fn add_resources(paths: impl IntoIterator<Item = impl AsRef<Path>>) {
+    try_add_resources(paths).fancy_unwrap();
 }
 
 #[test]
