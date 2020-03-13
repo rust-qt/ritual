@@ -8,6 +8,7 @@ members = [
     "qt_ritual",
     "qt_ritual_common",
     "qt_ritual_build",
+    "qt_macros",
 ]
 
 [patch.crates-io]
