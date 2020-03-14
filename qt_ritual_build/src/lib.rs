@@ -10,8 +10,8 @@
 
 use itertools::Itertools;
 use qt_ritual_common::get_full_build_config;
-use ritual_build::common::errors::{bail, FancyUnwrap, Result, ResultExt};
-use ritual_build::common::file_utils::{create_file, path_to_str};
+use ritual_build::common::errors::{bail, format_err, FancyUnwrap, Result, ResultExt};
+use ritual_build::common::file_utils::{create_file, os_str_to_str, path_to_str};
 use ritual_build::common::target;
 use ritual_build::common::utils::{run_command, MapIfOk};
 use ritual_build::Config;
@@ -131,7 +131,8 @@ pub fn try_add_resources(paths: impl IntoIterator<Item = impl AsRef<Path>>) -> R
     }
     let mut hasher = Sha1::new();
     hasher.input(format!("{:?}", paths));
-    let project_name = format!("qt_resources_{:x}", hasher.result());
+    //let project_name = format!("qt_resources_{:x}", hasher.result());
+    let project_name = "qt_resources1";
 
     let out_dir =
         PathBuf::from(env::var("OUT_DIR").with_context(|_| "OUT_DIR env var is missing")?);
@@ -142,12 +143,34 @@ pub fn try_add_resources(paths: impl IntoIterator<Item = impl AsRef<Path>>) -> R
     let mut pro_file = create_file(&pro_file_path)?;
     writeln!(pro_file, "TEMPLATE = lib")?;
     writeln!(pro_file, "CONFIG += staticlib")?;
+    writeln!(pro_file, "SOURCES += 1.cpp")?;
     writeln!(
         pro_file,
         "RESOURCES += {}",
         paths.iter().map_if_ok(|path| path_to_str(path))?.join(" ")
     )?;
     drop(pro_file);
+
+    let mut cpp_file = create_file(dir.join("1.cpp"))?;
+    writeln!(cpp_file, "#include <QDir>")?;
+    for path in paths {
+        let name = os_str_to_str(
+            path.file_stem()
+                .ok_or_else(|| format_err!("can't extract base name from path: {:?}", path))?,
+        )?;
+        writeln!(
+            cpp_file,
+            "void ritual_init_resource_{}_() {{ Q_INIT_RESOURCE({}); }}",
+            name, name
+        )?;
+        writeln!(
+            cpp_file,
+            "extern \"C\" void ritual_init_resource_{}() {{ ritual_init_resource_{}_(); }}",
+            name, name
+        )?;
+    }
+    drop(cpp_file);
+
     run_command(Command::new("qmake").arg(pro_file_path).current_dir(&dir))?;
     let make_command = if target::current_env() == target::Env::Msvc {
         "nmake"
@@ -156,7 +179,12 @@ pub fn try_add_resources(paths: impl IntoIterator<Item = impl AsRef<Path>>) -> R
     };
     run_command(Command::new(make_command).current_dir(&dir))?;
     println!("cargo:rustc-link-lib=static={}", project_name);
-    println!("cargo:rustc-link-search={}", path_to_str(&dir)?);
+    let lib_dir = if target::current_os() == target::OS::Windows {
+        dir.join("release")
+    } else {
+        dir
+    };
+    println!("cargo:rustc-link-search={}", path_to_str(&lib_dir)?);
     Ok(())
 }
 
