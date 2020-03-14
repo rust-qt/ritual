@@ -18,10 +18,13 @@ pub fn slot(attrs: TokenStream, input: TokenStream) -> TokenStream {
     let expanded = quote! {
         #input
 
-        #vis unsafe fn #slot_name(self: &std::rc::Rc<Self>) -> qt_core::QBox<#slot_type> {
-            let this = Rc::clone(&self);
-            #slot_type::new(self.main_widget(), move |#(#arg_names),*| {
-                this.#fn_name(#(#arg_names),*);
+        #vis unsafe fn #slot_name(self: &::std::rc::Rc<Self>) -> ::qt_core::QBox<#slot_type> {
+            let this = ::std::rc::Rc::downgrade(&self);
+            let parent = ::cpp_core::Ptr::from_raw(&**self);
+            #slot_type::new(parent, move |#(#arg_names),*| {
+                if let Some(this) = ::std::rc::Weak::upgrade(&this) {
+                    this.#fn_name(#(#arg_names),*);
+                }
             })
         }
     };
