@@ -6,6 +6,7 @@
 //! `ritual_build`.
 
 #![forbid(unsafe_code)]
+#![deny(missing_docs)]
 
 use itertools::Itertools;
 use qt_ritual_common::get_full_build_config;
@@ -114,6 +115,10 @@ pub fn run(crate_name: &str) -> ! {
     std::process::exit(0);
 }
 
+/// Builds and links [Qt resource files](https://doc.qt.io/qt-5/resources.html).
+///
+/// Note that the resource file may not be rebuilt when the resource file or files referenced
+/// for it are changed. You may have to run `cargo clean -p crate_name` to force a rebuild.
 pub fn try_add_resources(paths: impl IntoIterator<Item = impl AsRef<Path>>) -> Result<()> {
     let paths = paths
         .into_iter()
@@ -155,6 +160,7 @@ pub fn try_add_resources(paths: impl IntoIterator<Item = impl AsRef<Path>>) -> R
     Ok(())
 }
 
+/// Calls `try_add_resources` and panic on an error.
 pub fn add_resources(paths: impl IntoIterator<Item = impl AsRef<Path>>) {
     try_add_resources(paths).fancy_unwrap();
 }
