@@ -51,12 +51,12 @@
 //! pass a null pointer object (`NullPtr`) if you don't have a value
 //! (`Ptr::null()` is also an option but it can cause type inference issues).
 
-//#![deny(missing_docs)]
+#![deny(missing_docs)]
 
 pub use crate::casts::{DynamicCast, StaticDowncast, StaticUpcast};
 pub use crate::convert::{CastFrom, CastInto};
 pub use crate::cpp_box::{CppBox, CppDeletable};
-pub use crate::iterator::{cpp_iter, CppIterator, SliceAsBeginEnd};
+pub use crate::iterator::{cpp_iter, CppIterator, EndPtr};
 pub use crate::ptr::{NullPtr, Ptr};
 pub use crate::ref_::Ref;
 pub use libc::wchar_t;

@@ -1,5 +1,5 @@
 use crate::ops::{Decrement, Increment, Indirection};
-use crate::{CppBox, CppDeletable, Ptr, Ref};
+use crate::{CppBox, CppDeletable, Ref};
 use std::os::raw::c_char;
 
 /// `Iterator` and `DoubleEndedIterator` backed by C++ iterators.
@@ -73,28 +73,24 @@ where
     }
 }
 
-pub trait SliceAsBeginEnd {
+/// A convenience trait that provides `end_ptr()` method for slices.
+pub trait EndPtr {
+    /// Type of item.
     type Item;
-    fn begin_ptr(&self) -> Ptr<Self::Item>;
-    fn end_ptr(&self) -> Ptr<Self::Item>;
+    /// Returns pointer to the end of the slice (past the last element).
+    fn end_ptr(&self) -> *const Self::Item;
 }
 
-impl<'a, T> SliceAsBeginEnd for &'a [T] {
+impl<'a, T> EndPtr for &'a [T] {
     type Item = T;
-    fn begin_ptr(&self) -> Ptr<T> {
-        unsafe { Ptr::from_raw(self.as_ptr()) }
-    }
-    fn end_ptr(&self) -> Ptr<T> {
-        unsafe { Ptr::from_raw((self.as_ptr()).add(self.len())) }
+    fn end_ptr(&self) -> *const T {
+        unsafe { self.as_ptr().add(self.len()) }
     }
 }
 
-impl<'a> SliceAsBeginEnd for &'a str {
+impl<'a> EndPtr for &'a str {
     type Item = c_char;
-    fn begin_ptr(&self) -> Ptr<c_char> {
-        unsafe { Ptr::from_raw(self.as_ptr() as *const c_char) }
-    }
-    fn end_ptr(&self) -> Ptr<c_char> {
-        unsafe { Ptr::from_raw(self.as_ptr().add(self.len()) as *const c_char) }
+    fn end_ptr(&self) -> *const c_char {
+        unsafe { self.as_ptr().add(self.len()) as *const c_char }
     }
 }

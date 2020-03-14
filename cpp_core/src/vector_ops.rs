@@ -1,6 +1,8 @@
 //! Traits for common operations on C++ vectors.
 
+/// Provides access to the underlying memory buffer.
 pub trait Data {
+    /// Return type of `data()` function.
     type Output;
     /// Returns a pointer to the underlying memory buffer.
     ///
@@ -11,7 +13,9 @@ pub trait Data {
     unsafe fn data(&self) -> Self::Output;
 }
 
+/// Provides mutable access to the underlying memory buffer.
 pub trait DataMut {
+    /// Return type of `data_mut()` function.
     type Output;
     /// Returns a pointer to the underlying memory buffer.
     ///
@@ -22,6 +26,7 @@ pub trait DataMut {
     unsafe fn data_mut(&self) -> Self::Output;
 }
 
+/// Provides access to the size of the collection.
 pub trait Size {
     /// Returns number of the elements in the underlying buffer.
     ///
