@@ -18,7 +18,7 @@ mod ui_form;
 ///
 /// This attribute may be used on methods:
 ///
-/// ```no_run
+/// ```ignore
 /// impl TodoWidget {
 ///     #[slot(SlotNoArgs)]
 ///     unsafe fn on_add_clicked(self: &Rc<Self>) {
@@ -32,7 +32,7 @@ mod ui_form;
 ///
 /// The macro generates another method that is called `slot_{original_name}` and can be used for
 /// making a connection like this:
-/// ```no_run
+/// ```ignore
 /// self.form.add.clicked().connect(&self.slot_on_add_clicked());
 /// ```
 ///
@@ -58,7 +58,7 @@ pub fn slot(attrs: TokenStream, input: TokenStream) -> TokenStream {
 /// # Usage
 ///
 /// This attribute should be used on structs:
-/// ```no_run
+/// ```ignore
 /// #[ui_form("../ui/form.ui")]
 /// #[derive(Debug)]
 /// struct Form {
