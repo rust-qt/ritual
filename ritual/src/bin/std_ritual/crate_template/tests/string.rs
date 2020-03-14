@@ -1,22 +1,19 @@
-use cpp_std::cpp_core::SliceAsBeginEnd;
 use cpp_std::String;
 use std::ffi::CStr;
+use std::os::raw::c_char;
 
 fn main() {}
 
 #[test]
 fn string_push() {
     unsafe {
-        let mut s = String::new();
+        let s = String::new();
         s.push_back('t' as i8);
         s.push_back('e' as i8);
         s.push_back('s' as i8);
         s.push_back('t' as i8);
 
-        assert_eq!(
-            CStr::from_ptr(s.c_str().as_raw_ptr()).to_str().unwrap(),
-            "test"
-        );
+        assert_eq!(CStr::from_ptr(s.c_str()).to_str().unwrap(), "test");
     }
 }
 
@@ -24,12 +21,9 @@ fn string_push() {
 fn string_from_slice() {
     unsafe {
         let data = "string";
-        let s = String::from_char_usize(data.begin_ptr(), data.len());
+        let s = String::from_char_usize(data.as_ptr() as *const c_char, data.len());
         assert_eq!(s.length(), 6);
 
-        assert_eq!(
-            CStr::from_ptr(s.c_str().as_raw_ptr()).to_str().unwrap(),
-            "string"
-        );
+        assert_eq!(CStr::from_ptr(s.c_str()).to_str().unwrap(), "string");
     }
 }
