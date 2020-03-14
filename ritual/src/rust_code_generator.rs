@@ -295,11 +295,12 @@ impl Generator<'_> {
             if condition != Condition::True {
                 let expression = condition_expression(&condition);
                 condition_texts.attribute = format!(
-                    "#[cfg(any({}, feature = \"ritual_rustdoc\"))]\n",
-                    expression
+                    "#[cfg_attr(feature = \"ritual_rustdoc_nightly\", doc(cfg({})))]\n\
+                    #[cfg(any({}, feature = \"ritual_rustdoc\"))]\n",
+                    expression, expression
                 );
-                condition_texts.doc_text =
-                    format!("\n\nThis item is available if `{}`.", expression);
+                // condition_texts.doc_text =
+                // format!("\n\nThis item is available if `{}`.", expression);
             }
         }
 
@@ -366,6 +367,11 @@ impl Generator<'_> {
             }
             let path = self.module_path(&module.item.path, &self.output_src_path)?;
             self.push_file(&path)?;
+
+            writeln!(
+                self,
+                "#![cfg_attr(feature = \"ritual_rustdoc_nightly\", feature(doc_cfg))]"
+            )?;
 
             if let Some(crate_template_src_path) = &self.crate_template_src_path {
                 let template_path = self.module_path(&module.item.path, crate_template_src_path)?;

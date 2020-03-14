@@ -1,4 +1,4 @@
-use crate::config::CrateDependencySource;
+use crate::config::{CrateDependencyKind, CrateDependencySource};
 use crate::cpp_code_generator;
 use crate::cpp_code_generator::{
     all_include_directives, generate_cpp_type_size_requester, write_include_directives,
@@ -6,6 +6,7 @@ use crate::cpp_code_generator::{
 use crate::database::CRATE_DB_FILE_NAME;
 use crate::processor::ProcessorData;
 use crate::rust_code_generator;
+use itertools::Itertools;
 use ritual_common::errors::Result;
 use ritual_common::file_utils::{
     copy_file, copy_recursively, crate_version, create_dir, create_dir_all, create_file,
@@ -97,7 +98,10 @@ fn generate_crate_template(data: &mut ProcessorData<'_>, output_path: &Path) -> 
 
     let docs_rs_metadata = toml_table_with_single_item(
         "features",
-        vec![toml::Value::String("ritual_rustdoc".into())],
+        vec![
+            toml::Value::String("ritual_rustdoc".into()),
+            toml::Value::String("ritual_rustdoc_nightly".into()),
+        ],
     );
     package.insert(
         "metadata".into(),
@@ -172,7 +176,18 @@ fn generate_crate_template(data: &mut ProcessorData<'_>, output_path: &Path) -> 
         add_dependency(&mut build_dependencies, dep.name(), dep.source())?;
     }
     let mut features = toml::value::Table::new();
-    features.insert("ritual_rustdoc".into(), toml::value::Array::new().into());
+    for &feature in &["ritual_rustdoc", "ritual_rustdoc_nightly"] {
+        let dep_features = data
+            .config
+            .crate_properties()
+            .dependencies()
+            .iter()
+            .filter(|dep| dep.kind() == CrateDependencyKind::Ritual)
+            .map(|dep| toml::value::Value::String(format!("{}/{}", dep.name(), feature)))
+            .collect_vec();
+
+        features.insert(feature.into(), dep_features.into());
+    }
 
     let mut table = toml::value::Table::new();
     table.insert("package".into(), package.into());
