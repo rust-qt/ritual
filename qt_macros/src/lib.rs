@@ -8,7 +8,9 @@
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
+use proc_macro_hack::proc_macro_hack;
 
+mod q_init_resource;
 mod slot;
 mod ui_form;
 
@@ -86,4 +88,10 @@ pub fn slot(attrs: TokenStream, input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn ui_form(attrs: TokenStream, input: TokenStream) -> TokenStream {
     crate::ui_form::ui_form(attrs, input)
+}
+
+/// TODO
+#[proc_macro_hack]
+pub fn q_init_resource(input: TokenStream) -> TokenStream {
+    crate::q_init_resource::q_init_resource(input)
 }
