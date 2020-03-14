@@ -20,7 +20,7 @@ use std::process;
 pub struct QCoreApplicationArgs {
     _values: Vec<Vec<u8>>,
     argc: Box<c_int>,
-    argv: Vec<*mut c_char>,
+    argv: Box<[*mut c_char]>,
 }
 
 impl QCoreApplicationArgs {
@@ -45,7 +45,8 @@ impl QCoreApplicationArgs {
             argv: args
                 .iter_mut()
                 .map(|x| x.as_mut_ptr() as *mut c_char)
-                .collect(),
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
             _values: args,
         }
     }
