@@ -1,6 +1,6 @@
 [package]
 name = "qt_macros"
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 edition = "2018"
 description = "Macros for Qt"
@@ -14,4 +14,3 @@ proc-macro = true
 syn = { version = "1.0", features = ["full"] }
 quote = "1.0"
 proc-macro2 = "1.0"
-
