@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use ritual::config::Config;
+use ritual::config::{Config, CrateDependencyKind, CrateDependencySource};
 use ritual::cpp_checker::{PreliminaryTest, Snippet};
 use ritual::cpp_data::{CppItem, CppPath, CppPathItem, CppTypeDeclaration, CppTypeDeclarationKind};
 use ritual::cpp_ffi_data::CppFfiFunctionKind;
@@ -10,10 +10,26 @@ use ritual::processor::ProcessorData;
 use ritual::rust_info::{NameType, RustItem, RustPathScope};
 use ritual::rust_type::{RustFinalType, RustPath, RustToFfiTypeConversion};
 use ritual_common::errors::{bail, err_msg, Result};
+use ritual_common::file_utils::repo_dir_path;
 use ritual_common::string_utils::CaseOperations;
 
 /// QtCore specific configuration.
 pub fn core_config(config: &mut Config) -> Result<()> {
+    config.crate_properties_mut().add_dependency(
+        "qt_macros",
+        CrateDependencyKind::Normal,
+        CrateDependencySource::Local {
+            path: repo_dir_path("qt_macros")?,
+        },
+    )?;
+    config.crate_properties_mut().add_dependency(
+        "proc-macro-hack",
+        CrateDependencyKind::Normal,
+        CrateDependencySource::CratesIo {
+            version: "0.5.11".into(),
+        },
+    )?;
+
     let crate_name = config.crate_properties().name().to_string();
     let crate_name2 = crate_name.clone();
 

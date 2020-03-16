@@ -362,6 +362,11 @@ impl Config {
         &self.crate_properties
     }
 
+    /// Returns crate properties passed to `Config::new`.
+    pub fn crate_properties_mut(&mut self) -> &mut CrateProperties {
+        &mut self.crate_properties
+    }
+
     /// Returns value set by `Config::set_crate_template_path`.
     pub fn crate_template_path(&self) -> Option<&PathBuf> {
         self.crate_template_path.as_ref()

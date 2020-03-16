@@ -20,6 +20,7 @@ mod charts;
 mod core;
 mod gui;
 mod qml;
+mod ui_tools;
 mod widgets;
 
 use self::_3d::{
@@ -27,6 +28,7 @@ use self::_3d::{
 };
 use self::{charts::charts_config, core::core_config, gui::gui_config, widgets::widgets_config};
 use crate::lib_configs::qml::qml_config;
+use crate::lib_configs::ui_tools::ui_tools_config;
 use ritual::cpp_data::{CppItem, CppPath};
 use ritual::cpp_type::CppType;
 use std::env;
@@ -34,6 +36,7 @@ use std::env;
 pub const MOQT_INSTALL_DIR_ENV_VAR_NAME: &str = "MOQT_INSTALL_DIR";
 pub const MOQT_TEMPLATE_DIR_ENV_VAR_NAME: &str = "MOQT_TEMPLATE_DIR";
 
+#[allow(dead_code)]
 fn empty_config(_config: &mut Config) -> Result<()> {
     Ok(())
 }
@@ -236,7 +239,7 @@ pub fn create_config(
         "qt_3d_input" => input_3d_config,
         "qt_3d_logic" => logic_3d_config,
         "qt_3d_extras" => extras_3d_config,
-        "qt_ui_tools" => empty_config,
+        "qt_ui_tools" => ui_tools_config,
         "qt_charts" => charts_config,
         "qt_qml" => qml_config,
         "moqt_core" => core_config,

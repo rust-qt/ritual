@@ -1,5 +1,8 @@
 //! Macros for Qt.
 //!
+//! This crate shouldn't be used directly. The macros are reexported by `qt_core`
+//! and `qt_ui_tools` crates.
+//!
 //! This crate is part of the [ritual](https://github.com/rust-qt/ritual) project.
 
 #![deny(missing_docs)]
@@ -90,7 +93,8 @@ pub fn ui_form(attrs: TokenStream, input: TokenStream) -> TokenStream {
     crate::ui_form::ui_form(attrs, input)
 }
 
-/// TODO
+// This is an implementation detail of the `qt_core::q_init_resource` macro.
+#[doc(hidden)]
 #[proc_macro_hack]
 pub fn q_init_resource(input: TokenStream) -> TokenStream {
     crate::q_init_resource::q_init_resource(input)
