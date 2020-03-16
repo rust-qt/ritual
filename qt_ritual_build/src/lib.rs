@@ -11,7 +11,7 @@
 use itertools::Itertools;
 use qt_ritual_common::get_full_build_config;
 use ritual_build::common::errors::{bail, format_err, FancyUnwrap, Result, ResultExt};
-use ritual_build::common::file_utils::{canonicalize, create_file, os_str_to_str, path_to_str};
+use ritual_build::common::file_utils::{create_file, os_str_to_str, path_to_str};
 use ritual_build::common::target;
 use ritual_build::common::utils::{run_command, MapIfOk};
 use ritual_build::Config;
@@ -129,12 +129,21 @@ pub fn try_add_resources(path: impl AsRef<Path>) -> Result<()> {
     if !path.is_file() {
         bail!("not a file: {:?}", path);
     }
-    let path = canonicalize(path)?;
     let base_name = os_str_to_str(
         path.file_stem()
             .ok_or_else(|| format_err!("can't extract base name from path: {:?}", path))?,
     )?;
-    let project_name = format!("ritual_qt_resources_{}", base_name);
+    let escaped_base_name = base_name
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>();
+    let project_name = format!("ritual_qt_resources_{}", escaped_base_name);
 
     let out_dir =
         PathBuf::from(env::var("OUT_DIR").with_context(|_| "OUT_DIR env var is missing")?);
@@ -151,21 +160,17 @@ pub fn try_add_resources(path: impl AsRef<Path>) -> Result<()> {
 
     let mut cpp_file = create_file(dir.join("1.cpp"))?;
     writeln!(cpp_file, "#include <QDir>")?;
-    let name = os_str_to_str(
-        path.file_stem()
-            .ok_or_else(|| format_err!("can't extract base name from path: {:?}", path))?,
-    )?;
     // `Q_INIT_RESOURCE` doesn't work inside `extern "C"` context,
     // so we need a wrapper function.
     writeln!(
         cpp_file,
-        "void ritual_init_resource_cpp_{}() {{ Q_INIT_RESOURCE({}); }}",
-        name, name
+        "void ritual_init_resource_cpp_{name}() {{ Q_INIT_RESOURCE({name}); }}",
+        name = escaped_base_name
     )?;
     writeln!(
         cpp_file,
-        "extern \"C\" void ritual_init_resource_{}() {{ ritual_init_resource_cpp_{}(); }}",
-        name, name
+        "extern \"C\" void ritual_init_resource_{name}() {{ ritual_init_resource_cpp_{name}(); }}",
+        name = escaped_base_name
     )?;
     drop(cpp_file);
 
