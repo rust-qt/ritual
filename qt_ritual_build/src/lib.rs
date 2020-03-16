@@ -11,12 +11,11 @@
 use itertools::Itertools;
 use qt_ritual_common::get_full_build_config;
 use ritual_build::common::errors::{bail, format_err, FancyUnwrap, Result, ResultExt};
-use ritual_build::common::file_utils::{create_file, os_str_to_str, path_to_str};
+use ritual_build::common::file_utils::{canonicalize, create_file, os_str_to_str, path_to_str};
 use ritual_build::common::target;
 use ritual_build::common::utils::{run_command, MapIfOk};
 use ritual_build::Config;
 use semver::Version;
-use sha1::{Digest, Sha1};
 use std::env;
 use std::fs::create_dir_all;
 use std::io::Write;
@@ -115,24 +114,27 @@ pub fn run(crate_name: &str) -> ! {
     std::process::exit(0);
 }
 
-/// Builds and links [Qt resource files](https://doc.qt.io/qt-5/resources.html).
+/// Builds and links a [Qt resource file](https://doc.qt.io/qt-5/resources.html).
 ///
-/// Note that the resource file may not be rebuilt when the resource file or files referenced
-/// for it are changed. You may have to run `cargo clean -p crate_name` to force a rebuild.
-pub fn try_add_resources(paths: impl IntoIterator<Item = impl AsRef<Path>>) -> Result<()> {
-    let paths = paths
-        .into_iter()
-        .map(|path| path.as_ref().to_path_buf())
-        .collect_vec();
-    for path in &paths {
-        if !path.is_file() {
-            bail!("not a file: {}", path.display());
-        }
+/// The resource file must also be registered using the `qt_core::q_init_resource` macro.
+///
+/// Note that the resource file may not be rebuilt when files referenced
+/// by the resource file are changed.
+/// You may have to run `cargo clean -p crate_name` to force a rebuild.
+pub fn try_add_resources(path: impl AsRef<Path>) -> Result<()> {
+    let path = path.as_ref();
+    if !path.exists() {
+        bail!("no such file: {:?}", path);
     }
-    let mut hasher = Sha1::new();
-    hasher.input(format!("{:?}", paths));
-    //let project_name = format!("qt_resources_{:x}", hasher.result());
-    let project_name = "qt_resources1";
+    if !path.is_file() {
+        bail!("not a file: {:?}", path);
+    }
+    let path = canonicalize(path)?;
+    let base_name = os_str_to_str(
+        path.file_stem()
+            .ok_or_else(|| format_err!("can't extract base name from path: {:?}", path))?,
+    )?;
+    let project_name = format!("ritual_qt_resources_{}", base_name);
 
     let out_dir =
         PathBuf::from(env::var("OUT_DIR").with_context(|_| "OUT_DIR env var is missing")?);
@@ -144,31 +146,27 @@ pub fn try_add_resources(paths: impl IntoIterator<Item = impl AsRef<Path>>) -> R
     writeln!(pro_file, "TEMPLATE = lib")?;
     writeln!(pro_file, "CONFIG += staticlib")?;
     writeln!(pro_file, "SOURCES += 1.cpp")?;
-    writeln!(
-        pro_file,
-        "RESOURCES += {}",
-        paths.iter().map_if_ok(|path| path_to_str(path))?.join(" ")
-    )?;
+    writeln!(pro_file, "RESOURCES += {}", path_to_str(&path)?)?;
     drop(pro_file);
 
     let mut cpp_file = create_file(dir.join("1.cpp"))?;
     writeln!(cpp_file, "#include <QDir>")?;
-    for path in paths {
-        let name = os_str_to_str(
-            path.file_stem()
-                .ok_or_else(|| format_err!("can't extract base name from path: {:?}", path))?,
-        )?;
-        writeln!(
-            cpp_file,
-            "void ritual_init_resource_{}_() {{ Q_INIT_RESOURCE({}); }}",
-            name, name
-        )?;
-        writeln!(
-            cpp_file,
-            "extern \"C\" void ritual_init_resource_{}() {{ ritual_init_resource_{}_(); }}",
-            name, name
-        )?;
-    }
+    let name = os_str_to_str(
+        path.file_stem()
+            .ok_or_else(|| format_err!("can't extract base name from path: {:?}", path))?,
+    )?;
+    // `Q_INIT_RESOURCE` doesn't work inside `extern "C"` context,
+    // so we need a wrapper function.
+    writeln!(
+        cpp_file,
+        "void ritual_init_resource_cpp_{}() {{ Q_INIT_RESOURCE({}); }}",
+        name, name
+    )?;
+    writeln!(
+        cpp_file,
+        "extern \"C\" void ritual_init_resource_{}() {{ ritual_init_resource_cpp_{}(); }}",
+        name, name
+    )?;
     drop(cpp_file);
 
     run_command(Command::new("qmake").arg(pro_file_path).current_dir(&dir))?;
@@ -185,12 +183,13 @@ pub fn try_add_resources(paths: impl IntoIterator<Item = impl AsRef<Path>>) -> R
         dir
     };
     println!("cargo:rustc-link-search={}", path_to_str(&lib_dir)?);
+    println!("cargo:rerun-if-changed={}", path_to_str(&path)?);
     Ok(())
 }
 
 /// Calls `try_add_resources` and panic on an error.
-pub fn add_resources(paths: impl IntoIterator<Item = impl AsRef<Path>>) {
-    try_add_resources(paths).fancy_unwrap();
+pub fn add_resources(path: impl AsRef<Path>) {
+    try_add_resources(path).fancy_unwrap();
 }
 
 #[test]
