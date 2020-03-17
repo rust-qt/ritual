@@ -31,8 +31,8 @@ where
 /// use qt_core::{qdbg, QVectorOfInt};
 /// # unsafe {
 /// let x = QVectorOfInt::new_0a();
-/// x.push_back(&1);
-/// x.push_back(&2);
+/// x.append(&1);
+/// x.append(&2);
 /// println!("{:?}", qdbg(x.as_ref()));
 /// # }
 /// ```

@@ -65,9 +65,9 @@ fn operators() {
         assert!(!(c > 9));
         assert!(!(c < 4));
 
-        let vec = QVectorOfInt::new();
-        vec.push(&10);
-        vec.push(&12);
+        let vec = QVectorOfInt::new_0a();
+        vec.append(&10);
+        vec.append(&12);
         let _ = &b << vec.as_ref();
     }
 }

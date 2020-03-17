@@ -3,6 +3,7 @@
 
 #include "moqt_core_exports.h"
 #include <vector>
+#include "QString.h"
 
 template<typename T>
 class MOQT_CORE_EXPORT SomethingElse {};
@@ -11,7 +12,8 @@ template<typename T>
 class MOQT_CORE_EXPORT QVector {
 public:
     QVector() {}
-    void push(const T& value) {
+    QVector(int size) {}
+    void append(const T& value) {
         m_data[m_size] = value;
         m_size++;
     }
@@ -62,6 +64,11 @@ private:
     T m_data[32];
     int m_size = 0;
 };
+
+template <typename T>
+inline MOQT_CORE_EXPORT QDebug operator<<(QDebug debug, const QVector<T> &vec) {
+    return debug;
+}
 
 
 #endif //QVECTOR_H

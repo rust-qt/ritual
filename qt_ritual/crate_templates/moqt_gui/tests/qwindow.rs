@@ -34,17 +34,17 @@ fn test_with_vectors() {
     unsafe {
         let window: QBox<QWindow> = QWindow::new();
 
-        let vec = QVectorOfInt::new();
-        vec.push(&10);
-        vec.push(&12);
-        vec.push(&14);
-        vec.push(&16);
+        let vec = QVectorOfInt::new_0a();
+        vec.append(&10);
+        vec.append(&12);
+        vec.append(&14);
+        vec.append(&16);
         let r = window.show_vector_of_int(vec.as_ref());
         assert_eq!(r, 4);
 
-        let vec2 = QVectorOfQWindow::new();
-        vec2.push(&get_window().as_mut_raw_ptr());
-        vec2.push(&get_window().as_mut_raw_ptr());
+        let vec2 = QVectorOfQWindow::new_0a();
+        vec2.append(&get_window().as_mut_raw_ptr());
+        vec2.append(&get_window().as_mut_raw_ptr());
         let r = window.show_vector_of_windows(vec2.as_ref());
         assert_eq!(r, 2);
     }

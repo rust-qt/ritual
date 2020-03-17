@@ -28,9 +28,9 @@ void BasicClass::updateFoo(UpdateTypes updateTypes) {
 
 QVector<int> BasicClass::get_vector_int() const {
     auto r = QVector<int>();
-    r.push(1);
-    r.push(3);
-    r.push(5);
+    r.append(1);
+    r.append(3);
+    r.append(5);
     return r;
 }
 
@@ -38,11 +38,11 @@ QVector<BasicClassField> BasicClass::get_vector_class() const {
     auto r = QVector<BasicClassField>();
     BasicClassField value;
     value.set(2);
-    r.push(value);
+    r.append(value);
     value.set(4);
-    r.push(value);
+    r.append(value);
     value.set(6);
-    r.push(value);
+    r.append(value);
     return r;
 }
 
@@ -51,7 +51,7 @@ BasicClass::operator int() {
 }
 BasicClass::operator QVector<int>() {
     auto r = QVector<int>();
-    r.push(7);
+    r.append(7);
     return r;
 }
 
