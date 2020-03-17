@@ -11,3 +11,4 @@
 #include "QString.h"
 #include "Overloaded.h"
 #include "QByteArray.h"
+#include "QVector.h"

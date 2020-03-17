@@ -9,10 +9,14 @@ template<typename T>
 class MOQT_CORE_EXPORT SomethingElse {};
 
 template<typename T>
-class MOQT_CORE_EXPORT QVector {
+class QVector {
 public:
     QVector() {}
-    QVector(int size) {}
+    QVector(int size) {
+        for(int i = 0; i < size; ++i) {
+            append(T());
+        }
+    }
     void append(const T& value) {
         m_data[m_size] = value;
         m_size++;
