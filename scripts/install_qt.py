@@ -136,3 +136,10 @@ for name in os.listdir(current_dir):
             print('Configuring Qt installation in {}'.format(dir))
             with open(config_file, 'w') as file:
                 file.write("[Paths]\nPrefix=..\nDocumentation=../../Docs/Qt-{}".format(name))
+        config_file2 = os.path.join(dir, 'mkspecs', 'qconfig.pri')
+        with open(config_file2, 'r') as file:
+            content = file.read()
+        content = content.replace("QT_EDITION = Enterprise", "QT_EDITION = Opensource")
+        content = content.replace("QT_LICHECK = licheck64", "")
+        with open(config_file2, 'w') as file:
+            file.write(content)
