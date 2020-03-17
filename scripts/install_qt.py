@@ -140,6 +140,6 @@ for name in os.listdir(current_dir):
         with open(config_file2, 'r') as file:
             content = file.read()
         content = content.replace("QT_EDITION = Enterprise", "QT_EDITION = Opensource")
-        content = content.replace("QT_LICHECK = licheck64", "")
+        content = content.replace("QT_LICHECK", "#QT_LICHECK")
         with open(config_file2, 'w') as file:
             file.write(content)
