@@ -25,9 +25,9 @@ use std::marker::PhantomData;
 /// `ArgumentsCompatible` is implemented for tuples with up to 16 items.
 pub trait ArgumentsCompatible<T> {}
 
-/// Information about a receiving side of a Qt signal connection.
+/// Reference to a particular signal or slot of a particular object.
 ///
-/// A `Receiver` refers to a particular signal or slot of a particular object.
+/// A `Receiver` can be used as the receiving side of a Qt signal connection.
 /// The `Arguments` generic argument specifies argument types of this signal or slot.
 pub struct Receiver<Arguments> {
     q_object: Ref<QObject>,
@@ -76,9 +76,8 @@ impl<A> Receiver<A> {
     }
 }
 
-/// Information about a Qt signal.
+/// Reference to a particular signal of a particular object.
 ///
-/// A `Signal` refers to a particular signal of a particular object.
 /// The `Arguments` generic argument specifies argument types of this signal.
 pub struct Signal<Arguments>(Receiver<Arguments>);
 
@@ -191,6 +190,12 @@ where
 impl<SignalArguments> Signal<SignalArguments> {
     /// Creates a Qt connection between this signal and `receiver`, using the specified
     /// `connection_type`.
+    ///
+    /// Returns an object that represents the connection. You can use `is_valid()` on this object
+    /// to determine if the connection was successful.
+    ///
+    /// The connection will automatically be deleted when either the sender or the receiver
+    /// is deleted.
     ///
     /// # Safety
     ///

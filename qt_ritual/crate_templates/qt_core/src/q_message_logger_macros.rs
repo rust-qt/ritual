@@ -1,3 +1,4 @@
+/// Creates a `QMessageLogger` with attached information about current file, line, and module.
 #[macro_export]
 macro_rules! q_message_logger {
     () => {
@@ -13,6 +14,10 @@ macro_rules! q_message_logger {
     };
 }
 
+/// Creates a `QDebug` that logs a debug message
+/// with attached information about current file, line, and module.
+///
+/// This is similar to `qDebug()` C++ macro.
 #[macro_export]
 macro_rules! q_debug {
     () => {
@@ -20,6 +25,10 @@ macro_rules! q_debug {
     };
 }
 
+/// Creates a `QDebug` that logs an informational message
+/// with attached information about current file, line, and module.
+///
+/// This is similar to `qInfo()` C++ macro.
 #[macro_export]
 macro_rules! q_info {
     () => {
@@ -27,6 +36,10 @@ macro_rules! q_info {
     };
 }
 
+/// Creates a `QDebug` that logs a warning message
+/// with attached information about current file, line, and module.
+///
+/// This is similar to `qWarning()` C++ macro.
 #[macro_export]
 macro_rules! q_warning {
     () => {
@@ -34,6 +47,10 @@ macro_rules! q_warning {
     };
 }
 
+/// Creates a `QDebug` that logs a critical message
+/// with attached information about current file, line, and module.
+///
+/// This is similar to `qCritical()` C++ macro.
 #[macro_export]
 macro_rules! q_critical {
     () => {

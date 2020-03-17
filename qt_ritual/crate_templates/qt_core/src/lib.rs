@@ -18,7 +18,7 @@ pub use crate::impl_q_core_application::QCoreApplicationArgs;
 pub use crate::impl_q_object::FindChildError;
 pub use crate::impl_q_string::qs;
 pub use crate::q_box::QBox;
-pub use crate::q_debug_shim::{qdebug, QDebugShim};
+pub use crate::q_debug_shim::{qdbg, QDebugShim};
 pub use crate::q_flags::QFlags;
 pub use crate::q_ptr::QPtr;
 

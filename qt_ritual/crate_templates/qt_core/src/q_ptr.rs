@@ -5,7 +5,7 @@ use cpp_core::{
 use std::fmt;
 use std::ops::Deref;
 
-/// A smart pointer that automatically resets when the object is deleted.
+/// A smart pointer that automatically sets to null when the object is deleted.
 ///
 /// `QPtr` exposes functionality provided by the `QPointer<T>` C++ class.
 /// `QPtr` can only contain a pointer to a `QObject`-based object. When that object is
@@ -87,6 +87,10 @@ impl<T: StaticUpcast<QObject>> QPtr<T> {
     }
 
     /// Returns true if the pointer is null.
+    ///
+    /// ### Safety
+    ///
+    /// See type level documentation.
     pub unsafe fn is_null(&self) -> bool {
         self.q_pointer.as_ref().map_or(true, |p| p.is_null())
     }

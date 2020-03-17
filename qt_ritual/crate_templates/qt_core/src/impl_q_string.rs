@@ -11,12 +11,14 @@ impl<'a> From<&'a QString> for String {
 
 impl QString {
     /// Creates Qt string from an `std` string.
+    ///
+    /// `QString` makes a deep copy of the data.
     pub fn from_std_str<S: AsRef<str>>(s: S) -> CppBox<QString> {
         let slice = s.as_ref().as_bytes();
         unsafe { QString::from_utf8_char_int(slice.as_ptr() as *mut c_char, slice.len() as c_int) }
     }
 
-    /// Creates `std` string from a Qt string.
+    /// Creates an `std` string from a Qt string.
     pub fn to_std_string(&self) -> String {
         unsafe {
             let buf = self.to_utf8();

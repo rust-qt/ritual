@@ -199,14 +199,33 @@ impl<T: StaticUpcast<QObject> + CppDeletable> QBox<T> {
         self.into_q_ptr().to_box()
     }
 
+    /// Converts this `QBox` into a `QPtr`.
+    ///
+    /// Unlike `QBox`, `QPtr` will never delete the object when dropped.
+    ///
+    /// ### Safety
+    ///
+    /// See type level documentation.
     pub unsafe fn into_q_ptr(mut self) -> QPtr<T> {
         mem::replace(&mut self.0, QPtr::null())
     }
 
+    /// Converts this `QBox` into a `Ptr`.
+    ///
+    /// Unlike `QBox`, `Ptr` will never delete the object when dropped.
+    ///
+    /// ### Safety
+    ///
+    /// See type level documentation.
     pub unsafe fn into_ptr(self) -> Ptr<T> {
         self.into_q_ptr().as_ptr()
     }
 
+    /// Converts this `QBox` into a raw pointer without deleting the object.
+    ///
+    /// ### Safety
+    ///
+    /// See type level documentation.
     pub unsafe fn into_raw_ptr(self) -> *mut T {
         self.into_q_ptr().as_mut_raw_ptr()
     }

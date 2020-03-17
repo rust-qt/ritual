@@ -1,9 +1,11 @@
+use std::fmt;
 use std::marker::PhantomData;
+use std::ops::{BitAnd, BitOr, BitXor};
 use std::os::raw::c_int;
 
-/// Rust alternative to Qt's `QFlags` types.
+/// An OR-combination of integer values of the enum type `E`.
 ///
-/// `Flags<E>` is an OR-combination of integer values of the enum type `E`.
+/// This type serves as a replacement for Qt's `QFlags` C++ template class.
 #[derive(Clone, Copy)]
 pub struct QFlags<E> {
     value: c_int,
@@ -43,7 +45,7 @@ impl<E: Into<QFlags<E>>> QFlags<E> {
     }
 }
 
-impl<E, T: Into<QFlags<E>>> ::std::ops::BitOr<T> for QFlags<E> {
+impl<E, T: Into<QFlags<E>>> BitOr<T> for QFlags<E> {
     type Output = QFlags<E>;
     fn bitor(self, rhs: T) -> QFlags<E> {
         Self {
@@ -53,25 +55,25 @@ impl<E, T: Into<QFlags<E>>> ::std::ops::BitOr<T> for QFlags<E> {
     }
 }
 
-/*
-impl<E: QFlaggableEnum, T: EnumOrFlags<E>> std::ops::BitAnd<T> for QFlags<E> {
+impl<E, T: Into<QFlags<E>>> BitAnd<T> for QFlags<E> {
     type Output = QFlags<E>;
     fn bitand(self, rhs: T) -> QFlags<E> {
-        let mut r = self.clone();
-        r.value &= rhs.to_flags().to_int();
-        r
+        Self {
+            value: self.value & rhs.into().value,
+            _phantom_data: PhantomData,
+        }
     }
 }
 
-impl<E: QFlaggableEnum, T: EnumOrFlags<E>> std::ops::BitXor<T> for QFlags<E> {
+impl<E, T: Into<QFlags<E>>> BitXor<T> for QFlags<E> {
     type Output = QFlags<E>;
     fn bitxor(self, rhs: T) -> QFlags<E> {
-        let mut r = self.clone();
-        r.value ^= rhs.to_flags().to_int();
-        r
+        Self {
+            value: self.value ^ rhs.into().value,
+            _phantom_data: PhantomData,
+        }
     }
 }
-*/
 
 impl<E> Default for QFlags<E> {
     fn default() -> Self {
@@ -82,8 +84,8 @@ impl<E> Default for QFlags<E> {
     }
 }
 
-impl<T> ::std::fmt::Debug for QFlags<T> {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+impl<T> fmt::Debug for QFlags<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "QFlags({})", self.value)
     }
 }

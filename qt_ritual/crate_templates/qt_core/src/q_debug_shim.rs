@@ -2,6 +2,9 @@ use crate::{QDebug, QString};
 use std::fmt;
 use std::ops::Shl;
 
+/// Provides a `std::fmt::Debug` implementation for types with a `QDebug` operator.
+///
+/// Use `qdbg` function instead of using this type directly.
 pub struct QDebugShim<T>(T);
 
 impl<T> fmt::Debug for QDebugShim<T>
@@ -20,6 +23,19 @@ where
     }
 }
 
-pub unsafe fn qdebug<T>(value: T) -> QDebugShim<T> {
+/// Returns an object that implements `std::fmt::Debug` for a `value`
+/// that has a `QDebug` operator.
+///
+/// Example:
+/// ```
+/// use qt_core::{qdbg, QVectorOfInt};
+/// # unsafe {
+/// let x = QVectorOfInt::new_0a();
+/// x.push_back(&1);
+/// x.push_back(&2);
+/// println!("{:?}", qdbg(x.as_ref()));
+/// # }
+/// ```
+pub unsafe fn qdbg<T>(value: T) -> QDebugShim<T> {
     QDebugShim(value)
 }

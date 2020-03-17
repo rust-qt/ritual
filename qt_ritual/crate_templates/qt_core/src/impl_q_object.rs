@@ -3,6 +3,7 @@ use cpp_core::{DynamicCast, StaticUpcast};
 use std::error::Error;
 use std::fmt;
 
+/// An error returned by `QObject::find_child`.
 pub struct FindChildError(FindChildErrorInner);
 
 enum FindChildErrorInner {
@@ -37,6 +38,15 @@ impl fmt::Debug for FindChildError {
 impl Error for FindChildError {}
 
 impl QObject {
+    /// Finds a child of `self` with the specified object name
+    /// and casts it to type `T`.
+    ///
+    /// The search is performed recursively. If there is more than one child matching the search,
+    /// the most direct ancestor is returned. If there are several direct ancestors,
+    /// it is undefined which one will be returned.
+    ///
+    /// Returns an error if there is no child object with object name `name` or
+    /// the found object cannot be cast to `T`.
     pub unsafe fn find_child<T>(&self, name: &str) -> Result<QPtr<T>, FindChildError>
     where
         QObject: DynamicCast<T>,

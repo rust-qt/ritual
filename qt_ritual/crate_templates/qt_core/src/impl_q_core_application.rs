@@ -6,17 +6,18 @@ use std::process;
 /// A struct providing valid `argc` and `argv` values for Qt application
 /// objects.
 ///
-/// Constructors of `qt_core::core_application::CoreApplication`,
-/// `qt_gui::gui_application::GuiApplication` and `qt_widgets::application::Application`
+/// `QCoreApplication` shouldn't be used directly. Instead, use `init` function on
+/// the application types (`qt_core::QCoreApplication`,
+/// `qt_gui::QGuiApplication`, and `qt_widgets::QApplication`).
+///
+/// Constructors of Qt application classes
 /// require `argc` and `argv` values that are available in C++'s `main` function but
-/// not available in Rust. More importantly, `argc` and `argv` must be valid for the entire
+/// not available in Rust. Qt also expects `argc` and `argv` to be encoded in a particular
+/// (local 8-bit) encoding. `argc` and `argv` must be valid for the entire
 /// life of the application. This struct stores list of arguments in a format compatible with
 /// `argc` and `argv`, and can be used to initialize Qt application objects.
-/// `CoreApplicationArgs` must live longer than the application object.
 ///
-/// `CoreApplication::init` convenience function
-/// and similar functions in the other application types
-/// can be used instead of `CoreApplicationArgs`.
+/// `QCoreApplicationArgs` must live longer than the application object.
 pub struct QCoreApplicationArgs {
     _values: Vec<Vec<u8>>,
     argc: Box<c_int>,
@@ -62,10 +63,12 @@ impl QCoreApplication {
     /// A convenience function for performing proper initialization and de-initialization of
     /// a Qt application.
     ///
-    /// This function creates `CoreApplication` with valid `argc` and `argv`, calls the passed
-    /// closure `f(app)` with the application object and exist the process with the exit code
-    /// returned by the closure. The closure should perform the initialization of the application
-    /// and either return immediately or call `CoreApplication::exec()` and return its return value:
+    /// This function creates a `QCoreApplication` object with valid `argc` and `argv`,
+    /// calls the passed closure `f(app)` with the application object
+    /// and exits the process with the exit code returned by the closure.
+    /// The closure should perform the initialization of the application
+    /// and either return immediately or call `QCoreApplication::exec()`
+    /// and return its return value:
     /// ```no_run
     /// use qt_core::QCoreApplication;
     ///

@@ -6,10 +6,12 @@ impl QApplication {
     /// A convenience function for performing proper initialization and de-initialization of
     /// a Qt application.
     ///
-    /// This function creates `CoreApplication` with valid `argc` and `argv`, calls the passed
-    /// closure `f(app)` with the application object and exist the process with the exit code
-    /// returned by the closure. The closure should perform the initialization of the application
-    /// and either return immediately or call `CoreApplication::exec()` and return its return value:
+    /// This function creates a `QApplication` object with valid `argc` and `argv`,
+    /// calls the passed closure `f(app)` with the application object
+    /// and exits the process with the exit code returned by the closure.
+    /// The closure should perform the initialization of the application
+    /// and either return immediately or call `QApplication::exec()`
+    /// and return its return value:
     /// ```no_run
     /// use qt_widgets::QApplication;
     ///
