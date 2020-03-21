@@ -21,6 +21,7 @@ public:
         m_data[m_size] = value;
         m_size++;
     }
+    void append(const QVector<T> &l) {}
     T& at(int pos) {
         return m_data[pos];
     }

@@ -6,10 +6,10 @@ use std::os::raw::c_int;
 fn qvector_int() {
     unsafe {
         let vec = QVectorOfInt::new_0a();
-        vec.append(&10);
-        vec.append(&12);
-        vec.append(&14);
-        vec.append(&16);
+        vec.append_int(&10);
+        vec.append_int(&12);
+        vec.append_int(&14);
+        vec.append_int(&16);
         assert_eq!(vec.count(), 4);
         assert_eq!(*vec.at(2), 14);
     }
@@ -21,10 +21,10 @@ fn qvector_class() {
         let vec = QVectorOfBasicClassField::new_0a();
         let f = BasicClassField::new();
         f.set(21);
-        vec.append(f.as_ref());
+        vec.append_basic_class_field(f.as_ref());
         let f = BasicClassField::new();
         f.set(24);
-        vec.append(f.as_ref());
+        vec.append_basic_class_field(f.as_ref());
         assert_eq!(vec.count(), 2);
         assert_eq!(vec.at(1).get(), 24);
     }
@@ -34,10 +34,10 @@ fn qvector_class() {
 fn qvector_iter() {
     unsafe {
         let vec = QVectorOfInt::new_0a();
-        vec.append(&10);
-        vec.append(&12);
-        vec.append(&14);
-        vec.append(&16);
+        vec.append_int(&10);
+        vec.append_int(&12);
+        vec.append_int(&14);
+        vec.append_int(&16);
 
         let collected: Vec<c_int> = cpp_iter(vec.begin(), vec.end())
             .map(|mut_ref| *mut_ref)

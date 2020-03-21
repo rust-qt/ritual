@@ -35,16 +35,16 @@ fn test_with_vectors() {
         let window: QBox<QWindow> = QWindow::new();
 
         let vec = QVectorOfInt::new_0a();
-        vec.append(&10);
-        vec.append(&12);
-        vec.append(&14);
-        vec.append(&16);
+        vec.append_int(&10);
+        vec.append_int(&12);
+        vec.append_int(&14);
+        vec.append_int(&16);
         let r = window.show_vector_of_int(vec.as_ref());
         assert_eq!(r, 4);
 
         let vec2 = QVectorOfQWindow::new_0a();
-        vec2.append(&get_window().as_mut_raw_ptr());
-        vec2.append(&get_window().as_mut_raw_ptr());
+        vec2.append_q_window(&get_window().as_mut_raw_ptr());
+        vec2.append_q_window(&get_window().as_mut_raw_ptr());
         let r = window.show_vector_of_windows(vec2.as_ref());
         assert_eq!(r, 2);
     }
