@@ -6,20 +6,12 @@
 
 The main motivation for this project is to provide access to Qt from Rust. Ritual provides large amount of automation, supports incremental runs, and implements compatible API evolution. This is mostly dictated by the huge size of API provided by Qt and significant API differences between Qt versions. However, ritual is designed to be universal and can also be used to easily create bindings for other C++ libraries.
 
-# Examples and guides
+More information is available on [rust-qt.github.io](https://rust-qt.github.io/):
 
-- [How to use Qt from Rust](https://github.com/rust-qt/examples)
-- [How to use ritual on a C++ library of your choice](https://github.com/rust-qt/generator-example)
-
-The rest of this readme is focused on ritual's development.
-
-# Repository structure
-
-- `ritual` is the main part of the generator;
-- `qt_ritual` provides Qt-specific generator features, generator configuration for the Qt crates, and a binary file for running the generator.
-- `cpp_core` provides essential utilities used by generated crates;
-- `ritual_build` and `qt_ritual_build` provide build scripts for the generated crates;
-- `ritual_common` and `qt_ritual_common` contain common functionality for other crates.
+- [How to use Qt from Rust](https://rust-qt.github.io/qt/)
+- [Ritual overview](https://rust-qt.github.io/ritual/)
+- [How to use Ritual on a C++ library of your choice](https://rust-qt.github.io/processing_cpp_library/)
+- [Blog](https://rust-qt.github.io/blog/)
 
 # License
 
