@@ -58,7 +58,7 @@ pub fn create_config(
     );
     let description = format!("Bindings for {} C++ library", lib_folder_name(&crate_name));
     package_data.insert("description".to_string(), toml::Value::String(description));
-    let doc_url = format!("https://rust-qt.github.io/rustdoc/qt/{}", &crate_name);
+    let doc_url = format!("https://docs.rs/{}", &crate_name);
     package_data.insert("documentation".to_string(), toml::Value::String(doc_url));
     package_data.insert(
         "repository".to_string(),
