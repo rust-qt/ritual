@@ -113,7 +113,7 @@ impl FfiNameProvider {
             .map(|f| f.item.path().to_cpp_code().unwrap())
             .collect();
 
-        FfiNameProvider { prefix, names }
+        FfiNameProvider { names, prefix }
     }
 
     pub fn testing() -> Self {
@@ -202,16 +202,13 @@ fn generate_ffi_methods_for_method(
     movable_types: &[CppPath],
     name_provider: &mut FfiNameProvider,
 ) -> Result<Vec<CppFfiItem>> {
-    let mut methods = Vec::new();
-    methods.push(CppFfiItem::Function(to_ffi_method(
+    Ok(vec![CppFfiItem::Function(to_ffi_method(
         NewFfiFunctionKind::Function {
             cpp_function: method.clone(),
         },
         movable_types,
         name_provider,
-    )?));
-
-    Ok(methods)
+    )?)])
 }
 
 pub enum NewFfiFunctionKind {

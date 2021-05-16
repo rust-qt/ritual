@@ -375,13 +375,9 @@ impl DocParser {
 
 /// Extracts portions of the declaration corresponding to the function's arguments
 fn arguments_from_declaration(declaration: &str) -> Option<Vec<&str>> {
-    match declaration.find('(') {
-        None => None,
-        Some(start_index) => match declaration.rfind(')') {
-            None => None,
-            Some(end_index) => Some(declaration[start_index + 1..end_index].split(',').collect()),
-        },
-    }
+    let start_index = declaration.find('(')?;
+    let end_index = declaration.rfind(')')?;
+    Some(declaration[start_index + 1..end_index].split(',').collect())
 }
 
 /// Returns true if argument types in two declarations are equal.
@@ -482,7 +478,7 @@ fn reformat_qt_declaration(declaration: &str) -> String {
         .replace("[virtual]", "virtual")
         .replace("[signal]", "")
         .replace("[slot]", "");
-    if declaration.find("[pure virtual]").is_some() {
+    if declaration.contains("[pure virtual]") {
         declaration = format!("virtual {} = 0", declaration.replace("[pure virtual]", ""));
     }
     declaration
@@ -533,11 +529,7 @@ fn parse_item_doc(h3: Node<'_>, base_url: &str) -> Result<ItemDoc> {
                 Some(node)
             } else {
                 let mut value_list_r = node.find(value_list_condition);
-                if let Some(value_list) = value_list_r.next() {
-                    Some(value_list)
-                } else {
-                    None
-                }
+                value_list_r.next()
             };
 
             if let Some(value_list_node) = value_list_node {

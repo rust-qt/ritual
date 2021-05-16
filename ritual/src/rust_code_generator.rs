@@ -962,6 +962,7 @@ impl Generator<'_> {
     }
 
     /// Generates Rust code for declaring a function's arguments.
+    #[allow(clippy::collapsible_match)]
     fn arg_texts(
         &self,
         args: &[RustFunctionArgument],

@@ -49,42 +49,23 @@ pub enum RustStructKind {
 
 impl RustStructKind {
     pub fn is_wrapper_type(&self) -> bool {
-        if let RustStructKind::WrapperType(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, RustStructKind::WrapperType(_))
     }
 
     pub fn is_sized_type(&self) -> bool {
-        match *self {
-            RustStructKind::SizedType(_) => true,
-            _ => false,
-        }
+        matches!(self, RustStructKind::SizedType(_))
     }
 
     pub fn has_same_kind(&self, other: &Self) -> bool {
         match self {
             RustStructKind::WrapperType(_) => {
-                if let RustStructKind::WrapperType(_) = other {
-                    true
-                } else {
-                    false
-                }
+                matches!(other, RustStructKind::WrapperType(_))
             }
             RustStructKind::QtSlotWrapper(_) => {
-                if let RustStructKind::QtSlotWrapper(_) = other {
-                    true
-                } else {
-                    false
-                }
+                matches!(other, RustStructKind::QtSlotWrapper(_))
             }
             RustStructKind::SizedType(_) => {
-                if let RustStructKind::SizedType(_) = other {
-                    true
-                } else {
-                    false
-                }
+                matches!(other, RustStructKind::SizedType(_))
             }
         }
     }
@@ -165,19 +146,11 @@ impl RustFunctionKind {
     }
 
     pub fn is_ffi_function(&self) -> bool {
-        if let RustFunctionKind::FfiFunction = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, RustFunctionKind::FfiFunction)
     }
 
     pub fn is_signal_or_slot_getter(&self) -> bool {
-        if let RustFunctionKind::SignalOrSlotGetter(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, RustFunctionKind::SignalOrSlotGetter(_))
     }
 }
 
@@ -404,11 +377,7 @@ impl RustModuleKind {
     }
 
     pub fn is_cpp_nested_types(self) -> bool {
-        if let RustModuleKind::CppNestedTypes { .. } = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, RustModuleKind::CppNestedTypes { .. })
     }
 }
 
@@ -443,11 +412,10 @@ impl RustFunctionCaptionStrategy {
     pub fn all() -> Vec<Self> {
         use self::RustFunctionCaptionStrategy as S;
 
-        let mut all = Vec::new();
-        all.push(S {
+        let mut all = vec![S {
             mut_: true,
             ..S::default()
-        });
+        }];
 
         let other = &[
             S {
@@ -521,18 +489,10 @@ impl RustExtraImplKind {
     pub fn has_same_kind(&self, other: &Self) -> bool {
         match self {
             RustExtraImplKind::FlagEnum(_) => {
-                if let RustExtraImplKind::FlagEnum(_) = other {
-                    true
-                } else {
-                    false
-                }
+                matches!(other, RustExtraImplKind::FlagEnum(_))
             }
             RustExtraImplKind::QtReceiverImpl(_) => {
-                if let RustExtraImplKind::QtReceiverImpl(_) = other {
-                    true
-                } else {
-                    false
-                }
+                matches!(other, RustExtraImplKind::QtReceiverImpl(_))
             }
         }
     }
@@ -673,11 +633,7 @@ impl RustItem {
                 }
             }
             RustItem::EnumValue(_) => {
-                if let RustItem::EnumValue(_) = other {
-                    true
-                } else {
-                    false
-                }
+                matches!(other, RustItem::EnumValue(_))
             }
             RustItem::TraitImpl(data) => {
                 if let RustItem::TraitImpl(other) = other {
@@ -696,33 +652,21 @@ impl RustItem {
             RustItem::Function(data) => match &data.kind {
                 RustFunctionKind::FfiWrapper(_) => {
                     if let RustItem::Function(other) = other {
-                        if let RustFunctionKind::FfiWrapper(_) = &other.kind {
-                            true
-                        } else {
-                            false
-                        }
+                        matches!(&other.kind, RustFunctionKind::FfiWrapper(_))
                     } else {
                         false
                     }
                 }
                 RustFunctionKind::SignalOrSlotGetter(_) => {
                     if let RustItem::Function(other) = other {
-                        if let RustFunctionKind::SignalOrSlotGetter(_) = &other.kind {
-                            true
-                        } else {
-                            false
-                        }
+                        matches!(&other.kind, RustFunctionKind::SignalOrSlotGetter(_))
                     } else {
                         false
                     }
                 }
                 RustFunctionKind::FfiFunction => {
                     if let RustItem::Function(other) = other {
-                        if let RustFunctionKind::FfiFunction = &other.kind {
-                            true
-                        } else {
-                            false
-                        }
+                        matches!(&other.kind, RustFunctionKind::FfiFunction)
                     } else {
                         false
                     }
@@ -739,18 +683,11 @@ impl RustItem {
     }
 
     pub fn is_module(&self) -> bool {
-        if let RustItem::Module(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, RustItem::Module(_))
     }
+
     pub fn is_trait_impl(&self) -> bool {
-        if let RustItem::TraitImpl(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, RustItem::TraitImpl(_))
     }
     pub fn is_ffi_function(&self) -> bool {
         if let RustItem::Function(function) = self {
@@ -846,16 +783,10 @@ pub enum NameType<'a> {
 
 impl NameType<'_> {
     pub fn is_api_function(&self) -> bool {
-        match self {
-            NameType::ApiFunction(_) => true,
-            _ => false,
-        }
+        matches!(self, NameType::ApiFunction(_))
     }
 
     pub fn is_module(&self) -> bool {
-        match self {
-            NameType::Module { .. } => true,
-            _ => false,
-        }
+        matches!(self, NameType::Module { .. })
     }
 }

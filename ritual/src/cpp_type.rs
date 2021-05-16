@@ -153,38 +153,29 @@ impl CppBuiltInNumericType {
     /// Returns true if this type is some sort of floating point type.
     pub fn is_float(&self) -> bool {
         use self::CppBuiltInNumericType::*;
-        match *self {
-            Float | Double | LongDouble => true,
-            _ => false,
-        }
+        matches!(self, Float | Double | LongDouble)
     }
 
     /// Returns true if this type is a signed integer.
     pub fn is_signed_integer(&self) -> bool {
         use self::CppBuiltInNumericType::*;
-        match *self {
-            SChar | Short | Int | Long | LongLong | Int128 => true,
-            _ => false,
-        }
+        matches!(self, SChar | Short | Int | Long | LongLong | Int128)
     }
 
     /// Returns true if this type is an unsigned integer.
     pub fn is_unsigned_integer(&self) -> bool {
         use self::CppBuiltInNumericType::*;
-        match *self {
-            UChar | Char16 | Char32 | UShort | UInt | ULong | ULongLong | UInt128 => true,
-            _ => false,
-        }
+        matches!(
+            self,
+            UChar | Char16 | Char32 | UShort | UInt | ULong | ULongLong | UInt128
+        )
     }
 
     /// Returns true if this type is integer but may be signed or
     /// unsigned, depending on the platform.
     pub fn is_integer_with_undefined_signedness(&self) -> bool {
         use self::CppBuiltInNumericType::*;
-        match *self {
-            Char | WChar => true,
-            _ => false,
-        }
+        matches!(self, Char | WChar)
     }
 
     /// Returns all supported types.
@@ -216,31 +207,19 @@ impl CppType {
 
     /// Returns true if this is `void` type.
     pub fn is_void(&self) -> bool {
-        match *self {
-            CppType::Void => true,
-            _ => false,
-        }
+        matches!(self, CppType::Void)
     }
     /// Returns true if this is a class type.
     pub fn is_class(&self) -> bool {
-        match *self {
-            CppType::Class(..) => true,
-            _ => false,
-        }
+        matches!(self, CppType::Class(..))
     }
     /// Returns true if this is a template parameter.
     pub fn is_template_parameter(&self) -> bool {
-        match *self {
-            CppType::TemplateParameter { .. } => true,
-            _ => false,
-        }
+        matches!(self, CppType::TemplateParameter { .. })
     }
     /// Returns true if this is a function pointer.
     pub fn is_function_pointer(&self) -> bool {
-        match *self {
-            CppType::FunctionPointer(..) => true,
-            _ => false,
-        }
+        matches!(self, CppType::FunctionPointer(..))
     }
 
     pub fn is_pointer(&self) -> bool {

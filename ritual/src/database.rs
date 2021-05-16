@@ -182,11 +182,7 @@ pub enum DatabaseItemData {
 
 impl DatabaseItemData {
     pub fn is_cpp_item(&self) -> bool {
-        if let DatabaseItemData::CppItem(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, DatabaseItemData::CppItem(_))
     }
     pub fn as_cpp_item(&self) -> Option<&CppItem> {
         if let DatabaseItemData::CppItem(data) = self {
@@ -203,11 +199,7 @@ impl DatabaseItemData {
         }
     }
     pub fn is_ffi_item(&self) -> bool {
-        if let DatabaseItemData::FfiItem(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, DatabaseItemData::FfiItem(_))
     }
     pub fn as_ffi_item(&self) -> Option<&CppFfiItem> {
         if let DatabaseItemData::FfiItem(data) = self {
@@ -224,11 +216,7 @@ impl DatabaseItemData {
         }
     }
     pub fn is_rust_item(&self) -> bool {
-        if let DatabaseItemData::RustItem(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, DatabaseItemData::RustItem(_))
     }
     pub fn as_rust_item(&self) -> Option<&RustItem> {
         if let DatabaseItemData::RustItem(data) = self {
@@ -238,11 +226,7 @@ impl DatabaseItemData {
         }
     }
     pub fn is_cpp_checks_item(&self) -> bool {
-        if let DatabaseItemData::CppChecksItem(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, DatabaseItemData::CppChecksItem(_))
     }
     pub fn as_cpp_checks_item(&self) -> Option<&CppChecksItem> {
         if let DatabaseItemData::CppChecksItem(data) = self {
@@ -259,11 +243,7 @@ impl DatabaseItemData {
         }
     }
     pub fn is_doc_item(&self) -> bool {
-        if let DatabaseItemData::DocItem(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, DatabaseItemData::DocItem(_))
     }
     pub fn as_doc_item(&self) -> Option<&DocItem> {
         if let DatabaseItemData::DocItem(data) = self {
@@ -517,15 +497,15 @@ impl DatabaseClient {
         self.current_database.db.rust_items()
     }
 
-    pub fn cpp_item_ids<'a>(&'a self) -> impl Iterator<Item = ItemId> + 'a {
+    pub fn cpp_item_ids(&self) -> impl Iterator<Item = ItemId> + '_ {
         self.cpp_items().map(|item| item.id)
     }
 
-    pub fn ffi_item_ids<'a>(&'a self) -> impl Iterator<Item = ItemId> + 'a {
+    pub fn ffi_item_ids(&self) -> impl Iterator<Item = ItemId> + '_ {
         self.ffi_items().map(|item| item.id)
     }
 
-    pub fn rust_item_ids<'a>(&'a self) -> impl Iterator<Item = ItemId> + 'a {
+    pub fn rust_item_ids(&self) -> impl Iterator<Item = ItemId> + '_ {
         self.rust_items().map(|item| item.id)
     }
 

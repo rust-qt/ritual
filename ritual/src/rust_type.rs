@@ -177,19 +177,11 @@ pub struct RustClosureToCallbackConversion {
 
 impl RustToFfiTypeConversion {
     pub fn is_option_utils_ref_to_ptr(&self) -> bool {
-        if let RustToFfiTypeConversion::OptionUtilsRefToPtr { .. } = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, RustToFfiTypeConversion::OptionUtilsRefToPtr { .. })
     }
 
     pub fn is_utils_ref_to_ptr(&self) -> bool {
-        if let RustToFfiTypeConversion::UtilsRefToPtr { .. } = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, RustToFfiTypeConversion::UtilsRefToPtr { .. })
     }
 
     pub fn as_callback_ref(&self) -> Option<&RustClosureToCallbackConversion> {
@@ -349,17 +341,11 @@ pub enum RustPointerLikeTypeKind {
 
 impl RustPointerLikeTypeKind {
     pub fn is_pointer(&self) -> bool {
-        match *self {
-            RustPointerLikeTypeKind::Pointer => true,
-            _ => false,
-        }
+        matches!(self, RustPointerLikeTypeKind::Pointer)
     }
 
     pub fn is_ref(&self) -> bool {
-        match *self {
-            RustPointerLikeTypeKind::Reference { .. } => true,
-            _ => false,
-        }
+        matches!(self, RustPointerLikeTypeKind::Reference { .. })
     }
 }
 
@@ -554,8 +540,8 @@ impl RustType {
                     path.parts[0].to_snake_case()
                 } else if path.crate_name() == "std" {
                     let last = path.last();
-                    let last = if last.starts_with("c_") {
-                        &last[2..]
+                    let last = if let Some(suffix) = last.strip_prefix("c_") {
+                        suffix
                     } else {
                         last
                     };
@@ -634,6 +620,7 @@ impl RustType {
 
     /// Returns name of the lifetime of this type,
     /// or `None` if there isn't any lifetime in this type.
+    #[allow(clippy::collapsible_match)]
     pub fn lifetime(&self) -> Option<&str> {
         if let RustType::PointerLike { kind, .. } = self {
             if let RustPointerLikeTypeKind::Reference { lifetime } = kind {

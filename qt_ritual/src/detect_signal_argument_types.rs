@@ -23,7 +23,7 @@ pub fn detect_signal_argument_types(data: &mut ProcessorData<'_>) -> Result<Hash
     let mut types_with_omitted_args = HashSet::new();
     for t in &all_types {
         let mut types = t.clone();
-        while let Some(_) = types.pop() {
+        while types.pop().is_some() {
             types_with_omitted_args.insert(types.clone());
         }
     }

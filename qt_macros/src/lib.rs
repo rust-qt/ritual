@@ -7,9 +7,6 @@
 
 #![deny(missing_docs)]
 
-// TODO: this will be unneeded soon.
-extern crate proc_macro;
-
 use proc_macro::TokenStream;
 use proc_macro_hack::proc_macro_hack;
 

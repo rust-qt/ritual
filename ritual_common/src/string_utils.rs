@@ -53,11 +53,11 @@ impl<'a> Iterator for WordIterator<'a> {
 /// Convert to string with different cases
 pub trait CaseOperations {
     /// Convert to class-case string ("WordWordWord")
-    fn to_class_case(self) -> String;
+    fn to_class_case(&self) -> String;
     /// Convert to snake-case string ("word_word_word")
-    fn to_snake_case(self) -> String;
+    fn to_snake_case(&self) -> String;
     /// Convert to upper-case string ("WORD_WORD_WORD")
-    fn to_upper_case_words(self) -> String;
+    fn to_upper_case_words(&self) -> String;
 }
 
 fn iterator_to_class_case<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String {
@@ -134,27 +134,27 @@ fn replace_all_sub_vecs(parts: &mut Vec<String>, needle: &[&str]) {
     }
 }
 
-impl<'a> CaseOperations for &'a str {
-    fn to_class_case(self) -> String {
+impl CaseOperations for str {
+    fn to_class_case(&self) -> String {
         iterator_to_class_case(WordIterator::new(self))
     }
-    fn to_snake_case(self) -> String {
+    fn to_snake_case(&self) -> String {
         iterator_to_snake_case(WordIterator::new(self))
     }
-    fn to_upper_case_words(self) -> String {
+    fn to_upper_case_words(&self) -> String {
         iterator_to_upper_case_words(WordIterator::new(self))
     }
 }
 
-impl<'a> CaseOperations for Vec<&'a str> {
-    fn to_class_case(self) -> String {
-        iterator_to_class_case(self.into_iter())
+impl<'a> CaseOperations for [&'a str] {
+    fn to_class_case(&self) -> String {
+        iterator_to_class_case(self.iter())
     }
-    fn to_snake_case(self) -> String {
-        iterator_to_snake_case(self.into_iter())
+    fn to_snake_case(&self) -> String {
+        iterator_to_snake_case(self.iter())
     }
-    fn to_upper_case_words(self) -> String {
-        iterator_to_upper_case_words(self.into_iter())
+    fn to_upper_case_words(&self) -> String {
+        iterator_to_upper_case_words(self.iter())
     }
 }
 

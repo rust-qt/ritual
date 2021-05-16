@@ -6,16 +6,15 @@ use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io::{self, BufRead, BufReader, BufWriter, Lines, Read, Write};
 use std::path::{Path, PathBuf};
-use toml;
 
 /// Move file or directory `src` to `dst` recursively,
 /// overwriting previous contents of `dst`. If corresponding
 /// old file has the same content as the new file, timestamps
 /// of the old file are preserved.
-pub fn move_files(src: &PathBuf, dst: &PathBuf) -> Result<()> {
+pub fn move_files(src: &Path, dst: &Path) -> Result<()> {
     let inner = || -> Result<()> {
-        if src.as_path().is_dir() {
-            if !dst.as_path().is_dir() {
+        if src.is_dir() {
+            if !dst.is_dir() {
                 trace!("[DebugMoveFiles] New dir created: {}", dst.display());
                 create_dir(dst)?;
             }
@@ -51,9 +50,9 @@ pub fn move_files(src: &PathBuf, dst: &PathBuf) -> Result<()> {
 }
 
 /// Copy file or directory `src` to `dst` recursively
-pub fn copy_recursively(src: &PathBuf, dst: &PathBuf) -> Result<()> {
+pub fn copy_recursively(src: &Path, dst: &Path) -> Result<()> {
     let inner = || -> Result<()> {
-        if src.as_path().is_dir() {
+        if src.is_dir() {
             if !dst.is_dir() {
                 create_dir(&dst)?;
             }
@@ -74,9 +73,9 @@ pub fn copy_recursively(src: &PathBuf, dst: &PathBuf) -> Result<()> {
 
 /// Move file `old_path` to `new_path`. If contents of files are the same,
 /// timestamps of the old file are preserved.
-fn move_one_file(old_path: &PathBuf, new_path: &PathBuf) -> Result<()> {
+fn move_one_file(old_path: &Path, new_path: &Path) -> Result<()> {
     let inner = || -> Result<()> {
-        let is_changed = if new_path.as_path().is_file() {
+        let is_changed = if new_path.is_file() {
             let string1 = file_to_string(old_path)?;
             let string2 = file_to_string(new_path)?;
             string1 != string2
@@ -85,7 +84,7 @@ fn move_one_file(old_path: &PathBuf, new_path: &PathBuf) -> Result<()> {
         };
 
         if is_changed {
-            if new_path.as_path().exists() {
+            if new_path.exists() {
                 remove_file(&new_path)?;
             }
             rename_file(&old_path, &new_path)?;

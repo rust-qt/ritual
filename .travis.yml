@@ -1,6 +1,6 @@
 __common: &common
     language: rust
-    rust: 1.41.0
+    rust: 1.52.1
     script: scripts/travis/run.bash
     cache:
         directories:
@@ -16,4 +16,4 @@ matrix:
         os: osx
     -   <<: *common
         os: windows
-        rust: 1.41.0-x86_64-pc-windows-msvc
+        rust: 1.52.1-x86_64-pc-windows-msvc

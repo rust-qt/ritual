@@ -12,7 +12,7 @@ members = [
 ]
 
 [patch.crates-io]
-amq-proto = { git = "https://github.com/P0ntiuS/rust-amq-proto.git", branch = "error-chain" }
+amq-proto = { git = "https://github.com/rust-qt/rust-amq-proto.git", rev = "616a86e7" }
 
 [profile.release]
 debug = true

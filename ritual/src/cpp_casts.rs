@@ -51,28 +51,25 @@ fn generate_casts_one(
         kind: CppPointerLikeTypeKind::Pointer,
         target: Box::new(CppType::Class(base_type.clone())),
     };
-    let mut new_methods = Vec::new();
-    new_methods.push(create_cast_method(
-        CppCast::Static {
-            is_unsafe: true,
-            base_index: direct_base_index,
-        },
-        &base_ptr_type,
-        &target_ptr_type,
-    )?);
-    new_methods.push(create_cast_method(
-        CppCast::Static {
-            is_unsafe: false,
-            base_index: direct_base_index,
-        },
-        &target_ptr_type,
-        &base_ptr_type,
-    )?);
-    new_methods.push(create_cast_method(
-        CppCast::Dynamic,
-        &base_ptr_type,
-        &target_ptr_type,
-    )?);
+    let mut new_methods = vec![
+        create_cast_method(
+            CppCast::Static {
+                is_unsafe: true,
+                base_index: direct_base_index,
+            },
+            &base_ptr_type,
+            &target_ptr_type,
+        )?,
+        create_cast_method(
+            CppCast::Static {
+                is_unsafe: false,
+                base_index: direct_base_index,
+            },
+            &target_ptr_type,
+            &base_ptr_type,
+        )?,
+        create_cast_method(CppCast::Dynamic, &base_ptr_type, &target_ptr_type)?,
+    ];
 
     for item in data.db.all_cpp_items().filter_map(|i| i.item.as_base_ref()) {
         if &item.derived_class_type == base_type {

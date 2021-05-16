@@ -346,7 +346,7 @@ impl Config {
     }
 
     pub fn cpp_lib_version(&self) -> Option<&str> {
-        self.cpp_lib_version.as_ref().map(String::as_str)
+        self.cpp_lib_version.as_deref()
     }
 
     pub fn processing_steps(&self) -> &ProcessingSteps {
@@ -412,7 +412,7 @@ impl Config {
     pub fn movable_types_hook(
         &self,
     ) -> Option<&(dyn Fn(&CppPath) -> Result<MovableTypesHookOutput> + 'static)> {
-        self.movable_types_hook.as_ref().map(|b| &**b)
+        self.movable_types_hook.as_deref()
     }
 
     /// Adds a C++ identifier that should be skipped
@@ -434,7 +434,7 @@ impl Config {
     }
 
     pub fn cpp_parser_path_hook(&self) -> Option<&(dyn Fn(&CppPath) -> Result<bool> + 'static)> {
-        self.cpp_parser_path_hook.as_ref().map(|b| &**b)
+        self.cpp_parser_path_hook.as_deref()
     }
 
     pub fn set_rust_path_scope_hook(
@@ -449,7 +449,7 @@ impl Config {
     }
 
     pub fn rust_path_scope_hook(&self) -> Option<&RustPathScopeHook> {
-        self.rust_path_scope_hook.as_ref().map(|b| &**b)
+        self.rust_path_scope_hook.as_deref()
     }
 
     pub fn set_rust_path_hook(
@@ -461,7 +461,7 @@ impl Config {
     }
 
     pub fn rust_path_hook(&self) -> Option<&RustPathHook> {
-        self.rust_path_hook.as_ref().map(|b| &**b)
+        self.rust_path_hook.as_deref()
     }
 
     pub fn set_rust_item_hook(
@@ -473,7 +473,7 @@ impl Config {
     }
 
     pub fn rust_item_hook(&self) -> Option<&RustItemHook> {
-        self.rust_item_hook.as_ref().map(|b| &**b)
+        self.rust_item_hook.as_deref()
     }
 
     pub fn add_after_cpp_parser_hook(
@@ -496,7 +496,7 @@ impl Config {
     }
 
     pub fn cpp_item_filter_hook(&self) -> Option<&CppItemFilterHook> {
-        self.cpp_item_filter_hook.as_ref().map(|b| &**b)
+        self.cpp_item_filter_hook.as_deref()
     }
 
     pub fn set_cluster_config(&mut self, cluster_config: ClusterConfig) {
@@ -549,7 +549,7 @@ impl GlobalConfig {
     pub fn create_config_hook(
         &mut self,
     ) -> Option<&mut (dyn FnMut(CrateProperties) -> Result<Config> + 'static)> {
-        self.create_config_hook.as_mut().map(|b| &mut **b)
+        self.create_config_hook.as_deref_mut()
     }
 
     pub fn set_all_crate_names(&mut self, names: Vec<String>) {

@@ -390,17 +390,11 @@ impl CppTypeDeclaration {
 impl CppTypeDeclarationKind {
     /// Checks if the type is a class type.
     pub fn is_class(&self) -> bool {
-        match self {
-            CppTypeDeclarationKind::Class { .. } => true,
-            _ => false,
-        }
+        matches!(self, CppTypeDeclarationKind::Class { .. })
     }
 
     pub fn is_enum(&self) -> bool {
-        match self {
-            CppTypeDeclarationKind::Enum => true,
-            _ => false,
-        }
+        matches!(self, CppTypeDeclarationKind::Enum)
     }
 }
 

@@ -110,10 +110,7 @@ impl CppFfiArgumentMeaning {
     /// Checks if this argument corresponds to an original
     /// C++ method's argument
     pub fn is_argument(&self) -> bool {
-        match *self {
-            CppFfiArgumentMeaning::Argument(..) => true,
-            _ => false,
-        }
+        matches!(self, CppFfiArgumentMeaning::Argument(..))
     }
 }
 
@@ -181,11 +178,7 @@ impl CppFfiFunction {
     pub fn has_same_kind(&self, other: &Self) -> bool {
         match &self.kind {
             CppFfiFunctionKind::Function { .. } => {
-                if let CppFfiFunctionKind::Function { .. } = &other.kind {
-                    true
-                } else {
-                    false
-                }
+                matches!(&other.kind, CppFfiFunctionKind::Function { .. })
             }
             CppFfiFunctionKind::FieldAccessor { accessor_type, .. } => {
                 if let CppFfiFunctionKind::FieldAccessor {
@@ -242,8 +235,8 @@ impl CppFfiType {
                 conversion,
             }),
             CppToFfiTypeConversion::ImplicitCast { ffi_type } => Ok(CppFfiType {
-                ffi_type,
                 original_type,
+                ffi_type,
                 conversion,
             }),
         }
@@ -311,11 +304,7 @@ impl CppFfiItem {
     }
 
     pub fn is_function(&self) -> bool {
-        if let CppFfiItem::Function(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, CppFfiItem::Function(_))
     }
 
     pub fn as_slot_wrapper_ref(&self) -> Option<&QtSlotWrapper> {
@@ -335,19 +324,11 @@ impl CppFfiItem {
     }
 
     pub fn is_slot_wrapper(&self) -> bool {
-        if let CppFfiItem::QtSlotWrapper(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, CppFfiItem::QtSlotWrapper(_))
     }
 
     pub fn is_signal_wrapper(&self) -> bool {
-        if let CppFfiItem::QtSignalWrapper(_) = self {
-            true
-        } else {
-            false
-        }
+        matches!(self, CppFfiItem::QtSignalWrapper(_))
     }
 
     pub fn short_text(&self) -> String {

@@ -140,26 +140,17 @@ pub enum ReturnValueAllocationPlace {
 impl CppFunctionKind {
     /// Returns true if this method is a constructor
     pub fn is_constructor(&self) -> bool {
-        match *self {
-            CppFunctionKind::Constructor => true,
-            _ => false,
-        }
+        matches!(self, CppFunctionKind::Constructor)
     }
 
     /// Returns true if this method is a destructor
     pub fn is_destructor(&self) -> bool {
-        match *self {
-            CppFunctionKind::Destructor => true,
-            _ => false,
-        }
+        matches!(self, CppFunctionKind::Destructor)
     }
 
     /// Returns true if this method is a regular method or a free function
     pub fn is_regular(&self) -> bool {
-        match *self {
-            CppFunctionKind::Regular => true,
-            _ => false,
-        }
+        matches!(self, CppFunctionKind::Regular)
     }
 }
 

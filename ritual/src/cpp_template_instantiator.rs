@@ -72,12 +72,10 @@ pub fn instantiate_function(
     }
 
     let mut conversion_type = None;
-    if let Some(operator) = &mut new_method.operator {
-        if let CppOperator::Conversion(cpp_type) = operator {
-            let r = cpp_type.instantiate(nested_level, arguments)?;
-            *cpp_type = r.clone();
-            conversion_type = Some(r);
-        }
+    if let Some(CppOperator::Conversion(cpp_type)) = &mut new_method.operator {
+        let r = cpp_type.instantiate(nested_level, arguments)?;
+        *cpp_type = r.clone();
+        conversion_type = Some(r);
     }
     if new_method
         .all_involved_types()

@@ -408,9 +408,9 @@ impl CppParser<'_, '_> {
     ) -> Result<()> {
         if let Some(id) = self.data.add_cpp_item(self.source_id.clone(), item)? {
             self.output.0.push(CppParserOutputItem {
+                id,
                 include_file,
                 origin_location,
-                id,
             });
         }
         Ok(())
@@ -851,26 +851,23 @@ impl CppParser<'_, '_> {
                     self.parse_unexposed_type(Some(type1), None, context_template_args)
                 } else {
                     let mut parsed_canonical = self.parse_type(canonical, context_template_args);
-                    if let Ok(parsed_unexposed) =
+                    if let Ok(CppType::Class(path)) =
                         self.parse_unexposed_type(Some(type1), None, context_template_args)
                     {
-                        if let CppType::Class(path) = parsed_unexposed {
-                            if let Some(template_arguments_unexposed) =
-                                &path.last().template_arguments
-                            {
-                                if template_arguments_unexposed.iter().any(|x| match x {
+                        if let Some(template_arguments_unexposed) = &path.last().template_arguments
+                        {
+                            if template_arguments_unexposed.iter().any(|x| {
+                                matches!(
+                                    x,
                                     CppType::SpecificNumeric { .. }
-                                    | CppType::PointerSizedInteger { .. } => true,
-                                    _ => false,
-                                }) {
-                                    if let Ok(parsed_canonical) = &mut parsed_canonical {
-                                        if let CppType::Class(path) = parsed_canonical {
-                                            let mut last_item = path.last_mut();
-                                            if last_item.template_arguments.is_some() {
-                                                last_item.template_arguments =
-                                                    Some(template_arguments_unexposed.clone());
-                                            }
-                                        }
+                                        | CppType::PointerSizedInteger { .. }
+                                )
+                            }) {
+                                if let Ok(CppType::Class(path)) = &mut parsed_canonical {
+                                    let mut last_item = path.last_mut();
+                                    if last_item.template_arguments.is_some() {
+                                        last_item.template_arguments =
+                                            Some(template_arguments_unexposed.clone());
                                     }
                                 }
                             }
@@ -1079,7 +1076,7 @@ impl CppParser<'_, '_> {
             .ok_or_else(|| err_msg("failed to get function name"))?;
         if name.contains('<') {
             let regex = Regex::new(r"^([\w~]+)<[^<>]+>$")?;
-            if let Some(matches) = regex.captures(name.clone().as_ref()) {
+            if let Some(matches) = regex.captures(name.as_ref()) {
                 trace!("[DebugParser] Fixing malformed method name: {}", name);
                 name = matches
                     .get(1)
@@ -1107,8 +1104,8 @@ impl CppParser<'_, '_> {
         let has_this_argument = class_name.is_some() && !entity.is_static_method();
         let real_arguments_count = arguments.len() + if has_this_argument { 1 } else { 0 };
         let mut method_operator = None;
-        if name.starts_with("operator") {
-            let name_suffix = name["operator".len()..].trim();
+        if let Some(name_suffix) = name.strip_prefix("operator") {
+            let name_suffix = name_suffix.trim();
             let mut name_matches = false;
             for operator in CppOperator::all() {
                 let info = operator.info();
@@ -1593,24 +1590,24 @@ impl CppParser<'_, '_> {
             | EntityKind::ClassTemplate
             | EntityKind::ClassTemplatePartialSpecialization => {
                 if let Some(name) = entity.get_display_name() {
-                    if let Ok(parent_type) = self.parse_unexposed_type(
+                    if let Ok(CppType::Class(parent_type_path)) = self.parse_unexposed_type(
                         None,
                         Some(name),
                         &get_context_template_args(entity),
                     ) {
-                        if let CppType::Class(path) = parent_type {
-                            if let Some(template_arguments) = &path.last().template_arguments {
-                                if template_arguments
-                                    .iter()
-                                    .any(|x| !x.is_template_parameter())
-                                {
-                                    trace!(
-                                        "skipping template partial specialization: {}",
-                                        get_full_name_display(entity),
-                                    );
-                                    trace!("entity: {:?}", entity);
-                                    return Ok(());
-                                }
+                        if let Some(template_arguments) =
+                            &parent_type_path.last().template_arguments
+                        {
+                            if template_arguments
+                                .iter()
+                                .any(|x| !x.is_template_parameter())
+                            {
+                                trace!(
+                                    "skipping template partial specialization: {}",
+                                    get_full_name_display(entity),
+                                );
+                                trace!("entity: {:?}", entity);
+                                return Ok(());
                             }
                         }
                     }

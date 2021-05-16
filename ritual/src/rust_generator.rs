@@ -801,44 +801,40 @@ impl State<'_, '_> {
                         RustToFfiTypeConversion::UtilsRefToPtr {},
                     ));
                 }
-            } else {
-                if argument_meaning == &CppFfiArgumentMeaning::This {
-                    api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr { lifetime: None };
-                } else if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
-                    if target.is_class() {
-                        api_to_ffi_conversion =
-                            if let CppToFfiTypeConversion::ReferenceToPointer { .. } =
-                                cpp_ffi_type.conversion()
-                            {
-                                RustToFfiTypeConversion::UtilsRefToPtr {}
-                            } else {
-                                if inherits_qobject {
-                                    RustToFfiTypeConversion::QPtrToPtr
-                                } else {
-                                    RustToFfiTypeConversion::UtilsPtrToPtr {}
-                                }
-                            };
-                    } else {
-                        api_to_ffi_conversion = RustToFfiTypeConversion::None;
-                    }
+            } else if argument_meaning == &CppFfiArgumentMeaning::This {
+                api_to_ffi_conversion = RustToFfiTypeConversion::RefToPtr { lifetime: None };
+            } else if argument_meaning == &CppFfiArgumentMeaning::ReturnValue {
+                if target.is_class() {
+                    api_to_ffi_conversion =
+                        if let CppToFfiTypeConversion::ReferenceToPointer { .. } =
+                            cpp_ffi_type.conversion()
+                        {
+                            RustToFfiTypeConversion::UtilsRefToPtr {}
+                        } else if inherits_qobject {
+                            RustToFfiTypeConversion::QPtrToPtr
+                        } else {
+                            RustToFfiTypeConversion::UtilsPtrToPtr {}
+                        };
                 } else {
-                    // argument
-                    if target.is_class() {
-                        api_to_ffi_conversion =
-                            if let CppToFfiTypeConversion::ReferenceToPointer { .. } =
-                                cpp_ffi_type.conversion()
-                            {
-                                RustToFfiTypeConversion::ImplCastInto(Box::new(
-                                    RustToFfiTypeConversion::UtilsRefToPtr {},
-                                ))
-                            } else {
-                                RustToFfiTypeConversion::ImplCastInto(Box::new(
-                                    RustToFfiTypeConversion::UtilsPtrToPtr {},
-                                ))
-                            };
-                    } else {
-                        api_to_ffi_conversion = RustToFfiTypeConversion::None;
-                    }
+                    api_to_ffi_conversion = RustToFfiTypeConversion::None;
+                }
+            } else {
+                // argument
+                if target.is_class() {
+                    api_to_ffi_conversion =
+                        if let CppToFfiTypeConversion::ReferenceToPointer { .. } =
+                            cpp_ffi_type.conversion()
+                        {
+                            RustToFfiTypeConversion::ImplCastInto(Box::new(
+                                RustToFfiTypeConversion::UtilsRefToPtr {},
+                            ))
+                        } else {
+                            RustToFfiTypeConversion::ImplCastInto(Box::new(
+                                RustToFfiTypeConversion::UtilsPtrToPtr {},
+                            ))
+                        };
+                } else {
+                    api_to_ffi_conversion = RustToFfiTypeConversion::None;
                 }
             }
         }
@@ -1458,24 +1454,24 @@ impl State<'_, '_> {
                     .ok_or_else(|| err_msg("no arguments"))?;
 
                 if arg0.name != "self" {
-                    if let Ok(type1) = arg0.argument_type.ffi_type().pointer_like_to_target() {
-                        if let RustType::Common(type1) = type1 {
-                            if type1.path.crate_name() == self.data.db.crate_name() {
-                                arg0.name = "self".into();
-                                arg0.argument_type = RustFinalType::new(
-                                    arg0.argument_type.ffi_type().clone(),
-                                    RustToFfiTypeConversion::RefToPtr { lifetime: None },
-                                )?;
+                    if let Ok(RustType::Common(type1)) =
+                        arg0.argument_type.ffi_type().pointer_like_to_target()
+                    {
+                        if type1.path.crate_name() == self.data.db.crate_name() {
+                            arg0.name = "self".into();
+                            arg0.argument_type = RustFinalType::new(
+                                arg0.argument_type.ffi_type().clone(),
+                                RustToFfiTypeConversion::RefToPtr { lifetime: None },
+                            )?;
 
-                                let name = self
-                                    .special_function_rust_name(item.clone(), &type1.path)?
-                                    .ok_or_else(|| err_msg("operator must have special name"))?;
-                                results.push(ProcessedFfiItem::Function(FunctionWithDesiredPath {
-                                    function: unnamed_function,
-                                    desired_path: type1.path.join(name),
-                                }));
-                                return Ok(results);
-                            }
+                            let name = self
+                                .special_function_rust_name(item.clone(), &type1.path)?
+                                .ok_or_else(|| err_msg("operator must have special name"))?;
+                            results.push(ProcessedFfiItem::Function(FunctionWithDesiredPath {
+                                function: unnamed_function,
+                                desired_path: type1.path.join(name),
+                            }));
+                            return Ok(results);
                         }
                     }
                 }

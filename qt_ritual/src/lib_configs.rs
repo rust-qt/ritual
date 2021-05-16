@@ -195,7 +195,7 @@ pub fn create_config(
 
         let steps = config.processing_steps_mut();
         let crate_name_clone = crate_name.to_string();
-        let docs_path = qt_config.installation_data.docs_path.clone();
+        let docs_path = qt_config.installation_data.docs_path;
 
         steps.add_after(&["cpp_parser"], "qt_doc_parser", move |data| {
             parse_docs(data, &crate_name_clone, &docs_path)

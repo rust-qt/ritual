@@ -2,8 +2,8 @@
 
 use log::{info, trace};
 use ritual_common::errors::{bail, err_msg, Result, ResultExt};
-use rusqlite;
 use select::document::Document;
+use std::io::Read;
 use std::path::Path;
 
 /// Decoded documentation data.
@@ -28,10 +28,6 @@ pub struct DocIndexItem {
     /// If `true`, this item was previously accessed using `DocData::find_index_item`.
     pub accessed: bool,
 }
-
-use std::io::Read;
-
-use compress;
 
 impl DocData {
     /// Returns all index items.
@@ -70,9 +66,9 @@ impl DocData {
         &mut self,
         mut f: impl FnMut(&DocIndexItem) -> bool,
     ) -> Option<DocIndexItem> {
-        self.index.iter_mut().find(|item| f(item)).and_then(|item| {
+        self.index.iter_mut().find(|item| f(item)).map(|item| {
             item.accessed = true;
-            Some(item.clone())
+            item.clone()
         })
     }
 

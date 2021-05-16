@@ -19,6 +19,7 @@ pub enum Arch {
 pub enum OS {
     Windows,
     MacOS,
+    #[allow(clippy::upper_case_acronyms)]
     IOS,
     Linux,
     Android,
