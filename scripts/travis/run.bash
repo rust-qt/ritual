@@ -17,10 +17,7 @@ cargo fmt -- --check
 if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
     export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:/Library/Developer/CommandLineTools/usr/lib
 elif [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
-    sudo apt-get update
-    sudo apt-get install llvm-3.8 libclang-3.8-dev --yes --force-yes
-    export LLVM_CONFIG_PATH=/usr/lib/llvm-3.8/bin/llvm-config
-    export CLANG_SYSTEM_INCLUDE_PATH=/usr/lib/llvm-3.8/lib/clang/3.8.0/include
+    export LLVM_CONFIG_PATH=/usr/lib/llvm-10/bin/llvm-config
 elif [[ "$TRAVIS_OS_NAME" == "windows" ]]; then
     curl -o "$TEMP/sqlite.zip" "https://www.sqlite.org/2016/sqlite-dll-win64-x64-3150100.zip"
     export SQLITE3_LIB_DIR=$TEMP/sqlite
