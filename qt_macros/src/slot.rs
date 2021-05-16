@@ -1,6 +1,7 @@
 use proc_macro::TokenStream;
+use proc_macro2::Span;
 use quote::quote;
-use syn::{export::Span, parse_macro_input, Ident, ItemFn};
+use syn::{parse_macro_input, Ident, ItemFn};
 
 pub fn slot(attrs: TokenStream, input: TokenStream) -> TokenStream {
     let slot_type = parse_macro_input!(attrs as Ident);
