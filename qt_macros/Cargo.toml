@@ -1,6 +1,6 @@
 [package]
 name = "qt_macros"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Pavel Strakhov <ri@idzaaus.org>"]
 edition = "2018"
 description = "Macros for Qt"
