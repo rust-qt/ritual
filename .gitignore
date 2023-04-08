@@ -3,7 +3,6 @@ out
 .idea
 *.bk
 *.iml
-Cargo.lock
 *.swp
 .cargo
 *.orig
