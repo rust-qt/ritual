@@ -484,7 +484,7 @@ impl CppChecker<'_, '_> {
     fn run_local(&mut self) -> Result<()> {
         let instance_provider = LocalCppChecker::new(
             self.data.workspace.tmp_path().join("cpp_checker"),
-            &self.data.config,
+            self.data.config,
         )?;
 
         let env = self.env();
@@ -535,7 +535,7 @@ impl CppChecker<'_, '_> {
                 Some(checks)
             };
 
-            match snippet_for_item(ffi_item.clone(), &self.data.db) {
+            match snippet_for_item(ffi_item.clone(), self.data.db) {
                 Ok(snippet) => {
                     for library_target in library_targets {
                         if !self.force && checks.as_ref().unwrap().has_env(library_target) {
@@ -671,7 +671,7 @@ fn type_paths(type1: &CppType) -> Vec<&CppPath> {
             .arguments
             .iter()
             .chain(once(&*function.return_type))
-            .flat_map(|type1| type_paths(type1))
+            .flat_map(type_paths)
             .collect(),
         CppType::PointerLike { target, .. } => type_paths(target),
     }
@@ -697,7 +697,7 @@ pub fn check_cpp_parser_hook(
     let all_types = cpp_item.all_involved_types();
     let paths = all_types
         .iter()
-        .flat_map(|type1| type_paths(type1))
+        .flat_map(type_paths)
         .chain(cpp_item.path());
     for path in paths {
         if !recursive_hook(path.clone(), hook)? {
@@ -711,7 +711,7 @@ pub fn delete_blacklisted_items(data: &mut ProcessorData<'_>) -> Result<()> {
     if let Some(hook) = data.config.cpp_parser_path_hook() {
         let mut bad_cpp_item_ids = Vec::new();
         for cpp_item in data.db.cpp_items() {
-            if !check_cpp_parser_hook(&cpp_item.item, &hook)? {
+            if !check_cpp_parser_hook(cpp_item.item, &hook)? {
                 info!("deleting {}: {}", cpp_item.id, cpp_item.item.short_text());
                 bad_cpp_item_ids.push(cpp_item.id);
             }
@@ -723,7 +723,7 @@ pub fn delete_blacklisted_items(data: &mut ProcessorData<'_>) -> Result<()> {
     if let Some(hook) = data.config.cpp_item_filter_hook() {
         let mut bad_cpp_item_ids = Vec::new();
         for cpp_item in data.db.cpp_items() {
-            if !hook(&cpp_item.item)? {
+            if !hook(cpp_item.item)? {
                 info!("deleting {}: {}", cpp_item.id, cpp_item.item.short_text());
                 bad_cpp_item_ids.push(cpp_item.id);
             }

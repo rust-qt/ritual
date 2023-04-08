@@ -67,7 +67,7 @@ pub fn rust_type_to_code(rust_type: &RustType, current_crate: Option<&str>) -> S
             target,
             is_const,
         } => {
-            let target_code = rust_type_to_code(&*target, current_crate);
+            let target_code = rust_type_to_code(target, current_crate);
             match kind {
                 RustPointerLikeTypeKind::Pointer => {
                     if *is_const {
@@ -339,11 +339,11 @@ impl Generator<'_> {
     }
 
     fn rust_type_to_code(&self, rust_type: &RustType) -> String {
-        rust_type_to_code(rust_type, Some(&self.current_database.crate_name()))
+        rust_type_to_code(rust_type, Some(self.current_database.crate_name()))
     }
 
     fn rust_common_type_to_code(&self, rust_type: &RustCommonType) -> String {
-        rust_common_type_to_code(rust_type, Some(&self.current_database.crate_name()))
+        rust_common_type_to_code(rust_type, Some(self.current_database.crate_name()))
     }
 
     #[allow(clippy::collapsible_if)]
@@ -428,7 +428,7 @@ impl Generator<'_> {
 
         if module.item.kind == RustModuleKind::Special(RustSpecialModuleKind::Ffi) {
             let path = self.output_src_path.join("ffi.in.rs");
-            self.destination.push(create_file(&path)?);
+            self.destination.push(create_file(path)?);
             writeln!(self, "extern \"C\" {{\n")?;
             self.generate_children(&module.item.path, None)?;
             writeln!(self, "}}\n")?;
@@ -439,7 +439,7 @@ impl Generator<'_> {
     }
 
     fn qt_core_path(&self) -> RustPath {
-        qt_core_path(&self.current_database.crate_name())
+        qt_core_path(self.current_database.crate_name())
     }
 
     fn qt_core_prefix(&self) -> String {
@@ -553,7 +553,7 @@ impl Generator<'_> {
 
     // TODO: generate relative paths for better readability
     fn rust_path_to_string(&self, path: &RustPath) -> String {
-        path.full_name(Some(&self.current_database.crate_name()))
+        path.full_name(Some(self.current_database.crate_name()))
     }
 
     /// Wraps `expression` of type `type1.rust_ffi_type` to convert
@@ -775,7 +775,7 @@ impl Generator<'_> {
 
                 let intermediate_expr = format!(
                     "::cpp_core::CastInto::<{}>::cast_into({})",
-                    self.rust_type_to_code(&intermediate.api_type()),
+                    self.rust_type_to_code(intermediate.api_type()),
                     expr
                 );
                 self.convert_type_to_ffi(&intermediate_expr, &intermediate)?
@@ -955,7 +955,7 @@ impl Generator<'_> {
         }
         let code = result.join("");
         if maybe_result_var_name.is_none() {
-            self.convert_type_from_ffi(&return_type, code, in_unsafe_context, true)
+            self.convert_type_from_ffi(return_type, code, in_unsafe_context, true)
         } else {
             Ok(code)
         }
@@ -1057,7 +1057,7 @@ impl Generator<'_> {
                     "{}::new(::cpp_core::Ref::from_raw(self) \
                         .expect(\"attempted to construct a null Ref\"), \
                      ::std::ffi::CStr::from_bytes_with_nul_unchecked(b\"{}\\0\"))",
-                    self.rust_path_to_string(&path),
+                    self.rust_path_to_string(path),
                     cpp_item.receiver_id()?,
                 );
                 Some(wrap_unsafe(func.item.is_unsafe, &call))
@@ -1130,7 +1130,7 @@ impl Generator<'_> {
     }
 
     fn generate_children(&mut self, parent: &RustPath, self_type: Option<&RustType>) -> Result<()> {
-        for item in self.current_database.rust_children(&parent) {
+        for item in self.current_database.rust_children(parent) {
             self.generate_item(item, self_type)?;
         }
         Ok(())

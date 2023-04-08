@@ -137,7 +137,7 @@ impl<A, T: IntoIterator<Item = A>> MapIfOk<A> for T {
 /// (without applying it).
 pub fn add_env_path_item(env_var_name: &str, mut new_paths: Vec<PathBuf>) -> Result<OsString> {
     for path in env::split_paths(&env::var(env_var_name).unwrap_or_default()) {
-        if new_paths.iter().find(|&x| x == &path).is_none() {
+        if !new_paths.iter().any(|x| x == &path) {
             new_paths.push(path);
         }
     }

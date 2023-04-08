@@ -83,7 +83,7 @@ impl DocData {
         let doc_file_name = if qt_crate_name.starts_with("qt_3d_") {
             "qt3d".to_string()
         } else {
-            qt_crate_name.replace("_", "")
+            qt_crate_name.replace('_', "")
         };
 
         let doc_file_path = docs_path.join(format!("{}.qch", doc_file_name));

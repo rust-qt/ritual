@@ -128,7 +128,7 @@ fn generate_crate_template(data: &mut ProcessorData<'_>, output_path: &Path) -> 
         let value = if local_path.is_none() || !data.config.write_dependencies_local_paths() {
             toml::Value::String(version)
         } else {
-            let path = diff_paths(&local_path.expect("checked above"), &output_path)?;
+            let path = diff_paths(&local_path.expect("checked above"), output_path)?;
             let mut value = toml::value::Table::new();
             value.insert("version".into(), toml::Value::String(version));
             value.insert(
@@ -223,7 +223,7 @@ fn generate_c_lib_template(
 ) -> Result<()> {
     let name_upper = lib_name.to_uppercase();
     let cmakelists_path = lib_path.join("CMakeLists.txt");
-    let mut cmakelists_file = create_file(&cmakelists_path)?;
+    let mut cmakelists_file = create_file(cmakelists_path)?;
 
     write!(
         cmakelists_file,
@@ -232,8 +232,8 @@ fn generate_c_lib_template(
         lib_name_uppercase = name_upper
     )?;
 
-    let global_header_path = lib_path.join(&global_header_name);
-    let mut global_header_file = create_file(&global_header_path)?;
+    let global_header_path = lib_path.join(global_header_name);
+    let mut global_header_file = create_file(global_header_path)?;
     write!(
         global_header_file,
         "{}",
@@ -269,7 +269,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     )?;
 
     cpp_code_generator::generate_cpp_file(
-        &data.db,
+        data.db,
         &c_lib_path.join("file1.cpp"),
         &global_header_name,
     )?;
@@ -278,8 +278,8 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     generate_cpp_type_size_requester(data.db, data.config.include_directives(), file)?;
 
     rust_code_generator::generate(
-        &data.db,
-        &output_path.join("src"),
+        data.db,
+        output_path.join("src"),
         data.config.crate_template_path().map(|s| s.join("src")),
     )?;
 

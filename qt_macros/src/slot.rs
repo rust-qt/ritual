@@ -13,7 +13,7 @@ pub fn slot(attrs: TokenStream, input: TokenStream) -> TokenStream {
         .collect::<Vec<_>>();
 
     let fn_name = &input.sig.ident;
-    let slot_name = Ident::new(&format!("slot_{}", fn_name.to_string()), Span::call_site());
+    let slot_name = Ident::new(&format!("slot_{fn_name}"), Span::call_site());
     let vis = &input.vis;
 
     let expanded = quote! {

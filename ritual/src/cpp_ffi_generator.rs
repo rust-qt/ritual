@@ -63,7 +63,7 @@ pub fn ffi_type(original_type: &CppType, role: CppTypeRole) -> Result<CppFfiType
                 CppToFfiTypeConversion::NoChange
             }
             CppType::Class(path) => {
-                if is_qflags(&path) {
+                if is_qflags(path) {
                     CppToFfiTypeConversion::QFlagsToInt
                 } else {
                     CppToFfiTypeConversion::ValueToPointer {
@@ -157,7 +157,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
 
         let source_ffi_item = data.db.source_ffi_item(&cpp_item_id)?;
 
-        if let Err(err) = check_preconditions(&item.item, source_ffi_item) {
+        if let Err(err) = check_preconditions(item.item, source_ffi_item) {
             trace!("skipping {}: {}", item.item, err);
             continue;
         }

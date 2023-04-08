@@ -27,7 +27,7 @@ fn run_parser(code: &'static str) -> ParserCppData {
     let include_dir = dir.path().join("include");
     create_dir(&include_dir).unwrap();
     let include_name = "myfakelib.h";
-    let include_file_path = include_dir.join(&include_name);
+    let include_file_path = include_dir.join(include_name);
     {
         let mut include_file = create_file(&include_file_path).unwrap();
         writeln!(include_file, "{}", code).unwrap();
@@ -162,7 +162,7 @@ fn functions_with_class_arg() {
         CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
     );
     assert_eq!(data.fields[0].visibility, CppVisibility::Public);
-    assert_eq!(data.fields[0].is_static, false);
+    assert!(!data.fields[0].is_static);
 
     assert_eq!(data.fields[1].path, CppPath::from_good_str("Magic::b"));
     assert_eq!(
@@ -170,7 +170,7 @@ fn functions_with_class_arg() {
         CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
     );
     assert_eq!(data.fields[1].visibility, CppVisibility::Public);
-    assert_eq!(data.fields[1].is_static, false);
+    assert!(!data.fields[1].is_static);
 
     assert_eq!(data.fields[2].path, CppPath::from_good_str("Magic::c"));
     assert_eq!(
@@ -178,7 +178,7 @@ fn functions_with_class_arg() {
         CppType::BuiltInNumeric(CppBuiltInNumericType::Int),
     );
     assert_eq!(data.fields[2].visibility, CppVisibility::Public);
-    assert_eq!(data.fields[2].is_static, true);
+    assert!(data.fields[2].is_static);
 
     assert_eq!(data.methods.len(), 3);
     assert_eq!(
@@ -1159,7 +1159,7 @@ fn function_pointer() {
             allows_variadic_arguments: false,
         })
     );
-    assert_eq!(arg0.has_default_value, false);
+    assert!(!arg0.has_default_value);
 
     let arg1 = &function.arguments[1];
     assert_eq!(arg1.name, "data");
@@ -1167,7 +1167,7 @@ fn function_pointer() {
         arg1.argument_type,
         CppType::new_pointer(false, CppType::Void)
     );
-    assert_eq!(arg1.has_default_value, false);
+    assert!(!arg1.has_default_value);
 }
 
 #[test]

@@ -18,44 +18,44 @@ fn assert_type_to_ffi_unchanged(t: &CppType) {
 #[test]
 fn void() {
     let type1 = CppType::Void;
-    assert_eq!(type1.is_void(), true);
-    assert_eq!(type1.is_class(), false);
-    assert_eq!(type1.is_template_parameter(), false);
+    assert!(type1.is_void());
+    assert!(!type1.is_class());
+    assert!(!type1.is_template_parameter());
     assert_eq!(type1.to_cpp_code(None).unwrap(), "void");
-    assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+    assert!(type1.to_cpp_code(Some("")).is_err());
     assert_type_to_ffi_unchanged(&type1);
 }
 
 #[test]
 fn void_ptr() {
     let type1 = CppType::new_pointer(false, CppType::Void);
-    assert_eq!(type1.is_void(), false);
-    assert_eq!(type1.is_class(), false);
-    assert_eq!(type1.is_template_parameter(), false);
+    assert!(!type1.is_void());
+    assert!(!type1.is_class());
+    assert!(!type1.is_template_parameter());
     assert_eq!(type1.to_cpp_code(None).unwrap(), "void *");
-    assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+    assert!(type1.to_cpp_code(Some("")).is_err());
     assert_type_to_ffi_unchanged(&type1);
 }
 
 #[test]
 fn int() {
     let type1 = CppType::BuiltInNumeric(CppBuiltInNumericType::Int);
-    assert_eq!(type1.is_void(), false);
-    assert_eq!(type1.is_class(), false);
-    assert_eq!(type1.is_template_parameter(), false);
+    assert!(!type1.is_void());
+    assert!(!type1.is_class());
+    assert!(!type1.is_template_parameter());
     assert_eq!(type1.to_cpp_code(None).unwrap(), "int");
-    assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+    assert!(type1.to_cpp_code(Some("")).is_err());
     assert_type_to_ffi_unchanged(&type1);
 }
 
 #[test]
 fn bool_ptr() {
     let type1 = CppType::new_pointer(false, CppType::BuiltInNumeric(CppBuiltInNumericType::Bool));
-    assert_eq!(type1.is_void(), false);
-    assert_eq!(type1.is_class(), false);
-    assert_eq!(type1.is_template_parameter(), false);
+    assert!(!type1.is_void());
+    assert!(!type1.is_class());
+    assert!(!type1.is_template_parameter());
     assert_eq!(type1.to_cpp_code(None).unwrap(), "bool *");
-    assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+    assert!(type1.to_cpp_code(Some("")).is_err());
     assert_type_to_ffi_unchanged(&type1);
 }
 
@@ -65,11 +65,11 @@ fn char_ptr_ptr() {
         false,
         CppType::new_pointer(false, CppType::BuiltInNumeric(CppBuiltInNumericType::Char)),
     );
-    assert_eq!(type1.is_void(), false);
-    assert_eq!(type1.is_class(), false);
-    assert_eq!(type1.is_template_parameter(), false);
+    assert!(!type1.is_void());
+    assert!(!type1.is_class());
+    assert!(!type1.is_template_parameter());
     assert_eq!(type1.to_cpp_code(None).unwrap(), "char * *");
-    assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+    assert!(type1.to_cpp_code(Some("")).is_err());
     assert_type_to_ffi_unchanged(&type1);
 }
 
@@ -80,11 +80,11 @@ fn qint64() {
         bits: 64,
         kind: CppSpecificNumericTypeKind::Integer { is_signed: true },
     });
-    assert_eq!(type1.is_void(), false);
-    assert_eq!(type1.is_class(), false);
-    assert_eq!(type1.is_template_parameter(), false);
+    assert!(!type1.is_void());
+    assert!(!type1.is_class());
+    assert!(!type1.is_template_parameter());
     assert_eq!(type1.to_cpp_code(None).unwrap(), "qint64");
-    assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+    assert!(type1.to_cpp_code(Some("")).is_err());
     assert_type_to_ffi_unchanged(&type1);
 }
 
@@ -94,11 +94,11 @@ fn quintptr() {
         path: CppPath::from_good_str("quintptr"),
         is_signed: false,
     };
-    assert_eq!(type1.is_void(), false);
-    assert_eq!(type1.is_class(), false);
-    assert_eq!(type1.is_template_parameter(), false);
+    assert!(!type1.is_void());
+    assert!(!type1.is_class());
+    assert!(!type1.is_template_parameter());
     assert_eq!(type1.to_cpp_code(None).unwrap(), "quintptr");
-    assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+    assert!(type1.to_cpp_code(Some("")).is_err());
     assert_type_to_ffi_unchanged(&type1);
 }
 
@@ -107,22 +107,22 @@ fn enum1() {
     let type1 = CppType::Enum {
         path: CppPath::from_good_str("Qt::CaseSensitivity"),
     };
-    assert_eq!(type1.is_void(), false);
-    assert_eq!(type1.is_class(), false);
-    assert_eq!(type1.is_template_parameter(), false);
+    assert!(!type1.is_void());
+    assert!(!type1.is_class());
+    assert!(!type1.is_template_parameter());
     assert_eq!(type1.to_cpp_code(None).unwrap(), "Qt::CaseSensitivity");
-    assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+    assert!(type1.to_cpp_code(Some("")).is_err());
     assert_type_to_ffi_unchanged(&type1);
 }
 
 #[test]
 fn class_value() {
     let type1 = CppType::Class(CppPath::from_good_str("QPoint"));
-    assert_eq!(type1.is_void(), false);
-    assert_eq!(type1.is_class(), true);
-    assert_eq!(type1.is_template_parameter(), false);
+    assert!(!type1.is_void());
+    assert!(type1.is_class());
+    assert!(!type1.is_template_parameter());
     assert_eq!(type1.to_cpp_code(None).unwrap(), "QPoint");
-    assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+    assert!(type1.to_cpp_code(Some("")).is_err());
 
     let ffi_return_type = ffi_type(&type1, CppTypeRole::ReturnType).unwrap();
     assert_eq!(ffi_return_type.original_type(), &type1);
@@ -160,11 +160,11 @@ fn class_value() {
 #[test]
 fn class_const_ref() {
     let type1 = CppType::new_reference(true, CppType::Class(CppPath::from_good_str("QRectF")));
-    assert_eq!(type1.is_void(), false);
-    assert_eq!(type1.is_class(), false);
-    assert_eq!(type1.is_template_parameter(), false);
+    assert!(!type1.is_void());
+    assert!(!type1.is_class());
+    assert!(!type1.is_template_parameter());
     assert_eq!(type1.to_cpp_code(None).unwrap(), "QRectF const &");
-    assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+    assert!(type1.to_cpp_code(Some("")).is_err());
 
     for role in &[CppTypeRole::NotReturnType, CppTypeRole::ReturnType] {
         let ffi1 = ffi_type(&type1, *role).unwrap();
@@ -184,11 +184,11 @@ fn class_const_ref() {
 #[test]
 fn class_mut_ref() {
     let type1 = CppType::new_reference(false, CppType::Class(CppPath::from_good_str("QRectF")));
-    assert_eq!(type1.is_void(), false);
-    assert_eq!(type1.is_class(), false);
-    assert_eq!(type1.is_template_parameter(), false);
+    assert!(!type1.is_void());
+    assert!(!type1.is_class());
+    assert!(!type1.is_template_parameter());
     assert_eq!(type1.to_cpp_code(None).unwrap(), "QRectF &");
-    assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+    assert!(type1.to_cpp_code(Some("")).is_err());
 
     for role in &[CppTypeRole::NotReturnType, CppTypeRole::ReturnType] {
         let ffi1 = ffi_type(&type1, *role).unwrap();
@@ -208,11 +208,11 @@ fn class_mut_ref() {
 #[test]
 fn class_mut_ptr() {
     let type1 = CppType::new_pointer(false, CppType::Class(CppPath::from_good_str("QObject")));
-    assert_eq!(type1.is_void(), false);
-    assert_eq!(type1.is_class(), false);
-    assert_eq!(type1.is_template_parameter(), false);
+    assert!(!type1.is_void());
+    assert!(!type1.is_class());
+    assert!(!type1.is_template_parameter());
     assert_eq!(type1.to_cpp_code(None).unwrap(), "QObject *");
-    assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+    assert!(type1.to_cpp_code(Some("")).is_err());
     assert_type_to_ffi_unchanged(&type1);
 }
 
@@ -223,11 +223,11 @@ fn class_with_template_args() {
         name: "QVector".into(),
         template_arguments: args.clone(),
     }));
-    assert_eq!(type1.is_void(), false);
-    assert_eq!(type1.is_class(), true);
-    assert_eq!(type1.is_template_parameter(), false);
+    assert!(!type1.is_void());
+    assert!(type1.is_class());
+    assert!(!type1.is_template_parameter());
     assert_eq!(type1.to_cpp_code(None).unwrap(), "QVector< QString >");
-    assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+    assert!(type1.to_cpp_code(Some("")).is_err());
 
     let ffi_return_type = ffi_type(&type1, CppTypeRole::ReturnType).unwrap();
     assert_eq!(ffi_return_type.original_type(), &type1);
@@ -303,14 +303,14 @@ fn qflags() {
         name: "QFlags".into(),
         template_arguments: args,
     }));
-    assert_eq!(type1.is_void(), false);
-    assert_eq!(type1.is_class(), true);
-    assert_eq!(type1.is_template_parameter(), false);
+    assert!(!type1.is_void());
+    assert!(type1.is_class());
+    assert!(!type1.is_template_parameter());
     assert_eq!(
         type1.to_cpp_code(None).unwrap(),
         "QFlags< Qt::AlignmentFlag >"
     );
-    assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+    assert!(type1.to_cpp_code(Some("")).is_err());
 
     for role in &[CppTypeRole::NotReturnType, CppTypeRole::ReturnType] {
         let ffi_type = ffi_type(&type1, *role).unwrap();
@@ -334,11 +334,11 @@ fn template_parameter() {
             name: "T".into(),
         }),
     );
-    assert_eq!(type1.is_void(), false);
-    assert_eq!(type1.is_class(), false);
-    assert_eq!(type1.is_template_parameter(), false);
+    assert!(!type1.is_void());
+    assert!(!type1.is_class());
+    assert!(!type1.is_template_parameter());
     assert!(type1.to_cpp_code(None).is_err());
-    assert!(type1.to_cpp_code(Some(&String::new())).is_err());
+    assert!(type1.to_cpp_code(Some("")).is_err());
     assert!(ffi_type(&type1, CppTypeRole::NotReturnType).is_err());
     assert!(ffi_type(&type1, CppTypeRole::ReturnType).is_err());
 }
@@ -353,9 +353,9 @@ fn function1() {
             CppType::new_pointer(false, CppType::BuiltInNumeric(CppBuiltInNumericType::Bool)),
         ],
     });
-    assert_eq!(type1.is_void(), false);
-    assert_eq!(type1.is_class(), false);
-    assert_eq!(type1.is_template_parameter(), false);
+    assert!(!type1.is_void());
+    assert!(!type1.is_class());
+    assert!(!type1.is_template_parameter());
     assert!(type1.to_cpp_code(None).is_err());
     assert_type_to_ffi_unchanged(&type1);
 }

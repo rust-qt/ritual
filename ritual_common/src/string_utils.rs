@@ -33,13 +33,13 @@ impl<'a> Iterator for WordIterator<'a> {
             return None;
         }
         let mut i = self.index + 1;
-        let current_word_is_number = i < self.string.len() && char_at(self.string, i).is_digit(10);
+        let current_word_is_number = i < self.string.len() && char_at(self.string, i).is_ascii_digit();
         while i < self.string.len() {
             let current = char_at(self.string, i);
             if current == '_' || current.is_uppercase() {
                 break;
             }
-            if !current_word_is_number && current.is_digit(10) {
+            if !current_word_is_number && current.is_ascii_digit() {
                 break;
             }
             i += 1;
@@ -62,7 +62,7 @@ pub trait CaseOperations {
 
 fn iterator_to_class_case<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String {
     it.map(|x| {
-        if char_at(x.as_ref(), 0).is_digit(10) {
+        if char_at(x.as_ref(), 0).is_ascii_digit() {
             x.as_ref().to_uppercase()
         } else {
             format!(
@@ -83,8 +83,7 @@ pub fn ends_with_digit<S: AsRef<str>>(s: S) -> bool {
         str[str.len() - 1..str.len()]
             .chars()
             .next()
-            .unwrap()
-            .is_digit(10)
+            .unwrap().is_ascii_digit()
     }
 }
 
@@ -101,7 +100,7 @@ fn iterator_to_snake_case<S: AsRef<str>, T: Iterator<Item = S>>(it: T) -> String
         if part.is_empty() {
             continue;
         }
-        let all_digits = part.chars().all(|c| c.is_digit(10));
+        let all_digits = part.chars().all(|c| c.is_ascii_digit());
         if i > 0 && (!all_digits || ends_with_digit(&string)) {
             string.push('_');
         }

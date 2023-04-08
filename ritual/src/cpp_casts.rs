@@ -104,7 +104,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         .filter_map(|item| item.filter_map(|item| item.as_base_ref()));
 
     for item in bases {
-        for value in generate_casts(item.item, &data)? {
+        for value in generate_casts(item.item, data)? {
             results.push(ItemWithSource::new(&item.id, value));
         }
     }

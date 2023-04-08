@@ -235,7 +235,7 @@ impl CppLibBuilder {
                         status: 0,
                         stderr: format!(
                             "{}\n{}",
-                            err.to_string(),
+                            err,
                             file_to_string(capture_output_file)?
                         ),
                         stdout: String::new(),

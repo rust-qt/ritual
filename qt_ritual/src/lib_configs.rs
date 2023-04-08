@@ -162,7 +162,7 @@ pub fn create_config(
         let steps = config.processing_steps_mut();
         let crate_name_clone = crate_name.to_string();
         steps.add_after(&["cpp_parser"], "qt_doc_parser", move |data| {
-            parse_docs(data, &crate_name_clone, &Path::new("."))
+            parse_docs(data, &crate_name_clone, Path::new("."))
         })?;
 
         config

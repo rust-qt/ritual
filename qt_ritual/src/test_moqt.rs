@@ -82,7 +82,7 @@ fn build_moqt() -> Result<TempTestDir> {
         copy_recursively(&repo_template_dir.join(lib), &template_dir.join(lib))?;
         let real_lib = lib.replace("mo", "");
         let real_template_src_dir = repo_template_dir.join(&real_lib).join("src");
-        let template_src_dir = template_dir.join(&lib).join("src");
+        let template_src_dir = template_dir.join(lib).join("src");
         create_dir(&template_src_dir)?;
         for item in read_dir(&real_template_src_dir)? {
             let item = item?;

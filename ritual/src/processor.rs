@@ -66,9 +66,11 @@ pub struct ProcessorData<'a> {
     pub db: &'a mut DatabaseClient,
 }
 
+type ProcessingStepFn = Box<dyn Fn(&mut ProcessorData<'_>) -> Result<()>>;
+
 struct ProcessingStep {
     name: String,
-    function: Box<dyn Fn(&mut ProcessorData<'_>) -> Result<()>>,
+    function: ProcessingStepFn,
 }
 
 impl fmt::Debug for ProcessingStep {
@@ -355,7 +357,7 @@ pub fn process(
     trace_item_id: Option<&ItemId>,
 ) -> Result<()> {
     info!("Processing crate: {}", config.crate_properties().name());
-    check_all_paths(&config)?;
+    check_all_paths(config)?;
 
     if let Some(version) = config.cpp_lib_version() {
         info!("Current C++ library version: {}", version);

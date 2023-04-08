@@ -102,6 +102,7 @@ struct TraitImplInfo {
     trait_arg_is_second_arg_type: bool,
     second_arg_is_reference: bool,
     return_type_constraint: ReturnTypeConstraint,
+    #[allow(dead_code)]
     self_arg_kind: RustFunctionSelfArgKind,
     target_is_reference: bool,
 }
@@ -763,7 +764,7 @@ impl State<'_, '_> {
         if let RustType::PointerLike { .. } = &rust_ffi_type {
             let target = cpp_ffi_type.ffi_type().pointer_like_to_target()?;
             let inherits_qobject = if let CppType::Class(path) = &target {
-                inherits(&self.data.db, path, &CppPath::from_good_str("QObject"))
+                inherits(self.data.db, path, &CppPath::from_good_str("QObject"))
             } else {
                 false
             };
@@ -854,7 +855,7 @@ impl State<'_, '_> {
                     if !*is_const {
                         bail!("unsupported is_const for QFlagsToUInt: {:?}", cpp_ffi_type);
                     }
-                    &*target
+                    target
                 }
                 a => a,
             };
@@ -1257,7 +1258,7 @@ impl State<'_, '_> {
                 // as return type (value is produced behind FFI)
                 &CppFfiArgumentMeaning::ReturnValue,
                 ReturnValueAllocationPlace::NotApplicable,
-                Some(&checks),
+                Some(checks),
             )
         })?;
         let closure_return_type = self.rust_final_type(
@@ -1265,7 +1266,7 @@ impl State<'_, '_> {
             // TODO: not sure about the meaning.
             &CppFfiArgumentMeaning::Argument(0),
             ReturnValueAllocationPlace::NotApplicable,
-            Some(&checks),
+            Some(checks),
         )?;
 
         function.arguments.drain(function.arguments.len() - 2..);
@@ -1292,7 +1293,7 @@ impl State<'_, '_> {
         trait_types: &[TraitTypes],
     ) -> Result<Vec<ProcessedFfiItem>> {
         let function = item.item;
-        let rust_ffi_function = self.generate_ffi_function(&function)?;
+        let rust_ffi_function = self.generate_ffi_function(function)?;
         let ffi_function_path = rust_ffi_function.path.clone();
         let mut results = vec![ProcessedFfiItem::Item(RustItem::Function(
             rust_ffi_function,
@@ -1684,7 +1685,7 @@ impl State<'_, '_> {
 
     fn generate_rust_path(&self, cpp_path: &CppPath, name_type: NameType<'_>) -> Result<RustPath> {
         if let Some(hook) = self.data.config.rust_path_hook() {
-            if let Some(path) = hook(cpp_path, name_type.clone(), &self.data)? {
+            if let Some(path) = hook(cpp_path, name_type.clone(), self.data)? {
                 return Ok(path);
             }
         }
@@ -1776,12 +1777,12 @@ impl State<'_, '_> {
                     self.cpp_path_item_to_name(&path_item, &scope.path, &name_type)?
                         .to_class_case()
                 } else {
-                    self.cpp_path_item_to_name(&cpp_path.last(), &scope.path, &name_type)?
+                    self.cpp_path_item_to_name(cpp_path.last(), &scope.path, &name_type)?
                         .to_class_case()
                 }
             }
             NameType::Module { .. } => self
-                .cpp_path_item_to_name(&cpp_path.last(), &scope.path, &name_type)?
+                .cpp_path_item_to_name(cpp_path.last(), &scope.path, &name_type)?
                 .to_snake_case(),
             NameType::FfiFunction => cpp_path.last().name.clone(),
             NameType::QtSlotWrapper { signal_arguments } => {
@@ -1904,8 +1905,7 @@ impl State<'_, '_> {
 
         let is_movable = false;
 
-        let wrapper_kind;
-        if is_movable {
+        let wrapper_kind = if is_movable {
             let internal_path = self.generate_rust_path(&data.path, NameType::SizedItem)?;
 
             if internal_path == public_path {
@@ -1926,12 +1926,12 @@ impl State<'_, '_> {
 
             rust_items.push(internal_rust_item);
 
-            wrapper_kind = RustWrapperTypeKind::MovableClassWrapper {
+            RustWrapperTypeKind::MovableClassWrapper {
                 sized_type_path: internal_path,
-            };
+            }
         } else {
-            wrapper_kind = RustWrapperTypeKind::ImmovableClassWrapper;
-        }
+            RustWrapperTypeKind::ImmovableClassWrapper
+        };
 
         let nested_types_path = self.generate_rust_path(
             &data.path,
@@ -1974,7 +1974,7 @@ impl State<'_, '_> {
                 .item
                 .signal_arguments
                 .iter()
-                .map_if_ok(|t| ffi_type(&t, CppTypeRole::NotReturnType))?
+                .map_if_ok(|t| ffi_type(t, CppTypeRole::NotReturnType))?
                 .map_if_ok(|t| self.ffi_type_to_rust_ffi_type(t.ffi_type()))?;
 
             let impl_item = RustItem::ExtraImpl(RustExtraImpl {
@@ -2195,7 +2195,7 @@ impl State<'_, '_> {
         mut item: RustItem,
     ) -> Result<Option<ItemId>> {
         if let Some(hook) = self.data.config.rust_item_hook() {
-            hook(&mut item, &self.data)?;
+            hook(&mut item, self.data)?;
         }
         self.data.db.add_rust_item(source_id, item)
     }
@@ -2650,7 +2650,7 @@ mod ported {
         let mut parts = WordIterator::new(s).collect_vec();
         if remove_qt_prefix && parts.len() > 1 {
             if (parts[0] == "Q" || parts[0] == "q" || parts[0] == "Qt")
-                && !parts[1].starts_with(|c: char| c.is_digit(10))
+                && !parts[1].starts_with(|c: char| c.is_ascii_digit())
             {
                 parts.remove(0);
             }
@@ -2664,51 +2664,51 @@ mod ported {
     #[test]
     fn remove_qt_prefix_and_convert_case_test() {
         assert_eq!(
-            remove_qt_prefix_and_convert_case(&"OneTwo".to_string(), Case::Class, false),
+            remove_qt_prefix_and_convert_case("OneTwo", Case::Class, false),
             "OneTwo"
         );
         assert_eq!(
-            remove_qt_prefix_and_convert_case(&"OneTwo".to_string(), Case::Snake, false),
+            remove_qt_prefix_and_convert_case("OneTwo", Case::Snake, false),
             "one_two"
         );
         assert_eq!(
-            remove_qt_prefix_and_convert_case(&"OneTwo".to_string(), Case::Class, true),
+            remove_qt_prefix_and_convert_case("OneTwo", Case::Class, true),
             "OneTwo"
         );
         assert_eq!(
-            remove_qt_prefix_and_convert_case(&"OneTwo".to_string(), Case::Snake, true),
+            remove_qt_prefix_and_convert_case("OneTwo", Case::Snake, true),
             "one_two"
         );
         assert_eq!(
-            remove_qt_prefix_and_convert_case(&"QDirIterator".to_string(), Case::Class, false),
+            remove_qt_prefix_and_convert_case("QDirIterator", Case::Class, false),
             "QDirIterator"
         );
         assert_eq!(
-            remove_qt_prefix_and_convert_case(&"QDirIterator".to_string(), Case::Snake, false),
+            remove_qt_prefix_and_convert_case("QDirIterator", Case::Snake, false),
             "q_dir_iterator"
         );
         assert_eq!(
-            remove_qt_prefix_and_convert_case(&"QDirIterator".to_string(), Case::Class, true),
+            remove_qt_prefix_and_convert_case("QDirIterator", Case::Class, true),
             "DirIterator"
         );
         assert_eq!(
-            remove_qt_prefix_and_convert_case(&"QDirIterator".to_string(), Case::Snake, true),
+            remove_qt_prefix_and_convert_case("QDirIterator", Case::Snake, true),
             "dir_iterator"
         );
         assert_eq!(
-            remove_qt_prefix_and_convert_case(&"Qt3DWindow".to_string(), Case::Class, false),
+            remove_qt_prefix_and_convert_case("Qt3DWindow", Case::Class, false),
             "Qt3DWindow"
         );
         assert_eq!(
-            remove_qt_prefix_and_convert_case(&"Qt3DWindow".to_string(), Case::Snake, false),
+            remove_qt_prefix_and_convert_case("Qt3DWindow", Case::Snake, false),
             "qt_3d_window"
         );
         assert_eq!(
-            remove_qt_prefix_and_convert_case(&"Qt3DWindow".to_string(), Case::Class, true),
+            remove_qt_prefix_and_convert_case("Qt3DWindow", Case::Class, true),
             "Qt3DWindow"
         );
         assert_eq!(
-            remove_qt_prefix_and_convert_case(&"Qt3DWindow".to_string(), Case::Snake, true),
+            remove_qt_prefix_and_convert_case("Qt3DWindow", Case::Snake, true),
             "qt_3d_window"
         );
     }

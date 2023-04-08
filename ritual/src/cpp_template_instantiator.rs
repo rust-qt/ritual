@@ -237,7 +237,7 @@ fn instantiate_functions(data: &mut ProcessorData<'_>) -> Result<()> {
                     Ok(method) => {
                         let mut ok = true;
                         for type1 in method.all_involved_types() {
-                            match check_template_type(&data, &type1) {
+                            match check_template_type(data, &type1) {
                                 Ok(_) => {}
                                 Err(msg) => {
                                     ok = false;
@@ -305,7 +305,7 @@ pub fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> 
                         }
                     }
                     for arg in template_arguments {
-                        check_type(arg, &data, result);
+                        check_type(arg, data, result);
                     }
                 }
             }
@@ -316,7 +316,7 @@ pub fn find_template_instantiations(data: &mut ProcessorData<'_>) -> Result<()> 
     let mut result = Vec::new();
     for item in data.db.cpp_items() {
         for type1 in item.item.all_involved_types() {
-            check_type(&type1, &data, &mut result);
+            check_type(&type1, data, &mut result);
         }
     }
     for item in result {

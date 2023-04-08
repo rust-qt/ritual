@@ -28,7 +28,7 @@ use ritual_common::file_utils::{
 use ritual_common::target::{current_env, current_target, Env, LibraryTarget};
 use ritual_common::utils::MapIfOk;
 use std::io::Write;
-use std::mem;
+
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -353,7 +353,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         .current_target_paths
         .push(canonicalize(parser.data.workspace.tmp_path())?.join("extra"));
     run_clang(
-        &parser.data.config,
+        parser.data.config,
         &parser.data.workspace.tmp_path(),
         None,
         |translation_unit| parser.parse(translation_unit),
@@ -387,7 +387,7 @@ pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
             output: Default::default(),
         };
         run_clang(
-            &parser.data.config,
+            parser.data.config,
             &parser.data.workspace.tmp_path(),
             Some(code),
             |translation_unit| {
@@ -1642,7 +1642,7 @@ fn parse_template_args(str: &str) -> Option<(String, Vec<String>)> {
         match char {
             '<' => {
                 if level == 0 {
-                    name = mem::replace(&mut current_str, String::new());
+                    name = std::mem::take(&mut current_str);
                 } else {
                     current_str.push(char);
                 }
@@ -1651,7 +1651,7 @@ fn parse_template_args(str: &str) -> Option<(String, Vec<String>)> {
             '>' => {
                 level -= 1;
                 if level == 0 {
-                    args.push(mem::replace(&mut current_str, String::new()));
+                    args.push(std::mem::take(&mut current_str));
                     if chars.peek().is_some() {
                         return None;
                     } else {
@@ -1665,7 +1665,7 @@ fn parse_template_args(str: &str) -> Option<(String, Vec<String>)> {
                 if level == 0 {
                     return None;
                 } else if level == 1 {
-                    args.push(mem::replace(&mut current_str, String::new()));
+                    args.push(std::mem::take(&mut current_str));
                 } else {
                     current_str.push(char);
                 }

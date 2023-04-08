@@ -54,7 +54,7 @@ pub fn copy_recursively(src: &Path, dst: &Path) -> Result<()> {
     let inner = || -> Result<()> {
         if src.is_dir() {
             if !dst.is_dir() {
-                create_dir(&dst)?;
+                create_dir(dst)?;
             }
             for item in read_dir(src)? {
                 let item = item?;
@@ -85,12 +85,12 @@ fn move_one_file(old_path: &Path, new_path: &Path) -> Result<()> {
 
         if is_changed {
             if new_path.exists() {
-                remove_file(&new_path)?;
+                remove_file(new_path)?;
             }
-            rename_file(&old_path, &new_path)?;
+            rename_file(old_path, new_path)?;
             trace!("[DebugMoveFiles] File changed: {}", new_path.display());
         } else {
-            remove_file(&old_path)?;
+            remove_file(old_path)?;
             trace!("[DebugMoveFiles] File not changed: {}", new_path.display());
         }
         Ok(())
@@ -208,7 +208,7 @@ pub fn save_json<P: AsRef<Path>, T: ::serde::Serialize>(
 ) -> Result<()> {
     let tmp_path = {
         let mut buf = path.as_ref().to_path_buf();
-        let tmp_file_name = format!("{}.new", os_str_to_str(&buf.file_name().unwrap())?);
+        let tmp_file_name = format!("{}.new", os_str_to_str(buf.file_name().unwrap())?);
         buf.set_file_name(tmp_file_name);
         buf
     };

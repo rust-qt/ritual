@@ -155,7 +155,7 @@ pub fn try_add_resources(path: impl AsRef<Path>) -> Result<()> {
     writeln!(pro_file, "TEMPLATE = lib")?;
     writeln!(pro_file, "CONFIG += staticlib")?;
     writeln!(pro_file, "SOURCES += 1.cpp")?;
-    writeln!(pro_file, "RESOURCES += {}", path_to_str(&path)?)?;
+    writeln!(pro_file, "RESOURCES += {}", path_to_str(path)?)?;
     drop(pro_file);
 
     let mut cpp_file = create_file(dir.join("1.cpp"))?;
@@ -188,7 +188,7 @@ pub fn try_add_resources(path: impl AsRef<Path>) -> Result<()> {
         dir
     };
     println!("cargo:rustc-link-search={}", path_to_str(&lib_dir)?);
-    println!("cargo:rerun-if-changed={}", path_to_str(&path)?);
+    println!("cargo:rerun-if-changed={}", path_to_str(path)?);
     Ok(())
 }
 

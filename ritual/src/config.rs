@@ -177,6 +177,8 @@ pub type RustItemHook = dyn Fn(&mut RustItem, &ProcessorData<'_>) -> Result<()> 
 pub type AfterCppParserHook =
     dyn Fn(&mut ProcessorData<'_>, &CppParserOutput) -> Result<()> + 'static;
 pub type CppItemFilterHook = dyn Fn(&CppItem) -> Result<bool> + 'static;
+pub type MovableTypesHook = dyn Fn(&CppPath) -> Result<MovableTypesHookOutput> + 'static;
+pub type CppParserPathHook = dyn Fn(&CppPath) -> Result<bool> + 'static;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkerLibraryConfig {
@@ -212,8 +214,8 @@ pub struct Config {
     cpp_build_paths: CppBuildPaths,
     cpp_parser_arguments: Vec<String>,
     processing_steps: ProcessingSteps,
-    movable_types_hook: Option<Box<dyn Fn(&CppPath) -> Result<MovableTypesHookOutput>>>,
-    cpp_parser_path_hook: Option<Box<dyn Fn(&CppPath) -> Result<bool>>>,
+    movable_types_hook: Option<Box<MovableTypesHook>>,
+    cpp_parser_path_hook: Option<Box<CppParserPathHook>>,
     rust_path_scope_hook: Option<Box<RustPathScopeHook>>,
     rust_path_hook: Option<Box<RustPathHook>>,
     rust_item_hook: Option<Box<RustItemHook>>,
@@ -409,9 +411,7 @@ impl Config {
         self.movable_types_hook = Some(Box::new(hook));
     }
 
-    pub fn movable_types_hook(
-        &self,
-    ) -> Option<&(dyn Fn(&CppPath) -> Result<MovableTypesHookOutput> + 'static)> {
+    pub fn movable_types_hook(&self) -> Option<&MovableTypesHook> {
         self.movable_types_hook.as_deref()
     }
 
@@ -433,7 +433,7 @@ impl Config {
         self.cpp_parser_path_hook = Some(Box::new(hook));
     }
 
-    pub fn cpp_parser_path_hook(&self) -> Option<&(dyn Fn(&CppPath) -> Result<bool> + 'static)> {
+    pub fn cpp_parser_path_hook(&self) -> Option<&CppParserPathHook> {
         self.cpp_parser_path_hook.as_deref()
     }
 

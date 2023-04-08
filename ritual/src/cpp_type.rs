@@ -346,7 +346,7 @@ impl CppType {
             CppType::Class(base) => return base.to_cpp_pseudo_code(),
             CppType::FunctionPointer(..) => {
                 return self
-                    .to_cpp_code(Some(&"FN_PTR".to_string()))
+                    .to_cpp_code(Some("FN_PTR"))
                     .unwrap_or_else(|_| "[?]".to_string());
             }
             CppType::PointerLike {

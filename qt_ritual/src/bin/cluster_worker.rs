@@ -43,7 +43,7 @@ fn run() -> Result<()> {
     let supported_qt_libs = env::vars()
         .filter(|(key, _value)| key.starts_with(QMAKE_PATH_VAR_PREFIX))
         .flat_map(|(key, value)| {
-            let version = key[QMAKE_PATH_VAR_PREFIX.len()..].replace("_", ".");
+            let version = key[QMAKE_PATH_VAR_PREFIX.len()..].replace('_', ".");
             all_crate_names().iter().map(move |&crate_name| {
                 let lib = GroupKey {
                     crate_name: crate_name.to_string(),

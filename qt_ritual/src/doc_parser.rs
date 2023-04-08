@@ -199,7 +199,7 @@ impl DocParser {
             for item in &candidates {
                 for item_declaration in &item.declarations {
                     let mut item_declaration_imprint =
-                        item_declaration.replace("virtual ", "").replace(" ", "");
+                        item_declaration.replace("virtual ", "").replace(' ', "");
                     if let Some((prefix1, prefix2)) = &scope_prefix {
                         item_declaration_imprint = item_declaration_imprint
                             .replace(prefix1, "")
@@ -414,10 +414,10 @@ fn are_argument_types_equal(declaration1: &str, declaration2: &str) -> bool {
         let arg2 = arg_prepare(args2[i]);
         let arg1_maybe_type = arg_to_type(arg1);
         let arg2_maybe_type = arg_to_type(arg2);
-        let a1_orig = arg1.replace(" ", "");
-        let a1_type = arg1_maybe_type.replace(" ", "");
-        let a2_orig = arg2.replace(" ", "");
-        let a2_type = arg2_maybe_type.replace(" ", "");
+        let a1_orig = arg1.replace(' ', "");
+        let a1_type = arg1_maybe_type.replace(' ', "");
+        let a2_orig = arg2.replace(' ', "");
+        let a2_type = arg2_maybe_type.replace(' ', "");
         if a1_orig != a2_orig && a1_orig != a2_type && a1_type != a2_orig && a1_type != a2_type {
             return false;
         }
@@ -428,26 +428,24 @@ fn are_argument_types_equal(declaration1: &str, declaration2: &str) -> bool {
 #[test]
 fn qt_doc_parser_test() {
     assert!(are_argument_types_equal(
-        &"Q_CORE_EXPORT int qstricmp(const char *, const char *)".to_string(),
-        &"int qstricmp(const char * str1, const char * str2)".to_string(),
+        "Q_CORE_EXPORT int qstricmp(const char *, const char *)",
+        "int qstricmp(const char * str1, const char * str2)",
     ));
 
     assert!(are_argument_types_equal(
-        &"static void exit ( int retcode = 0 )".to_string(),
-        &"static void exit(int returnCode = 0)".to_string(),
+        "static void exit ( int retcode = 0 )",
+        "static void exit(int returnCode = 0)",
     ));
 
     assert!(are_argument_types_equal(
-        &"static QMetaObject :: Connection connect ( const QObject * \
+        "static QMetaObject :: Connection connect ( const QObject * \
           sender , const char * signal , const QObject * receiver , \
           const char * member , Qt :: ConnectionType = Qt :: \
-          AutoConnection )"
-            .to_string(),
-        &"static QMetaObject::Connection connect(const QObject * \
+          AutoConnection )",
+        "static QMetaObject::Connection connect(const QObject * \
           sender, const char * signal, const QObject * receiver, \
           const char * method, Qt::ConnectionType type = \
-          Qt::AutoConnection)"
-            .to_string(),
+          Qt::AutoConnection)",
     ));
 }
 
@@ -725,7 +723,7 @@ pub fn parse_docs(
     let mut parser = if qt_crate_name.starts_with("moqt_") {
         DocParserOrMock::Mock(MockDocParser)
     } else {
-        let doc_data = match DocData::new(&qt_crate_name, &docs_path) {
+        let doc_data = match DocData::new(qt_crate_name, docs_path) {
             Ok(doc_data) => doc_data,
             Err(err) => {
                 error!("Failed to get Qt documentation: {}", err);

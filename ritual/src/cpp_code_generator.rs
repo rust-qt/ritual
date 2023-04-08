@@ -345,7 +345,7 @@ impl Generator<'_> {
         ))
     }
 
-    fn condition_expression(&self, condition: &Condition) -> String {
+    fn condition_expression(condition: &Condition) -> String {
         match condition {
             Condition::CppLibraryVersion(version) => {
                 let value = version_to_number(version).expect("version_to_number failed");
@@ -359,13 +359,13 @@ impl Generator<'_> {
             Condition::Endian(_) => unimplemented!(),
             Condition::And(conditions) => conditions
                 .iter()
-                .map(|c| format!("({})", self.condition_expression(c)))
+                .map(|c| format!("({})", Self::condition_expression(c)))
                 .join("&&"),
             Condition::Or(conditions) => conditions
                 .iter()
-                .map(|c| format!("({})", self.condition_expression(c)))
+                .map(|c| format!("({})", Self::condition_expression(c)))
                 .join("||"),
-            Condition::Not(condition) => format!("!({})", self.condition_expression(condition)),
+            Condition::Not(condition) => format!("!({})", Self::condition_expression(condition)),
             Condition::True => "true".to_string(),
             Condition::False => "false".to_string(),
         }
@@ -377,7 +377,7 @@ impl Generator<'_> {
         }
         format!(
             "#if {}\n{}\n#endif\n",
-            self.condition_expression(condition),
+            Self::condition_expression(condition),
             code
         )
     }
@@ -545,11 +545,7 @@ pub fn all_include_directives(config: &Config) -> Result<Vec<PathBuf>> {
 
 pub fn write_include_directives(mut destination: impl Write, directives: &[PathBuf]) -> Result<()> {
     for directive in directives {
-        writeln!(
-            &mut destination,
-            "#include \"{}\"",
-            path_to_str(&directive)?
-        )?;
+        writeln!(&mut destination, "#include \"{}\"", path_to_str(directive)?)?;
     }
     Ok(())
 }

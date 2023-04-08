@@ -14,7 +14,7 @@ fn generate_slot_wrapper(
     arguments: &[CppType],
     name_provider: &mut FfiNameProvider,
 ) -> Result<QtSlotWrapper> {
-    let ffi_types = arguments.map_if_ok(|t| ffi_type(&t, CppTypeRole::NotReturnType))?;
+    let ffi_types = arguments.map_if_ok(|t| ffi_type(t, CppTypeRole::NotReturnType))?;
     let class_path = name_provider.create_path(&format!(
         "slot_wrapper_{}",
         arguments.iter().map(CppType::ascii_caption).join("_")
