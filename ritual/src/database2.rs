@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::cpp_data::CppItem;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Database {
     crate_name: Arc<String>,
     crate_version: String,
@@ -45,6 +45,10 @@ impl Database {
     }
     pub fn items_mut(&mut self) -> &mut [DatabaseItem] {
         &mut self.items
+    }
+
+    pub fn crate_name(&self) -> &str {
+        &self.crate_name
     }
 }
 

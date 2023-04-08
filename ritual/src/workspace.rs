@@ -1,5 +1,6 @@
 use crate::config::{CrateDependency, CrateDependencyKind, CrateDependencySource};
 use crate::database::{DatabaseCache, DatabaseClient, CRATE_DB_FILE_NAME};
+use crate::database2;
 use crate::download_db::download_db;
 use log::info;
 use ritual_common::errors::{bail, Result};
@@ -58,6 +59,28 @@ impl Workspace {
 
     pub fn database_path(&self, crate_name: &str) -> PathBuf {
         database_path(&self.path, crate_name)
+    }
+
+    pub fn load_database2(
+        &self,
+        crate_name: &str,
+        allow_create: bool,
+    ) -> Result<database2::Database> {
+        let path = self.database_path(crate_name);
+        if path.exists() {
+            Ok(load_json(path)?)
+        } else if allow_create {
+            Ok(database2::Database::default())
+        } else {
+            bail!("database not found for crate {}", crate_name);
+        }
+    }
+
+    pub fn save_database2(&self, db: &database2::Database) -> Result<()> {
+        let path = self.database_path(db.crate_name());
+        let backup_path = self.database_backup_path(db.crate_name());
+        save_json(path, db, Some(&backup_path))?;
+        Ok(())
     }
 
     pub fn path(&self) -> &Path {

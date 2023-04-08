@@ -54,9 +54,9 @@ pub fn get_installation_data(
     debug!("QT_VERSION = \"{}\"", qt_version);
 
     let qt_version_parsed = semver::Version::parse(&qt_version)?;
-    if qt_version_parsed.major != 5 {
+    if qt_version_parsed.major < 5 {
         bail!(
-            "only Qt 5 is supported! \"{}\" is not supported",
+            "only Qt 5 and above is supported! \"{}\" is not supported",
             qt_version
         );
     }

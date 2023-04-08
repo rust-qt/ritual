@@ -1,7 +1,7 @@
 use crate::lib_configs::{
     global_config, MOQT_INSTALL_DIR_ENV_VAR_NAME, MOQT_TEMPLATE_DIR_ENV_VAR_NAME,
 };
-use ritual::cli::{self, Options};
+use ritual::cli::{self, Command, Options};
 use ritual_common::cpp_lib_builder::{BuildType, CppLibBuilder};
 use ritual_common::env_var_names;
 use ritual_common::errors::{FancyUnwrap, Result};
@@ -123,10 +123,8 @@ fn test_moqt() {
             workspace,
             local_paths: Some(true),
             crates: vec!["moqt_core".into(), "moqt_gui".into()],
-            operations: vec!["discard".into(), "main".into()],
-            output_crates_version: "0.0.0".into(),
-            cluster: None,
-            trace: None,
+            output_crates_version: None,
+            command: Command::Parse,
         },
         global_config(),
     )

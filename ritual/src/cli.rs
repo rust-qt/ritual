@@ -3,48 +3,45 @@
 //! See [README](https://github.com/rust-qt/ritual)
 //! for more information.
 
-use crate::config::{CrateProperties, GlobalConfig};
-use crate::database::ItemId;
-use crate::processor;
+use crate::config::{CrateDependencySource, CrateProperties, GlobalConfig};
+use crate::cpp_parser::{self, CppParserContext};
 use crate::workspace::Workspace;
+use clap::{Parser, Subcommand};
 use flexi_logger::{Duplicate, LevelFilter, LogSpecification, Logger};
 use itertools::Itertools;
-use log::{error, info};
+use log::info;
 use ritual_common::errors::{bail, err_msg, Result};
-use ritual_common::file_utils::{canonicalize, create_dir, load_json, path_to_str};
+use ritual_common::file_utils::{canonicalize, create_dir, path_to_str};
 use ritual_common::target::current_target;
 use std::path::PathBuf;
-use structopt::StructOpt;
 
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 /// Generates rust_qt crates using ritual.
 /// See [ritual](https://github.com/rust-qt/ritual) for more details.
 pub struct Options {
-    #[structopt(parse(from_os_str))]
+    #[arg(short, long)]
     /// Directory for output and temporary files
     pub workspace: PathBuf,
-    #[structopt(long = "local-paths")]
+    #[arg(short, long)]
     /// Write local paths to `ritual` crates in generated `Cargo.toml`
     pub local_paths: Option<bool>,
-    #[structopt(short = "c", long = "crates", required = true)]
+    #[arg(short, long, required = true)]
     /// Crates to process (e.g. `qt_core`)
     pub crates: Vec<String>,
-    #[structopt(short = "o", long = "operations", required = true)]
-    /// Operations to perform
-    pub operations: Vec<String>,
-    #[structopt(short = "v", long = "version")]
+    #[arg(long)]
     /// Version of the output crates.
-    pub output_crates_version: String,
-    #[structopt(long = "cluster")]
-    /// Cluster configuration
-    pub cluster: Option<PathBuf>,
-    #[structopt(long = "trace")]
-    /// ID of item to trace
-    pub trace: Option<String>,
+    pub output_crates_version: Option<String>,
+    #[command(subcommand)]
+    pub command: Command,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum Command {
+    Parse,
 }
 
 pub fn run_from_args(config: GlobalConfig) -> Result<()> {
-    run(Options::from_args(), config)
+    run(Options::parse(), config)
 }
 
 pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
@@ -53,7 +50,7 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
     }
     let workspace_path = canonicalize(options.workspace)?;
 
-    let mut workspace = Workspace::new(workspace_path.clone())?;
+    let workspace = Workspace::new(workspace_path.clone())?;
 
     Logger::with(LogSpecification::default(LevelFilter::Trace).build())
         .log_to_file()
@@ -69,8 +66,6 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
     info!("Workspace: {}", workspace_path.display());
     info!("Current target: {}", current_target().short_text());
 
-    let mut was_any_action = false;
-
     let final_crates = if options.crates.iter().any(|x| *x == "all") {
         let all = config.all_crate_names();
         if all.is_empty() {
@@ -81,31 +76,6 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
         options.crates.clone()
     };
 
-    let operations = options
-        .operations
-        .iter()
-        .map(|s| s.to_lowercase())
-        .collect_vec();
-
-    if operations.is_empty() {
-        error!("No action requested. Run \"qt_generator --help\".");
-        return Ok(());
-    }
-
-    let trace_item_id = if let Some(text) = options.trace {
-        let mut parts = text.split('#');
-        let crate_name = parts
-            .next()
-            .ok_or_else(|| err_msg("invalid id format for trace"))?;
-        let id = parts
-            .next()
-            .ok_or_else(|| err_msg("invalid id format for trace"))?
-            .parse()?;
-        Some(ItemId::new(crate_name.to_string(), id))
-    } else {
-        None
-    };
-
     for crate_name in &final_crates {
         let create_config = config
             .create_config_hook()
@@ -113,25 +83,34 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
 
         let mut config = create_config(CrateProperties::new(
             crate_name,
-            &options.output_crates_version,
+            options.output_crates_version.as_deref().unwrap_or("0.1"),
         ))?;
-
-        if let Some(cluster_config_path) = &options.cluster {
-            config.set_cluster_config(load_json(cluster_config_path)?);
-        }
 
         if let Some(local_paths) = options.local_paths {
             config.set_write_dependencies_local_paths(local_paths);
         }
 
-        was_any_action = true;
-        processor::process(&mut workspace, &config, &operations, trace_item_id.as_ref())?;
+        match options.command {
+            Command::Parse => {
+                let mut deps = Vec::new();
+                for dep in config.crate_properties().dependencies() {
+                    if dep.source() == &CrateDependencySource::CurrentWorkspace {
+                        deps.push(workspace.load_database2(dep.name(), false)?);
+                    }
+                }
+                let mut main_db = workspace.load_database2(crate_name, true)?;
+                let data = CppParserContext {
+                    current_database: &mut main_db,
+                    dependencies: &deps.iter().collect_vec(),
+                    config: &config,
+                    workspace: &workspace,
+                };
+                cpp_parser::run(data)?;
+                workspace.save_database2(&main_db)?;
+            }
+        }
     }
 
-    if was_any_action {
-        info!("ritual finished");
-    } else {
-        error!("No action requested. Run \"qt_generator --help\".");
-    }
+    info!("ritual finished");
     Ok(())
 }
