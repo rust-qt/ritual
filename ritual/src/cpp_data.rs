@@ -2,6 +2,7 @@
 
 use crate::cpp_function::CppFunction;
 pub use crate::cpp_operator::CppOperator;
+use crate::cpp_parser::CppParserContext;
 use crate::cpp_type::{CppTemplateParameter, CppType};
 use crate::database::DatabaseClient;
 use itertools::Itertools;
@@ -629,6 +630,27 @@ pub fn inherits(
         if let CppItem::ClassBase(base_data) = &item.item {
             if &base_data.derived_class_type == derived_class_name
                 && inherits(db, &base_data.base_class_type, base_class_name)
+            {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Checks if `class_name` types inherits `base_name` type directly or indirectly.
+pub fn inherits2(
+    data: &CppParserContext<'_>,
+    derived_class_name: &CppPath,
+    base_class_name: &CppPath,
+) -> bool {
+    if derived_class_name == base_class_name {
+        return true;
+    }
+    for item in data.all_cpp_items() {
+        if let CppItem::ClassBase(base_data) = item {
+            if &base_data.derived_class_type == derived_class_name
+                && inherits2(data, &base_data.base_class_type, base_class_name)
             {
                 return true;
             }

@@ -1,10 +1,9 @@
 use itertools::Itertools;
 use log::trace;
 use regex::Regex;
-use ritual::cpp_data::{inherits, CppItem, CppPath};
-use ritual::cpp_parser::CppParserOutput;
-use ritual::processor::ProcessorData;
-use ritual_common::errors::{Result, ResultExt};
+use ritual::cpp_data::{inherits2, CppItem, CppPath};
+use ritual::cpp_parser::{CppParserContext, CppParserOutput};
+use ritual_common::errors::{err_msg, Result, ResultExt};
 use ritual_common::file_utils::open_file;
 use std::collections::{HashMap, HashSet};
 
@@ -23,7 +22,7 @@ struct Section {
 /// Parses include files to detect which methods are signals or slots.
 #[allow(clippy::cognitive_complexity, clippy::collapsible_if)]
 pub fn detect_signals_and_slots(
-    data: &mut ProcessorData<'_>,
+    data: CppParserContext<'_>,
     output: &CppParserOutput,
 ) -> Result<()> {
     // TODO: only run if it's a new class or it has some new methods; don't change existing old methods
@@ -31,11 +30,15 @@ pub fn detect_signals_and_slots(
 
     let qobject_path = CppPath::from_good_str("QObject");
     for item in &output.0 {
-        let cpp_item = data.db.cpp_item(&item.id)?;
+        let cpp_item = data
+            .current_database
+            .items()
+            .get(item.index)
+            .ok_or_else(|| err_msg("invalid item index in CppParserContext"))?;
 
         if let CppItem::Type(type1) = &cpp_item.item {
             if type1.kind.is_class() {
-                if inherits(data.db, &type1.path, &qobject_path) {
+                if inherits2(&data, &type1.path, &qobject_path) {
                     if !files.contains(&item.origin_location.include_file_path) {
                         files.insert(item.origin_location.include_file_path.clone());
                     }
@@ -82,7 +85,11 @@ pub fn detect_signals_and_slots(
 
     let mut sections_per_class = HashMap::new();
     for item in &output.0 {
-        let cpp_item = data.db.cpp_item(&item.id)?;
+        let cpp_item = data
+            .current_database
+            .items()
+            .get(item.index)
+            .ok_or_else(|| err_msg("invalid item index in CppParserContext"))?;
 
         if let CppItem::Type(type1) = &cpp_item.item {
             if let Some(sections) = sections.get(&item.origin_location.include_file_path) {
@@ -96,7 +103,11 @@ pub fn detect_signals_and_slots(
     }
 
     for item in &output.0 {
-        let mut cpp_item = data.db.cpp_item_mut(&item.id)?;
+        let cpp_item = data
+            .current_database
+            .items_mut()
+            .get_mut(item.index)
+            .ok_or_else(|| err_msg("invalid item index in CppParserContext"))?;
         if let CppItem::Function(method) = &mut cpp_item.item {
             let mut section_type = SectionType::Other;
             if let Ok(class_name) = method.class_path() {

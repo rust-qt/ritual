@@ -2,7 +2,7 @@
 
 use crate::cpp_checker::PreliminaryTest;
 use crate::cpp_data::{CppItem, CppPath};
-use crate::cpp_parser::CppParserOutput;
+use crate::cpp_parser::{CppParserContext, CppParserOutput};
 use crate::processor::{ProcessingSteps, ProcessorData};
 use crate::rust_info::{NameType, RustItem, RustPathScope};
 use crate::rust_type::RustPath;
@@ -175,7 +175,7 @@ pub type RustPathHook =
     dyn Fn(&CppPath, NameType<'_>, &ProcessorData<'_>) -> Result<Option<RustPath>> + 'static;
 pub type RustItemHook = dyn Fn(&mut RustItem, &ProcessorData<'_>) -> Result<()> + 'static;
 pub type AfterCppParserHook =
-    dyn Fn(&mut ProcessorData<'_>, &CppParserOutput) -> Result<()> + 'static;
+    dyn Fn(CppParserContext<'_>, &CppParserOutput) -> Result<()> + 'static;
 pub type CppItemFilterHook = dyn Fn(&CppItem) -> Result<bool> + 'static;
 pub type MovableTypesHook = dyn Fn(&CppPath) -> Result<MovableTypesHookOutput> + 'static;
 pub type CppParserPathHook = dyn Fn(&CppPath) -> Result<bool> + 'static;
@@ -478,7 +478,7 @@ impl Config {
 
     pub fn add_after_cpp_parser_hook(
         &mut self,
-        hook: impl Fn(&mut ProcessorData<'_>, &CppParserOutput) -> Result<()> + 'static,
+        hook: impl Fn(CppParserContext<'_>, &CppParserOutput) -> Result<()> + 'static,
     ) {
         self.after_cpp_parser_hooks.push(Box::new(hook));
     }

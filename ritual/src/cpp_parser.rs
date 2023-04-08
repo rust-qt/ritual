@@ -12,8 +12,8 @@ use crate::cpp_type::{
     CppBuiltInNumericType, CppFunctionPointerType, CppPointerLikeTypeKind, CppSpecificNumericType,
     CppSpecificNumericTypeKind, CppTemplateParameter, CppType,
 };
-use crate::database::ItemId;
-use crate::processor::ProcessorData;
+use crate::database2;
+use crate::workspace::Workspace;
 use clang::diagnostic::{Diagnostic, Severity};
 use clang::*;
 use itertools::Itertools;
@@ -29,6 +29,7 @@ use ritual_common::target::{current_env, current_target, Env, LibraryTarget};
 use ritual_common::utils::MapIfOk;
 use std::io::Write;
 
+use std::iter::once;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
@@ -60,7 +61,7 @@ fn convert_type_kind(kind: TypeKind) -> CppBuiltInNumericType {
 
 #[derive(Debug)]
 pub struct CppParserOutputItem {
-    pub id: ItemId,
+    pub index: usize,
     /// File name of the include file (without full path)
     pub include_file: String,
     /// Exact location of the declaration
@@ -70,12 +71,39 @@ pub struct CppParserOutputItem {
 #[derive(Debug, Default)]
 pub struct CppParserOutput(pub Vec<CppParserOutputItem>);
 
+pub struct CppParserContext<'a> {
+    pub current_database: &'a mut database2::Database,
+    pub dependencies: &'a [&'a database2::Database],
+    pub config: &'a Config,
+    pub workspace: &'a Workspace,
+}
+
+impl CppParserContext<'_> {
+    fn all_databases(&self) -> impl Iterator<Item = &database2::Database> {
+        once(self.current_database as &_).chain(self.dependencies.iter().copied())
+    }
+
+    pub fn all_cpp_items(&self) -> impl Iterator<Item = &CppItem> {
+        self.all_databases()
+            .flat_map(|d| d.items().iter().map(|i| &i.item))
+    }
+
+    fn reborrow(&mut self) -> CppParserContext<'_> {
+        CppParserContext {
+            current_database: self.current_database,
+            dependencies: self.dependencies,
+            config: self.config,
+            workspace: self.workspace,
+        }
+    }
+}
+
 /// Implementation of the C++ parser that extracts information
 /// about the C++ library's API from its headers.
-struct CppParser<'b, 'a> {
-    data: &'b mut ProcessorData<'a>,
+struct CppParser<'a> {
+    data: CppParserContext<'a>,
     current_target_paths: Vec<PathBuf>,
-    source_id: Option<ItemId>,
+    target_index: usize,
     output: CppParserOutput,
 }
 
@@ -336,7 +364,7 @@ fn run_clang<R, F: FnMut(Entity<'_>) -> Result<R>>(
 }
 
 /// Runs the parser on specified data.
-pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
+pub fn run(data: CppParserContext<'_>) -> Result<()> {
     debug!("clang version: {}", get_version());
     debug!("Initializing clang");
     let mut parser = CppParser {
@@ -345,7 +373,10 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
             .target_include_paths()
             .iter()
             .map_if_ok(canonicalize)?,
-        source_id: None,
+        target_index: data.current_database.add_target(LibraryTarget {
+            cpp_library_version: data.config.cpp_lib_version().map(ToString::to_string),
+            target: current_target(),
+        }),
         data,
         output: Default::default(),
     };
@@ -362,7 +393,8 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     Ok(())
 }
 
-pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
+/*
+pub fn parse_generated_items(data: CppParserContext<'_>) -> Result<()> {
     let current_target = LibraryTarget {
         cpp_library_version: data.config.cpp_lib_version().map(ToString::to_string),
         target: current_target(),
@@ -397,18 +429,18 @@ pub fn parse_generated_items(data: &mut ProcessorData<'_>) -> Result<()> {
         )?;
     }
     Ok(())
-}
+}*/
 
-impl CppParser<'_, '_> {
+impl CppParser<'_> {
     fn add_output(
         &mut self,
         include_file: String,
         origin_location: CppOriginLocation,
         item: CppItem,
     ) -> Result<()> {
-        if let Some(id) = self.data.add_cpp_item(self.source_id.clone(), item)? {
+        if let Some(index) = self.data.current_database.add_item(self.target_index, item) {
             self.output.0.push(CppParserOutputItem {
-                id,
+                index,
                 include_file,
                 origin_location,
             });
@@ -423,9 +455,8 @@ impl CppParser<'_, '_> {
         mut f: impl FnMut(&CppTypeDeclaration) -> bool,
     ) -> Option<&CppTypeDeclaration> {
         self.data
-            .db
             .all_cpp_items()
-            .filter_map(|item| item.item.as_type_ref())
+            .filter_map(|item| item.as_type_ref())
             .find(|i| f(i))
     }
 
@@ -1490,7 +1521,7 @@ impl CppParser<'_, '_> {
         debug!("Parsing functions");
         self.parse_functions(entity)?;
         for hook in self.data.config.after_cpp_parser_hooks() {
-            hook(self.data, &self.output)?;
+            hook(self.data.reborrow(), &self.output)?;
         }
         Ok(())
     }

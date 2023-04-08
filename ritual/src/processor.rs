@@ -5,7 +5,7 @@ use crate::database::{DatabaseClient, ItemId};
 use crate::workspace::Workspace;
 use crate::{
     cpp_casts, cpp_checker, cpp_ffi_generator, cpp_implicit_methods, cpp_omitting_arguments,
-    cpp_parser, cpp_template_instantiator, crate_writer, rust_generator,
+    cpp_template_instantiator, crate_writer, rust_generator,
 };
 use itertools::Itertools;
 use log::debug;
@@ -121,9 +121,9 @@ impl Default for ProcessingSteps {
             });
         };
 
-        s.push("cpp_parser", cpp_parser::run);
+        //s.push("cpp_parser", cpp_parser::run);
         push_cpp_post_processing(&mut s, "");
-        s.push("cpp_parser_stage2", cpp_parser::parse_generated_items);
+        //s.push("cpp_parser_stage2", cpp_parser::parse_generated_items);
         push_cpp_post_processing(&mut s, "_stage2");
         s.push("rust_generator", rust_generator::run);
         s.push("crate_writer", crate_writer::run);

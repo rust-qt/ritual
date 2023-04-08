@@ -28,6 +28,7 @@ pub mod cpp_template_instantiator;
 pub mod cpp_type;
 mod crate_writer;
 pub mod database;
+pub mod database2;
 mod doc_formatter;
 mod download_db;
 pub mod processor;
