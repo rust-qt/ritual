@@ -153,23 +153,23 @@ impl Default for ProcessingSteps {
 impl ProcessingSteps {
     pub fn add_after(
         &mut self,
-        after: &[&str],
-        name: &str,
-        func: impl Fn(&mut ProcessorData<'_>) -> Result<()> + 'static,
+        _after: &[&str],
+        _name: &str,
+        _func: impl Fn(&mut ProcessorData<'_>) -> Result<()> + 'static,
     ) -> Result<()> {
-        let indexes = after.iter().map_if_ok(|s| {
-            self.main_procedure
-                .iter()
-                .position(|a| a == s)
-                .ok_or_else(|| format_err!("requested step not found: {}", s))
-        })?;
+        // let indexes = after.iter().map_if_ok(|s| {
+        //     self.main_procedure
+        //         .iter()
+        //         .position(|a| a == s)
+        //         .ok_or_else(|| format_err!("requested step not found: {}", s))
+        // })?;
 
-        let max_index = indexes
-            .into_iter()
-            .max()
-            .ok_or_else(|| err_msg("no steps provided"))?;
-        self.main_procedure.insert(max_index + 1, name.to_string());
-        self.all_steps.push(ProcessingStep::new(name, func));
+        // let max_index = indexes
+        //     .into_iter()
+        //     .max()
+        //     .ok_or_else(|| err_msg("no steps provided"))?;
+        // self.main_procedure.insert(max_index + 1, name.to_string());
+        // self.all_steps.push(ProcessingStep::new(name, func));
         Ok(())
     }
 

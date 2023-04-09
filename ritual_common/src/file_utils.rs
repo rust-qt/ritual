@@ -1,7 +1,7 @@
 //! Various utilities for working with files
 
 use crate::errors::{bail, err_msg, format_err, Result, ResultExt};
-use log::trace;
+use log::{info, trace};
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::io::{self, BufRead, BufReader, BufWriter, Lines, Read, Write};
@@ -206,6 +206,7 @@ pub fn save_json<P: AsRef<Path>, T: ::serde::Serialize>(
     value: &T,
     backup_path: Option<&Path>,
 ) -> Result<()> {
+    info!("saving json file {}", path.as_ref().display());
     let tmp_path = {
         let mut buf = path.as_ref().to_path_buf();
         let tmp_file_name = format!("{}.new", os_str_to_str(buf.file_name().unwrap())?);

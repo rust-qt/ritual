@@ -61,16 +61,26 @@ impl Workspace {
         database_path(&self.path, crate_name)
     }
 
-    pub fn load_database2(
+    pub fn load_or_create_database2(
         &self,
         crate_name: &str,
-        allow_create: bool,
+        crate_version: &str,
     ) -> Result<database2::Database> {
         let path = self.database_path(crate_name);
         if path.exists() {
             Ok(load_json(path)?)
-        } else if allow_create {
-            Ok(database2::Database::default())
+        } else {
+            Ok(database2::Database::new(
+                crate_name.into(),
+                crate_version.into(),
+            ))
+        }
+    }
+
+    pub fn load_database2(&self, crate_name: &str) -> Result<database2::Database> {
+        let path = self.database_path(crate_name);
+        if path.exists() {
+            Ok(load_json(path)?)
         } else {
             bail!("database not found for crate {}", crate_name);
         }

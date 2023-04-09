@@ -52,7 +52,7 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
 
     let workspace = Workspace::new(workspace_path.clone())?;
 
-    Logger::with(LogSpecification::default(LevelFilter::Trace).build())
+    Logger::with(LogSpecification::default(LevelFilter::Debug).build())
         .log_to_file()
         .directory(path_to_str(&workspace.log_path())?)
         .suppress_timestamp()
@@ -92,13 +92,17 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
 
         match options.command {
             Command::Parse => {
+                info!("running cpp parser");
                 let mut deps = Vec::new();
                 for dep in config.crate_properties().dependencies() {
                     if dep.source() == &CrateDependencySource::CurrentWorkspace {
-                        deps.push(workspace.load_database2(dep.name(), false)?);
+                        deps.push(workspace.load_database2(dep.name())?);
                     }
                 }
-                let mut main_db = workspace.load_database2(crate_name, true)?;
+                let mut main_db = workspace.load_or_create_database2(
+                    config.crate_properties().name(),
+                    config.crate_properties().version(),
+                )?;
                 let data = CppParserContext {
                     current_database: &mut main_db,
                     dependencies: &deps.iter().collect_vec(),
@@ -106,6 +110,7 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
                     workspace: &workspace,
                 };
                 cpp_parser::run(data)?;
+                info!("saving database");
                 workspace.save_database2(&main_db)?;
             }
         }

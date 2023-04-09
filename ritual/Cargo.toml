@@ -15,7 +15,7 @@ ritual_common = { version = "0.4.0", path = "../ritual_common" }
 regex = "1.1.0"
 serde = { version = "1.0.84", features = ["rc"] }
 serde_derive = "1.0.84"
-clang = "0.20.0"    # C++ parsing
+clang = { version = "2.0", features = ["clang_10_0"] } # C++ parsing
 select = "0.6.0"    # html parsing
 tempdir = "0.3.7"   # temporary directory creation
 derive_more = "0.13.0"

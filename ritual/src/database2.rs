@@ -1,19 +1,26 @@
-use std::sync::Arc;
-
 use ritual_common::target::LibraryTarget;
 use serde::{Deserialize, Serialize};
 
 use crate::cpp_data::CppItem;
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Database {
-    crate_name: Arc<String>,
+    crate_name: String,
     crate_version: String,
     items: Vec<DatabaseItem>,
     targets: Vec<LibraryTarget>,
 }
 
 impl Database {
+    pub fn new(crate_name: String, crate_version: String) -> Self {
+        Self {
+            crate_name,
+            crate_version,
+            items: Vec::new(),
+            targets: Vec::new(),
+        }
+    }
+
     pub fn add_target(&mut self, target: LibraryTarget) -> usize {
         if let Some(pos) = self.targets.iter().position(|t| t == &target) {
             return pos;

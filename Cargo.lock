@@ -239,22 +239,21 @@ dependencies = [
 
 [[package]]
 name = "clang"
-version = "0.20.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26c4a9fd36cd08afe44217c95f31698862e48bee3380cbc60184d95c91abf996"
+checksum = "84c044c781163c001b913cd018fc95a628c50d0d2dfea8bca77dad71edb16e37"
 dependencies = [
  "clang-sys",
- "lazy_static",
  "libc",
 ]
 
 [[package]]
 name = "clang-sys"
-version = "0.23.0"
+version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7f7c04e52c35222fffcc3a115b5daf5f7e2bfb71c13c4e2321afe1fc71859c2"
+checksum = "c688fc74432808e3eb684cae8830a86be1d66a2bd58e1f248ed0960a590baf6f"
 dependencies = [
- "glob 0.2.11",
+ "glob 0.3.0",
  "libc",
 ]
 
