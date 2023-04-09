@@ -2,7 +2,7 @@
 
 use crate::cpp_function::CppFunction;
 pub use crate::cpp_operator::CppOperator;
-use crate::cpp_parser::CppParserContext;
+use crate::cpp_parser::Context2;
 use crate::cpp_type::{CppTemplateParameter, CppType};
 use crate::database::DatabaseClient;
 use itertools::Itertools;
@@ -99,6 +99,16 @@ pub struct CppBaseSpecifier {
     /// Name and template arguments of the class type that
     /// inherits this base class
     pub derived_class_type: CppPath,
+}
+
+impl CppBaseSpecifier {
+    pub fn short_text(&self) -> String {
+        format!(
+            "{} inherits {}",
+            self.derived_class_type.to_cpp_pseudo_code(),
+            self.base_class_type.to_cpp_pseudo_code()
+        )
+    }
 }
 
 /// Location of a C++ type's definition in header files.
@@ -562,7 +572,7 @@ impl CppItem {
             CppItem::EnumValue(value) => format!("enum value {}", value.path.to_cpp_pseudo_code()),
             CppItem::Function(value) => value.short_text(),
             CppItem::ClassField(value) => value.short_text(),
-            CppItem::ClassBase(_) => format!("{:?}", self),
+            CppItem::ClassBase(value) => value.short_text(),
         }
     }
 }
@@ -640,7 +650,7 @@ pub fn inherits(
 
 /// Checks if `class_name` types inherits `base_name` type directly or indirectly.
 pub fn inherits2(
-    data: &CppParserContext<'_>,
+    data: &Context2<'_>,
     derived_class_name: &CppPath,
     base_class_name: &CppPath,
 ) -> bool {

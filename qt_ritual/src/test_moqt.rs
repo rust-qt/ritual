@@ -122,7 +122,7 @@ fn test_moqt() {
         Options {
             workspace,
             local_paths: Some(true),
-            crates: vec!["moqt_core".into(), "moqt_gui".into()],
+            crates: "moqt_core,moqt_gui".into(),
             output_crates_version: None,
             command: Command::Parse,
         },

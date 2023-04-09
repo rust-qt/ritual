@@ -71,14 +71,14 @@ pub struct CppParserOutputItem {
 #[derive(Debug, Default)]
 pub struct CppParserOutput(pub Vec<CppParserOutputItem>);
 
-pub struct CppParserContext<'a> {
+pub struct Context2<'a> {
     pub current_database: &'a mut database2::Database,
     pub dependencies: &'a [&'a database2::Database],
     pub config: &'a Config,
     pub workspace: &'a Workspace,
 }
 
-impl CppParserContext<'_> {
+impl Context2<'_> {
     fn all_databases(&self) -> impl Iterator<Item = &database2::Database> {
         once(self.current_database as &_).chain(self.dependencies.iter().copied())
     }
@@ -88,8 +88,8 @@ impl CppParserContext<'_> {
             .flat_map(|d| d.items().iter().map(|i| &i.item))
     }
 
-    fn reborrow(&mut self) -> CppParserContext<'_> {
-        CppParserContext {
+    fn reborrow(&mut self) -> Context2<'_> {
+        Context2 {
             current_database: self.current_database,
             dependencies: self.dependencies,
             config: self.config,
@@ -101,7 +101,7 @@ impl CppParserContext<'_> {
 /// Implementation of the C++ parser that extracts information
 /// about the C++ library's API from its headers.
 struct CppParser<'a> {
-    data: CppParserContext<'a>,
+    data: Context2<'a>,
     current_target_paths: Vec<PathBuf>,
     target_index: usize,
     output: CppParserOutput,
@@ -364,7 +364,7 @@ fn run_clang<R, F: FnMut(Entity<'_>) -> Result<R>>(
 }
 
 /// Runs the parser on specified data.
-pub fn run(data: CppParserContext<'_>) -> Result<()> {
+pub fn run(data: Context2<'_>) -> Result<()> {
     debug!("clang version: {}", get_version());
     debug!("Initializing clang");
     let mut parser = CppParser {
@@ -1186,6 +1186,7 @@ impl CppParser<'_> {
             );
             let start = source_range.get_start().get_file_location();
             let end = source_range.get_end().get_file_location();
+            //println!("start = {:?}, end = {:?}", start, end);
             let file_path = start
                 .file
                 .ok_or_else(|| err_msg("no file in source location"))?
@@ -1211,7 +1212,16 @@ impl CppParser<'_> {
                     } else {
                         line.len()
                     };
-                    result.push_str(&line[start_column..end_column]);
+                    if start_column <= end_column
+                        && start_column <= line.len()
+                        && end_column <= line.len()
+                    {
+                        result.push_str(&line[start_column..end_column]);
+                    } else {
+                        warn!("invalid source range: start = {:?}, end = {:?}", start, end);
+                    }
+                    //println!("TEST1 {:?}, {:?}, {:?}", line, start_column, end_column);
+
                     if line_num >= range_line2 {
                         break;
                     }

@@ -185,13 +185,13 @@ pub fn all_crate_names() -> &'static [&'static str] {
         "qt_gui",
         "qt_widgets",
         "qt_ui_tools",
-        "qt_3d_core",
-        "qt_3d_render",
-        "qt_3d_input",
-        "qt_3d_logic",
-        "qt_3d_extras",
-        "qt_charts",
-        "qt_qml",
+        // "qt_3d_core",
+        // "qt_3d_render",
+        // "qt_3d_input",
+        // "qt_3d_logic",
+        // "qt_3d_extras",
+        // "qt_charts",
+        // "qt_qml",
     ]
 }
 

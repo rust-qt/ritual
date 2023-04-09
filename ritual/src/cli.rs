@@ -4,7 +4,8 @@
 //! for more information.
 
 use crate::config::{CrateDependencySource, CrateProperties, GlobalConfig};
-use crate::cpp_parser::{self, CppParserContext};
+use crate::cpp_parser::{self, Context2};
+use crate::search_db;
 use crate::workspace::Workspace;
 use clap::{Parser, Subcommand};
 use flexi_logger::{Duplicate, LevelFilter, LogSpecification, Logger};
@@ -26,8 +27,8 @@ pub struct Options {
     /// Write local paths to `ritual` crates in generated `Cargo.toml`
     pub local_paths: Option<bool>,
     #[arg(short, long, required = true)]
-    /// Crates to process (e.g. `qt_core`)
-    pub crates: Vec<String>,
+    /// One or more (comma separated) crates to process (e.g. `qt_core,qt_gui`) or "all"
+    pub crates: String,
     #[arg(long)]
     /// Version of the output crates.
     pub output_crates_version: Option<String>,
@@ -38,6 +39,7 @@ pub struct Options {
 #[derive(Debug, Subcommand)]
 pub enum Command {
     Parse,
+    Search { name: String },
 }
 
 pub fn run_from_args(config: GlobalConfig) -> Result<()> {
@@ -66,33 +68,36 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
     info!("Workspace: {}", workspace_path.display());
     info!("Current target: {}", current_target().short_text());
 
-    let final_crates = if options.crates.iter().any(|x| *x == "all") {
+    let crates = if options.crates == "all" {
         let all = config.all_crate_names();
         if all.is_empty() {
             bail!("\"all\" is not supported as crate name specifier");
         }
         all.to_vec()
     } else {
-        options.crates.clone()
+        options
+            .crates
+            .split(',')
+            .map(|s| s.to_string())
+            .collect_vec()
     };
 
-    for crate_name in &final_crates {
-        let create_config = config
-            .create_config_hook()
-            .ok_or_else(|| err_msg("create_config_hook is missing"))?;
+    match &options.command {
+        Command::Parse => {
+            for crate_name in &crates {
+                let create_config = config
+                    .create_config_hook()
+                    .ok_or_else(|| err_msg("create_config_hook is missing"))?;
 
-        let mut config = create_config(CrateProperties::new(
-            crate_name,
-            options.output_crates_version.as_deref().unwrap_or("0.1"),
-        ))?;
+                let mut config = create_config(CrateProperties::new(
+                    crate_name,
+                    options.output_crates_version.as_deref().unwrap_or("0.1"),
+                ))?;
 
-        if let Some(local_paths) = options.local_paths {
-            config.set_write_dependencies_local_paths(local_paths);
-        }
+                if let Some(local_paths) = options.local_paths {
+                    config.set_write_dependencies_local_paths(local_paths);
+                }
 
-        match options.command {
-            Command::Parse => {
-                info!("running cpp parser");
                 let mut deps = Vec::new();
                 for dep in config.crate_properties().dependencies() {
                     if dep.source() == &CrateDependencySource::CurrentWorkspace {
@@ -103,16 +108,25 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
                     config.crate_properties().name(),
                     config.crate_properties().version(),
                 )?;
-                let data = CppParserContext {
+                let ctx = Context2 {
                     current_database: &mut main_db,
                     dependencies: &deps.iter().collect_vec(),
                     config: &config,
                     workspace: &workspace,
                 };
-                cpp_parser::run(data)?;
+                info!("running cpp parser");
+
+                cpp_parser::run(ctx)?;
                 info!("saving database");
                 workspace.save_database2(&main_db)?;
             }
+        }
+        Command::Search { name } => {
+            let mut dbs = Vec::new();
+            for c in crates {
+                dbs.push(workspace.load_database2(&c)?);
+            }
+            search_db::run(&dbs, name);
         }
     }
 

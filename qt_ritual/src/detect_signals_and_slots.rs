@@ -2,7 +2,7 @@ use itertools::Itertools;
 use log::trace;
 use regex::Regex;
 use ritual::cpp_data::{inherits2, CppItem, CppPath};
-use ritual::cpp_parser::{CppParserContext, CppParserOutput};
+use ritual::cpp_parser::{Context2, CppParserOutput};
 use ritual_common::errors::{err_msg, Result, ResultExt};
 use ritual_common::file_utils::open_file;
 use std::collections::{HashMap, HashSet};
@@ -21,10 +21,7 @@ struct Section {
 
 /// Parses include files to detect which methods are signals or slots.
 #[allow(clippy::cognitive_complexity, clippy::collapsible_if)]
-pub fn detect_signals_and_slots(
-    data: CppParserContext<'_>,
-    output: &CppParserOutput,
-) -> Result<()> {
+pub fn detect_signals_and_slots(data: Context2<'_>, output: &CppParserOutput) -> Result<()> {
     // TODO: only run if it's a new class or it has some new methods; don't change existing old methods
     let mut files = HashSet::new();
 
