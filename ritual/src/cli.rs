@@ -5,8 +5,8 @@
 
 use crate::config::{CrateDependencySource, CrateProperties, GlobalConfig};
 use crate::cpp_parser::{self, Context2};
-use crate::search_db;
 use crate::workspace::Workspace;
+use crate::{crate_writer, search_db};
 use clap::{Parser, Subcommand};
 use flexi_logger::{Duplicate, LevelFilter, LogSpecification, Logger};
 use itertools::Itertools;
@@ -39,6 +39,7 @@ pub struct Options {
 #[derive(Debug, Subcommand)]
 pub enum Command {
     Parse,
+    Generate,
     Search { name: String },
 }
 
@@ -83,7 +84,7 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
     };
 
     match &options.command {
-        Command::Parse => {
+        Command::Parse | Command::Generate => {
             for crate_name in &crates {
                 let create_config = config
                     .create_config_hook()
@@ -91,7 +92,7 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
 
                 let mut config = create_config(CrateProperties::new(
                     crate_name,
-                    options.output_crates_version.as_deref().unwrap_or("0.1"),
+                    options.output_crates_version.as_deref().unwrap_or("0.1.0"),
                 ))?;
 
                 if let Some(local_paths) = options.local_paths {
@@ -114,11 +115,20 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
                     config: &config,
                     workspace: &workspace,
                 };
-                info!("running cpp parser");
 
-                cpp_parser::run(ctx)?;
-                info!("saving database");
-                workspace.save_database2(&main_db)?;
+                match &options.command {
+                    Command::Parse => {
+                        info!("running cpp parser");
+                        cpp_parser::run(ctx)?;
+                        info!("saving database");
+                        workspace.save_database2(&main_db)?;
+                    }
+                    Command::Generate => {
+                        info!("generating crate");
+                        crate_writer::run(ctx)?;
+                    }
+                    Command::Search { .. } => unreachable!(),
+                }
             }
         }
         Command::Search { name } => {

@@ -147,7 +147,7 @@ pub fn create_config(
         {
             let mut data = CppBuildConfigData::new();
             data.add_compiler_flag("-fPIC");
-            data.add_compiler_flag("-std=gnu++11");
+            data.add_compiler_flag("-std=c++17");
             config
                 .cpp_build_config_mut()
                 .add(target::Condition::Env(target::Env::Msvc).negate(), data);

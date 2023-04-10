@@ -57,6 +57,12 @@ impl Database {
     pub fn crate_name(&self) -> &str {
         &self.crate_name
     }
+    pub fn crate_version(&self) -> &str {
+        &self.crate_version
+    }
+    pub fn targets(&self) -> &[LibraryTarget] {
+        &self.targets
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

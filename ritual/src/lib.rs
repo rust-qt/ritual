@@ -5,6 +5,7 @@
 //! for more information.
 
 #![forbid(unsafe_code)]
+#![allow(dead_code)]
 
 pub use ritual_common as common;
 

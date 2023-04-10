@@ -88,13 +88,19 @@ impl Context2<'_> {
             .flat_map(|d| d.items().iter().map(|i| &i.item))
     }
 
-    fn reborrow(&mut self) -> Context2<'_> {
+    pub fn reborrow(&mut self) -> Context2<'_> {
         Context2 {
             current_database: self.current_database,
             dependencies: self.dependencies,
             config: self.config,
             workspace: self.workspace,
         }
+    }
+
+    pub fn database(&self, crate_name: &str) -> Result<&database2::Database> {
+        self.all_databases()
+            .find(|db| db.crate_name() == crate_name)
+            .ok_or_else(|| format_err!("no database found for crate: {}", crate_name))
     }
 }
 

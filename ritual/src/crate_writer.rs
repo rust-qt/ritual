@@ -1,11 +1,7 @@
 use crate::config::{CrateDependencyKind, CrateDependencySource};
-use crate::cpp_code_generator;
-use crate::cpp_code_generator::{
-    all_include_directives, generate_cpp_type_size_requester, write_include_directives,
-};
+use crate::cpp_code_generator::{all_include_directives, write_include_directives};
+use crate::cpp_parser::Context2;
 use crate::database::CRATE_DB_FILE_NAME;
-use crate::processor::ProcessorData;
-use crate::rust_code_generator;
 use itertools::Itertools;
 use ritual_common::errors::Result;
 use ritual_common::file_utils::{
@@ -59,7 +55,7 @@ fn toml_table_with_single_item(key: &str, value: impl Into<toml::Value>) -> toml
 /// Generates `Cargo.toml` file and skeleton of the crate.
 /// If a crate template was supplied, files from it are
 /// copied to the output location.
-fn generate_crate_template(data: &mut ProcessorData<'_>, output_path: &Path) -> Result<()> {
+fn generate_crate_template(data: Context2<'_>, output_path: &Path) -> Result<()> {
     let template_build_rs_path =
         data.config
             .crate_template_path()
@@ -120,7 +116,7 @@ fn generate_crate_template(data: &mut ProcessorData<'_>, output_path: &Path) -> 
             }
             CrateDependencySource::CurrentWorkspace => {
                 let path = data.workspace.crate_path(name);
-                let version = data.db.dependency_version(name)?;
+                let version = data.database(name)?.crate_version();
                 (version.to_string(), Some(path))
             }
         };
@@ -243,7 +239,7 @@ fn generate_c_lib_template(
     Ok(())
 }
 
-pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
+pub fn run(mut data: Context2<'_>) -> Result<()> {
     let crate_name = data.config.crate_properties().name();
     let output_path = data.workspace.crate_path(crate_name);
 
@@ -252,7 +248,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
     }
 
     create_dir(&output_path)?;
-    generate_crate_template(data, &output_path)?;
+    generate_crate_template(data.reborrow(), &output_path)?;
     data.workspace.update_cargo_toml()?;
 
     let c_lib_path = output_path.join("c_lib");
@@ -268,20 +264,84 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         &all_include_directives(data.config)?,
     )?;
 
-    cpp_code_generator::generate_cpp_file(
-        data.db,
-        &c_lib_path.join("file1.cpp"),
-        &global_header_name,
-    )?;
+    // cpp_code_generator::generate_cpp_file(
+    //     data.db,
+    //     &c_lib_path.join("file1.cpp"),
+    //     &global_header_name,
+    // )?;
+    {
+        let mut cpp_file = create_file(c_lib_path.join("file1.cpp"))?;
+        writeln!(cpp_file, "#include \"{}\"", global_header_name)?;
+        #[allow(clippy::write_literal)]
+        writeln!(
+            cpp_file,
+            "{}",
+            r#"
+            class Slot1 : public QObject {
+                Q_OBJECT
+            public:
+                Slot1() {}
 
-    let file = create_file(c_lib_path.join("sized_types.cxx"))?;
-    generate_cpp_type_size_requester(data.db, data.config.include_directives(), file)?;
+            public slots:
+                void slot1(QString value) {}
+            };
 
-    rust_code_generator::generate(
-        data.db,
-        output_path.join("src"),
-        data.config.crate_template_path().map(|s| s.join("src")),
-    )?;
+            extern "C" {
+                RITUAL_EXPORT int ffi_f1(int x) {
+                    QRect rect;
+                    rect.setLeft(x * 2);
+                    return rect.left();
+                }
+            }
+
+            #include "file1.moc"
+            "#
+        )?;
+    }
+
+    // let file = create_file(c_lib_path.join("sized_types.cxx"))?;
+    // generate_cpp_type_size_requester(data.db, data.config.include_directives(), file)?;
+
+    // rust_code_generator::generate(
+    //     data.db,
+    //     output_path.join("src"),
+    //     data.config.crate_template_path().map(|s| s.join("src")),
+    // )?;
+
+    {
+        let mut rust_file = create_file(output_path.join("src/lib.rs"))?;
+        #[allow(clippy::write_literal)]
+        writeln!(
+            rust_file,
+            "{}",
+            r#"
+            mod ffi {
+                include!(concat!(env!("OUT_DIR"), "/ffi.rs"));
+            }
+            pub fn f1(x: std::os::raw::c_int) -> std::os::raw::c_int {
+                unsafe { crate::ffi::ffi_f1(x) }
+            }
+
+            #[test]
+            fn test_f1() {
+                assert_eq!(f1(2), 4);
+            }
+            "#
+        )?;
+    }
+    {
+        let mut rust_ffi_file = create_file(output_path.join("src/ffi.in.rs"))?;
+        #[allow(clippy::write_literal)]
+        writeln!(
+            rust_ffi_file,
+            "{}",
+            r#"
+            extern "C" {
+                pub fn ffi_f1(x: std::os::raw::c_int) -> std::os::raw::c_int;
+            }
+            "#
+        )?;
+    }
 
     // -p shouldn't be needed, it's a workaround for this bug on Windows:
     // https://github.com/rust-lang/rustfmt/issues/2694
@@ -302,7 +362,7 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         &BuildScriptData {
             cpp_build_config: data.config.cpp_build_config().clone(),
             cpp_wrapper_lib_name: c_lib_name,
-            known_targets: data.db.environments().to_vec(),
+            known_targets: data.current_database.targets().to_vec(),
         },
         None,
     )?;
@@ -311,6 +371,8 @@ pub fn run(data: &mut ProcessorData<'_>) -> Result<()> {
         data.workspace.database_path(crate_name),
         output_path.join(CRATE_DB_FILE_NAME),
     )?;
+
+    run_command(Command::new("cargo").arg("test").current_dir(&output_path))?;
 
     Ok(())
 }
