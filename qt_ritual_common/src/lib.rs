@@ -39,6 +39,8 @@ pub struct InstallationData {
     pub lib_include_path: PathBuf,
     /// Path to the directory containing library files for the linker.
     pub lib_path: PathBuf,
+    /// Path to the directory containing build utils such as moc and qrc.
+    pub libexecs_path: PathBuf,
     /// Path to the directory containing Qt documentation files.
     pub docs_path: PathBuf,
     /// If true, this Qt library was built as a MacOS framework.
@@ -67,6 +69,8 @@ pub fn get_installation_data(
     debug!("QT_INSTALL_HEADERS = \"{}\"", root_include_path.display());
     let lib_path = run_qmake_query("QT_INSTALL_LIBS", qmake_path)?;
     debug!("QT_INSTALL_LIBS = \"{}\"", lib_path.display());
+    let libexecs_path = run_qmake_query("QT_INSTALL_LIBEXECS", qmake_path)?;
+    debug!("QT_INSTALL_LIBEXECS = \"{}\"", libexecs_path.display());
     let docs_path = run_qmake_query("QT_INSTALL_DOCS", qmake_path)?;
     debug!("QT_INSTALL_DOCS = \"{}\"", docs_path.display());
     let folder_name = lib_folder_name(crate_name);
@@ -76,6 +80,7 @@ pub fn get_installation_data(
         Ok(InstallationData {
             root_include_path,
             lib_path,
+            libexecs_path,
             docs_path,
             lib_include_path: framework_headers_dir,
             is_framework: true,
@@ -87,6 +92,7 @@ pub fn get_installation_data(
             Ok(InstallationData {
                 root_include_path,
                 lib_path,
+                libexecs_path,
                 docs_path,
                 lib_include_path: lib_headers_dir,
                 is_framework: false,

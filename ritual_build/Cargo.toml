@@ -12,3 +12,4 @@ license = "MIT OR Apache-2.0"
 ritual_common = { version = "0.4.0", path = "../ritual_common" }
 
 log = "0.4.6"
+cc = "1.0.79"

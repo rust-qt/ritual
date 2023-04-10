@@ -283,7 +283,9 @@ pub fn run(mut data: Context2<'_>) -> Result<()> {
                 Slot1() {}
 
             public slots:
-                void slot1(QString value) {}
+                void slot1(QString value) {
+                    Q_UNUSED(value);
+                }
             };
 
             extern "C" {

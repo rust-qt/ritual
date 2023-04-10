@@ -11,10 +11,12 @@
 use itertools::Itertools;
 use qt_ritual_common::get_full_build_config;
 use ritual_build::common::errors::{bail, format_err, FancyUnwrap, Result, ResultExt};
-use ritual_build::common::file_utils::{create_file, os_str_to_str, path_to_str};
+use ritual_build::common::file_utils::{
+    create_dir, create_file, open_file, os_str_to_str, path_to_str,
+};
 use ritual_build::common::target;
-use ritual_build::common::utils::{run_command, MapIfOk};
-use ritual_build::Config;
+use ritual_build::common::utils::{exe_suffix, run_command, MapIfOk};
+use ritual_build::{manifest_dir, out_dir, Config};
 use semver::Version;
 use std::env;
 use std::fs::create_dir_all;
@@ -54,7 +56,7 @@ fn detect_closest_version(known: &[&str], current: &str) -> Result<Option<String
 pub fn try_run(crate_name: &str) -> Result<()> {
     env_logger::init();
 
-    let qt_config = get_full_build_config(crate_name, None)?;
+    let mut qt_config = get_full_build_config(crate_name, None)?;
 
     let mut config = Config::new()?;
 
@@ -103,8 +105,37 @@ pub fn try_run(crate_name: &str) -> Result<()> {
         }
     }
 
+    let moc = qt_config
+        .installation_data
+        .libexecs_path
+        .join(format!("moc{}", exe_suffix()));
+    if !moc.exists() {
+        bail!("moc not found at {}", moc.display());
+    }
+    let moc_output = Command::new(moc)
+        .arg(manifest_dir()?.join("c_lib").join("file1.cpp"))
+        .output()?;
+    if !moc_output.status.success() {
+        bail!(
+            "moc failed with status {:?}\n{}\n{}",
+            moc_output.status,
+            String::from_utf8_lossy(&moc_output.stdout),
+            String::from_utf8_lossy(&moc_output.stderr),
+        );
+    }
+    let moc_out_dir = out_dir()?.join("moc_out");
+    if !moc_out_dir.exists() {
+        create_dir(&moc_out_dir)?;
+    }
+    let mut moc_file = create_file(moc_out_dir.join("file1.moc"))?;
+    moc_file.write_all(&moc_output.stdout)?;
+    moc_file.flush()?;
+
+    qt_config.cpp_build_paths.add_include_path(&moc_out_dir);
+
     config.set_cpp_build_config(qt_config.cpp_build_config);
     config.set_cpp_build_paths(qt_config.cpp_build_paths);
+
     config.try_run()
 }
 
