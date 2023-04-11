@@ -272,24 +272,85 @@ pub fn run(mut data: Context2<'_>) -> Result<()> {
     {
         let mut cpp_file = create_file(c_lib_path.join("file1.cpp"))?;
         writeln!(cpp_file, "#include \"{}\"", global_header_name)?;
-        #[allow(clippy::write_literal)]
-        writeln!(
-            cpp_file,
-            "{}",
-            r#"
-            class Slot1 : public QObject {
+
+        if data.config.crate_properties().name() == "qt_gui" {
+            #[allow(clippy::write_literal)]
+            writeln!(
+                cpp_file,
+                "{}",
+                r#"
+            #ifndef Q_MOC_RUN
+            class LifetimeChecker : public QObject {
                 Q_OBJECT
             public:
-                Slot1() {}
+                LifetimeChecker();
+                void add(QObject* obj);
 
-            public slots:
-                void slot1(QString value) {
-                    Q_UNUSED(value);
-                }
+            private slots:
+                void objectDestroyed(QObject* obj);
+
+            private:
+                QSet<QObject*> m_objects;
+                int m_counter;
             };
+            #endif
+            extern LifetimeChecker* LIFETIME_CHECKER;
+
+            extern "C" {
+                RITUAL_EXPORT int ffi_f2(int x) {
+                    QObject* obj = new QObject();
+                    LIFETIME_CHECKER->add(obj);
+                    qDebug() << "before deleted!";
+                    delete obj;
+                    qDebug() << "deleted!";
+                    QRect rect;
+                    rect.setLeft(x * 3);
+                    return rect.left();
+                }
+            }
+
+            #include "file1.moc"
+            "#
+            )?;
+        } else {
+            #[allow(clippy::write_literal)]
+            writeln!(
+                cpp_file,
+                "{}",
+                r#"
+            class LifetimeChecker : public QObject {
+                Q_OBJECT
+            public:
+                LifetimeChecker() : m_counter(0) {
+                    qDebug() << "LifetimeChecker created" << this;
+                }
+                void add(QObject* obj) {
+                    m_counter++;
+                    qDebug() << QObject::connect(obj, &QObject::destroyed, this, &LifetimeChecker::objectDestroyed, Qt::DirectConnection);
+                    qDebug() << "added" << obj << "counter" << m_counter << "this" << this;
+                    m_objects.insert(obj);
+                }
+
+            private slots:
+                void objectDestroyed(QObject* obj) {
+                    qDebug() << "destroyed" << obj << "this" << this;
+                    m_objects.remove(obj);
+                }
+
+            private:
+                QSet<QObject*> m_objects;
+                int m_counter;
+            };
+            LifetimeChecker* LIFETIME_CHECKER = new LifetimeChecker();
+
 
             extern "C" {
                 RITUAL_EXPORT int ffi_f1(int x) {
+                    QObject* obj = new QObject();
+                    LIFETIME_CHECKER->add(obj);
+                    qDebug() << "before deleted!";
+                    delete obj;
+                    qDebug() << "deleted!";
                     QRect rect;
                     rect.setLeft(x * 2);
                     return rect.left();
@@ -298,7 +359,8 @@ pub fn run(mut data: Context2<'_>) -> Result<()> {
 
             #include "file1.moc"
             "#
-        )?;
+            )?;
+        }
     }
 
     // let file = create_file(c_lib_path.join("sized_types.cxx"))?;
@@ -312,11 +374,32 @@ pub fn run(mut data: Context2<'_>) -> Result<()> {
 
     {
         let mut rust_file = create_file(output_path.join("src/lib.rs"))?;
-        #[allow(clippy::write_literal)]
-        writeln!(
-            rust_file,
-            "{}",
-            r#"
+        if data.config.crate_properties().name() == "qt_gui" {
+            #[allow(clippy::write_literal)]
+            writeln!(
+                rust_file,
+                "{}",
+                r#"
+            mod ffi {
+                include!(concat!(env!("OUT_DIR"), "/ffi.rs"));
+            }
+            pub fn f2(x: std::os::raw::c_int) -> std::os::raw::c_int {
+                unsafe { crate::ffi::ffi_f2(x) }
+            }
+
+            #[test]
+            fn test_f2() {
+                assert_eq!(qt_core::f1(2), 4);
+                assert_eq!(f2(2), 6);
+            }
+            "#
+            )?;
+        } else {
+            #[allow(clippy::write_literal)]
+            writeln!(
+                rust_file,
+                "{}",
+                r#"
             mod ffi {
                 include!(concat!(env!("OUT_DIR"), "/ffi.rs"));
             }
@@ -329,20 +412,34 @@ pub fn run(mut data: Context2<'_>) -> Result<()> {
                 assert_eq!(f1(2), 4);
             }
             "#
-        )?;
+            )?;
+        }
     }
     {
         let mut rust_ffi_file = create_file(output_path.join("src/ffi.in.rs"))?;
-        #[allow(clippy::write_literal)]
-        writeln!(
-            rust_ffi_file,
-            "{}",
-            r#"
-            extern "C" {
-                pub fn ffi_f1(x: std::os::raw::c_int) -> std::os::raw::c_int;
-            }
-            "#
-        )?;
+        if data.config.crate_properties().name() == "qt_gui" {
+            #[allow(clippy::write_literal)]
+            writeln!(
+                rust_ffi_file,
+                "{}",
+                r#"
+                extern "C" {
+                    pub fn ffi_f2(x: std::os::raw::c_int) -> std::os::raw::c_int;
+                }
+                "#
+            )?;
+        } else {
+            #[allow(clippy::write_literal)]
+            writeln!(
+                rust_ffi_file,
+                "{}",
+                r#"
+                extern "C" {
+                    pub fn ffi_f1(x: std::os::raw::c_int) -> std::os::raw::c_int;
+                }
+                "#
+            )?;
+        }
     }
 
     // -p shouldn't be needed, it's a workaround for this bug on Windows:

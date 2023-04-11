@@ -130,6 +130,7 @@ pub fn try_run(crate_name: &str) -> Result<()> {
     let mut moc_file = create_file(moc_out_dir.join("file1.moc"))?;
     moc_file.write_all(&moc_output.stdout)?;
     moc_file.flush()?;
+    drop(moc_file); // this is necessary for some reason
 
     qt_config.cpp_build_paths.add_include_path(&moc_out_dir);
 

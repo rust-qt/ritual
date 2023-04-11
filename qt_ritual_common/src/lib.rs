@@ -151,6 +151,13 @@ pub fn get_full_build_config(
     }
     {
         let mut data = CppBuildConfigData::new();
+        data.add_compiler_flag("/Zc:__cplusplus");
+        data.add_compiler_flag("/std:c++17");
+        data.add_compiler_flag("/permissive-");
+        cpp_build_config.add(target::Condition::Env(target::Env::Msvc), data);
+    }
+    {
+        let mut data = CppBuildConfigData::new();
         data.add_compiler_flag("-fPIC");
         // msvc and mingw don't need this
         cpp_build_config.add(target::Condition::OS(target::OS::Windows).negate(), data);
