@@ -154,6 +154,11 @@ impl Config {
         for flag in cpp_build_config_data.compiler_flags() {
             build.flag(flag);
         }
+        for dir in self.cpp_build_paths.framework_paths() {
+            let str = path_to_str(dir)?;
+            build.flag("-F");
+            build.flag(str);
+        }
         build.compile(&self.build_script_data.cpp_wrapper_lib_name);
 
         // let cmake_config = CMakeConfigData {
