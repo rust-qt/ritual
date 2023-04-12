@@ -6,6 +6,7 @@ use crate::cpp_parser::{Context2, CppParserOutput};
 use crate::processor::{ProcessingSteps, ProcessorData};
 use crate::rust_info::{NameType, RustItem, RustPathScope};
 use crate::rust_type::RustPath;
+use crate::rustifier::Rustifier;
 use ritual_common::cpp_build_config::{CppBuildConfig, CppBuildPaths};
 use ritual_common::errors::{bail, Result};
 use ritual_common::target::Target;
@@ -178,6 +179,7 @@ pub type AfterCppParserHook = dyn Fn(Context2<'_>, &CppParserOutput) -> Result<(
 pub type CppItemFilterHook = dyn Fn(&CppItem) -> Result<bool> + 'static;
 pub type MovableTypesHook = dyn Fn(&CppPath) -> Result<MovableTypesHookOutput> + 'static;
 pub type CppParserPathHook = dyn Fn(&CppPath) -> Result<bool> + 'static;
+pub type RustifierHook = dyn Fn(&mut Rustifier) -> Result<()> + 'static;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkerLibraryConfig {
@@ -218,6 +220,7 @@ pub struct Config {
     rust_path_scope_hook: Option<Box<RustPathScopeHook>>,
     rust_path_hook: Option<Box<RustPathHook>>,
     rust_item_hook: Option<Box<RustItemHook>>,
+    rustifier_hook: Option<Box<RustifierHook>>,
     after_cpp_parser_hooks: Vec<Box<AfterCppParserHook>>,
     cpp_item_filter_hook: Option<Box<CppItemFilterHook>>,
     cluster_config: Option<ClusterConfig>,
@@ -251,6 +254,7 @@ impl Config {
             rust_path_scope_hook: Default::default(),
             rust_path_hook: Default::default(),
             rust_item_hook: Default::default(),
+            rustifier_hook: Default::default(),
             after_cpp_parser_hooks: Default::default(),
             cpp_item_filter_hook: Default::default(),
             cluster_config: None,
@@ -496,6 +500,15 @@ impl Config {
 
     pub fn cpp_item_filter_hook(&self) -> Option<&CppItemFilterHook> {
         self.cpp_item_filter_hook.as_deref()
+    }
+
+    pub fn set_rustifier_hook(&mut self, hook: impl Fn(&mut Rustifier) -> Result<()> + 'static) {
+        assert!(self.rustifier_hook.is_none(), "only one hook can be set");
+        self.rustifier_hook = Some(Box::new(hook));
+    }
+
+    pub fn rustifier_hook(&self) -> Option<&RustifierHook> {
+        self.rustifier_hook.as_deref()
     }
 
     pub fn set_cluster_config(&mut self, cluster_config: ClusterConfig) {

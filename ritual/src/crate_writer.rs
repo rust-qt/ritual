@@ -6,11 +6,13 @@ use itertools::Itertools;
 use ritual_common::errors::Result;
 use ritual_common::file_utils::{
     copy_file, copy_recursively, crate_version, create_dir, create_dir_all, create_file,
-    diff_paths, path_to_str, read_dir, remove_dir_all, repo_dir_path, save_json, save_toml_table,
+    diff_paths, file_to_string, path_to_str, read_dir, remove_dir_all, repo_dir_path, save_json,
+    save_toml_table,
 };
 use ritual_common::toml;
 use ritual_common::utils::run_command;
 use ritual_common::BuildScriptData;
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -211,35 +213,56 @@ fn generate_crate_template(data: Context2<'_>, output_path: &Path) -> Result<()>
 }
 
 /// Generates main files and directories of the library.
-fn generate_c_lib_template(
-    lib_name: &str,
+fn generate_cpp_lib_template(
+    _lib_name: &str,
     lib_path: &Path,
     global_header_name: &str,
     include_directives: &[PathBuf],
 ) -> Result<()> {
-    let name_upper = lib_name.to_uppercase();
-    let cmakelists_path = lib_path.join("CMakeLists.txt");
-    let mut cmakelists_file = create_file(cmakelists_path)?;
+    // let name_upper = lib_name.to_uppercase();
+    // let cmakelists_path = lib_path.join("CMakeLists.txt");
+    // let mut cmakelists_file = create_file(cmakelists_path)?;
 
-    write!(
-        cmakelists_file,
-        include_str!("../templates/c_lib/CMakeLists.txt"),
-        lib_name_lowercase = lib_name,
-        lib_name_uppercase = name_upper
-    )?;
+    // write!(
+    //     cmakelists_file,
+    //     include_str!("../templates/cpp/CMakeLists.txt"),
+    //     lib_name_lowercase = lib_name,
+    //     lib_name_uppercase = name_upper
+    // )?;
 
     let global_header_path = lib_path.join(global_header_name);
     let mut global_header_file = create_file(global_header_path)?;
     write!(
         global_header_file,
         "{}",
-        include_str!("../templates/c_lib/global.h"),
+        include_str!("../templates/cpp/file1.cpp"),
     )?;
     write_include_directives(&mut global_header_file, include_directives)?;
     Ok(())
 }
 
-pub fn run(mut data: Context2<'_>) -> Result<()> {
+pub const ROOT_MODULE: &str = "lib";
+pub const FFI_MODULE: &str = "ffi";
+
+#[derive(Debug)]
+pub struct Code {
+    pub cpp: String,
+    pub rust: HashMap<String, String>,
+}
+
+impl Default for Code {
+    fn default() -> Self {
+        let mut code = Self {
+            cpp: Default::default(),
+            rust: Default::default(),
+        };
+        code.rust.insert(FFI_MODULE.into(), String::new());
+        code.rust.insert(ROOT_MODULE.into(), String::new());
+        code
+    }
+}
+
+pub fn run(mut data: Context2<'_>, code: &Code) -> Result<()> {
     let crate_name = data.config.crate_properties().name();
     let output_path = data.workspace.crate_path(crate_name);
 
@@ -251,130 +274,136 @@ pub fn run(mut data: Context2<'_>) -> Result<()> {
     generate_crate_template(data.reborrow(), &output_path)?;
     data.workspace.update_cargo_toml()?;
 
-    let c_lib_path = output_path.join("c_lib");
-    if !c_lib_path.exists() {
-        create_dir(&c_lib_path)?;
+    let cpp_lib_path = output_path.join("cpp");
+    if !cpp_lib_path.exists() {
+        create_dir(&cpp_lib_path)?;
     }
-    let c_lib_name = format!("{}_c", data.config.crate_properties().name());
-    let global_header_name = format!("{}_global.h", c_lib_name);
-    generate_c_lib_template(
-        &c_lib_name,
-        &c_lib_path,
-        &global_header_name,
-        &all_include_directives(data.config)?,
-    )?;
 
-    // cpp_code_generator::generate_cpp_file(
-    //     data.db,
-    //     &c_lib_path.join("file1.cpp"),
-    //     &global_header_name,
-    // )?;
-    {
-        let mut cpp_file = create_file(c_lib_path.join("file1.cpp"))?;
-        writeln!(cpp_file, "#include \"{}\"", global_header_name)?;
+    let mut cpp_file = create_file(cpp_lib_path.join("file1.cpp"))?;
+    write!(cpp_file, "{}", include_str!("../templates/cpp/file1.cpp"))?;
+    write_include_directives(&mut cpp_file, &all_include_directives(data.config)?)?;
+    writeln!(cpp_file, "{}", &code.cpp)?;
+    cpp_file.flush()?;
+    drop(cpp_file);
 
-        if data.config.crate_properties().name() == "qt_gui" {
-            #[allow(clippy::write_literal)]
-            writeln!(
-                cpp_file,
-                "{}",
-                r#"
-            #ifndef Q_MOC_RUN
-            class LifetimeChecker : public QObject {
-                Q_OBJECT
-            public:
-                LifetimeChecker();
-                void add(QObject* obj);
+    /*if data.config.crate_properties().name() == "qt_gui" {
+        #[allow(clippy::write_literal)]
+        writeln!(
+            cpp_file,
+            "{}",
+            r#"
+        #ifndef Q_MOC_RUN
+        class LifetimeChecker : public QObject {
+            Q_OBJECT
+        public:
+            LifetimeChecker();
+            void add(QObject* obj);
 
-            private slots:
-                void objectDestroyed(QObject* obj);
+        private slots:
+            void objectDestroyed(QObject* obj);
 
-            private:
-                QSet<QObject*> m_objects;
-                int m_counter;
-            };
-            #endif
-            extern LifetimeChecker* LIFETIME_CHECKER;
+        private:
+            QSet<QObject*> m_objects;
+            int m_counter;
+        };
+        #endif
+        extern LifetimeChecker* LIFETIME_CHECKER;
 
-            extern "C" {
-                RITUAL_EXPORT int ffi_f2(int x) {
-                    QObject* obj = new QObject();
-                    LIFETIME_CHECKER->add(obj);
-                    qDebug() << "before deleted!";
-                    delete obj;
-                    qDebug() << "deleted!";
-                    QRect rect;
-                    rect.setLeft(x * 3);
-                    return rect.left();
-                }
+        extern "C" {
+            RITUAL_EXPORT int ffi_f2(int x) {
+                QObject* obj = new QObject();
+                LIFETIME_CHECKER->add(obj);
+                qDebug() << "before deleted!";
+                delete obj;
+                qDebug() << "deleted!";
+                QRect rect;
+                rect.setLeft(x * 3);
+                return rect.left();
             }
-
-            #include "file1.moc"
-            "#
-            )?;
-        } else {
-            #[allow(clippy::write_literal)]
-            writeln!(
-                cpp_file,
-                "{}",
-                r#"
-            class LifetimeChecker : public QObject {
-                Q_OBJECT
-            public:
-                LifetimeChecker() : m_counter(0) {
-                    qDebug() << "LifetimeChecker created" << this;
-                }
-                void add(QObject* obj) {
-                    m_counter++;
-                    qDebug() << QObject::connect(obj, &QObject::destroyed, this, &LifetimeChecker::objectDestroyed, Qt::DirectConnection);
-                    qDebug() << "added" << obj << "counter" << m_counter << "this" << this;
-                    m_objects.insert(obj);
-                }
-
-            private slots:
-                void objectDestroyed(QObject* obj) {
-                    qDebug() << "destroyed" << obj << "this" << this;
-                    m_objects.remove(obj);
-                }
-
-            private:
-                QSet<QObject*> m_objects;
-                int m_counter;
-            };
-            LifetimeChecker* LIFETIME_CHECKER = new LifetimeChecker();
-
-
-            extern "C" {
-                RITUAL_EXPORT int ffi_f1(int x) {
-                    QObject* obj = new QObject();
-                    LIFETIME_CHECKER->add(obj);
-                    qDebug() << "before deleted!";
-                    delete obj;
-                    qDebug() << "deleted!";
-                    QRect rect;
-                    rect.setLeft(x * 2);
-                    return rect.left();
-                }
-            }
-
-            #include "file1.moc"
-            "#
-            )?;
         }
-    }
 
-    // let file = create_file(c_lib_path.join("sized_types.cxx"))?;
-    // generate_cpp_type_size_requester(data.db, data.config.include_directives(), file)?;
+        #include "file1.moc"
+        "#
+        )?;
+    } else {
+        #[allow(clippy::write_literal)]
+        writeln!(
+            cpp_file,
+            "{}",
+            r#"
+        class LifetimeChecker : public QObject {
+            Q_OBJECT
+        public:
+            LifetimeChecker() : m_counter(0) {
+                qDebug() << "LifetimeChecker created" << this;
+            }
+            void add(QObject* obj) {
+                m_counter++;
+                qDebug() << QObject::connect(obj, &QObject::destroyed, this, &LifetimeChecker::objectDestroyed, Qt::DirectConnection);
+                qDebug() << "added" << obj << "counter" << m_counter << "this" << this;
+                m_objects.insert(obj);
+            }
 
-    // rust_code_generator::generate(
-    //     data.db,
-    //     output_path.join("src"),
-    //     data.config.crate_template_path().map(|s| s.join("src")),
-    // )?;
+        private slots:
+            void objectDestroyed(QObject* obj) {
+                qDebug() << "destroyed" << obj << "this" << this;
+                m_objects.remove(obj);
+            }
+
+        private:
+            QSet<QObject*> m_objects;
+            int m_counter;
+        };
+        LifetimeChecker* LIFETIME_CHECKER = new LifetimeChecker();
+
+
+        extern "C" {
+            RITUAL_EXPORT int ffi_f1(int x) {
+                QObject* obj = new QObject();
+                LIFETIME_CHECKER->add(obj);
+                qDebug() << "before deleted!";
+                delete obj;
+                qDebug() << "deleted!";
+                QRect rect;
+                rect.setLeft(x * 2);
+                return rect.left();
+            }
+        }
+
+        #include "file1.moc"
+        "#
+        )?;
+    }*/
 
     {
-        let mut rust_file = create_file(output_path.join("src/lib.rs"))?;
-        if data.config.crate_properties().name() == "qt_gui" {
+        let template_src_path = data.config.crate_template_path().map(|s| s.join("src"));
+
+        for (module_name, content) in &code.rust {
+            let file_name = if module_name == FFI_MODULE {
+                format!("{module_name}.in.rs")
+            } else {
+                format!("{module_name}.rs")
+            };
+            let mut rust_file = create_file(output_path.join("src").join(&file_name))?;
+            if module_name == FFI_MODULE {
+                writeln!(rust_file, "extern \"C\" {{\n")?;
+            }
+
+            if let Some(template_src_path) = &template_src_path {
+                let template_path = template_src_path.join(&file_name);
+                if template_path.exists() {
+                    let template_content = file_to_string(template_path)?;
+                    writeln!(rust_file, "{}", template_content)?;
+                }
+                writeln!(rust_file, "{}", content)?;
+            }
+
+            if module_name == FFI_MODULE {
+                writeln!(rust_file, "}}\n")?;
+            }
+        }
+
+        /*if data.config.crate_properties().name() == "qt_gui" {
             #[allow(clippy::write_literal)]
             writeln!(
                 rust_file,
@@ -413,7 +442,7 @@ pub fn run(mut data: Context2<'_>) -> Result<()> {
             }
             "#
             )?;
-        }
+        }*/
     }
     {
         let mut rust_ffi_file = create_file(output_path.join("src/ffi.in.rs"))?;
@@ -460,7 +489,6 @@ pub fn run(mut data: Context2<'_>) -> Result<()> {
         output_path.join("build_script_data.json"),
         &BuildScriptData {
             cpp_build_config: data.config.cpp_build_config().clone(),
-            cpp_wrapper_lib_name: c_lib_name,
             known_targets: data.current_database.targets().to_vec(),
         },
         None,

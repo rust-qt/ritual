@@ -278,7 +278,7 @@ fn run_clang<R, F: FnMut(Entity<'_>) -> Result<R>>(
     writeln!(
         global_file,
         "{}",
-        include_str!("../templates/c_lib/global.h"),
+        include_str!("../templates/cpp/file1.cpp"),
     )?;
     write_include_directives(&mut global_file, &all_include_directives(config)?)?;
     drop(global_file);
@@ -292,7 +292,7 @@ fn run_clang<R, F: FnMut(Entity<'_>) -> Result<R>>(
     drop(tmp_file);
 
     if let Some(template_path) = config.crate_template_path() {
-        let extra_files_dir = template_path.join("c_lib/extra");
+        let extra_files_dir = template_path.join("cpp/extra");
         if extra_files_dir.exists() {
             let destination = tmp_path.join("extra");
             if destination.exists() {

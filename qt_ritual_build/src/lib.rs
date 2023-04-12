@@ -11,9 +11,7 @@
 use itertools::Itertools;
 use qt_ritual_common::get_full_build_config;
 use ritual_build::common::errors::{bail, format_err, FancyUnwrap, Result, ResultExt};
-use ritual_build::common::file_utils::{
-    create_dir, create_file, open_file, os_str_to_str, path_to_str,
-};
+use ritual_build::common::file_utils::{create_dir, create_file, os_str_to_str, path_to_str};
 use ritual_build::common::target;
 use ritual_build::common::utils::{exe_suffix, run_command, MapIfOk};
 use ritual_build::{manifest_dir, out_dir, Config};
@@ -113,7 +111,7 @@ pub fn try_run(crate_name: &str) -> Result<()> {
         bail!("moc not found at {}", moc.display());
     }
     let moc_output = Command::new(moc)
-        .arg(manifest_dir()?.join("c_lib").join("file1.cpp"))
+        .arg(manifest_dir()?.join("cpp").join("file1.cpp"))
         .output()?;
     if !moc_output.status.success() {
         bail!(

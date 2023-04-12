@@ -6,7 +6,7 @@
 use crate::config::{CrateDependencySource, CrateProperties, GlobalConfig};
 use crate::cpp_parser::{self, Context2};
 use crate::workspace::Workspace;
-use crate::{crate_writer, search_db};
+use crate::{crate_writer, rustifier, search_db};
 use clap::{Parser, Subcommand};
 use flexi_logger::{Duplicate, LevelFilter, LogSpecification, Logger};
 use itertools::Itertools;
@@ -109,7 +109,7 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
                     config.crate_properties().name(),
                     config.crate_properties().version(),
                 )?;
-                let ctx = Context2 {
+                let mut ctx = Context2 {
                     current_database: &mut main_db,
                     dependencies: &deps.iter().collect_vec(),
                     config: &config,
@@ -125,7 +125,8 @@ pub fn run(options: Options, mut config: GlobalConfig) -> Result<()> {
                     }
                     Command::Generate => {
                         info!("generating crate");
-                        crate_writer::run(ctx)?;
+                        let code = rustifier::run(ctx.reborrow())?;
+                        crate_writer::run(ctx, &code)?;
                     }
                     Command::Search { .. } => unreachable!(),
                 }

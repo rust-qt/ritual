@@ -9,6 +9,7 @@ use ritual::cpp_type::{CppBuiltInNumericType, CppType};
 use ritual::processor::ProcessorData;
 use ritual::rust_info::{NameType, RustItem, RustPathScope};
 use ritual::rust_type::{RustFinalType, RustPath, RustToFfiTypeConversion};
+use ritual::rustifier::Rustifier;
 use ritual_common::errors::{bail, err_msg, Result};
 use ritual_common::file_utils::repo_dir_path;
 use ritual_common::string_utils::CaseOperations;
@@ -341,6 +342,8 @@ pub fn core_config(config: &mut Config) -> Result<()> {
         add_extra_cpp_items,
     )?;
 
+    config.set_rustifier_hook(rustify);
+
     Ok(())
 }
 
@@ -431,4 +434,41 @@ fn connection_to_bool_function() -> CppFunction {
         declaration_code: None,
         return_type: CppType::BuiltInNumeric(CppBuiltInNumericType::Bool),
     }
+}
+
+pub fn rustify(r: &mut Rustifier<'_>) -> Result<()> {
+    r.add_cpp_code(include_str!(
+        "../../crate_templates/common/QObjectLifetimeChecker.h"
+    ));
+    r.add_cpp_code(include_str!(
+        "../../crate_templates/common/QObjectLifetimeChecker.cpp"
+    ));
+    rustify_qobject(r, "QObject")?;
+    rustify_qobject(r, "QTimer")?;
+    include_moc(r)?;
+    Ok(())
+}
+
+pub fn add_lifetime_checker_header(r: &mut Rustifier<'_>) -> Result<()> {
+    r.add_cpp_code("#ifndef Q_MOC_RUN");
+    r.add_cpp_code(include_str!(
+        "../../crate_templates/common/QObjectLifetimeChecker.h"
+    ));
+    r.add_cpp_code("#endif");
+    r.add_cpp_code("extern QObjectLifetimeChecker* QOBJECT_LIFETIME_CHECKER;");
+    Ok(())
+}
+
+pub fn rustify_qobject(r: &mut Rustifier<'_>, cpp_type: &str) -> Result<()> {
+    let rust_name = cpp_type;
+    r.add_rust_lib_code(&format!(
+        "
+        pub struct {rust_name}(::std::num::NonZeroUsize);
+    "
+    ));
+    Ok(())
+}
+pub fn include_moc(rustifier: &mut Rustifier<'_>) -> Result<()> {
+    rustifier.add_cpp_code(r#"#include "file1.moc""#);
+    Ok(())
 }

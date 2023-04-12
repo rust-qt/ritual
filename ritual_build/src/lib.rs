@@ -27,8 +27,7 @@
 use log::info;
 pub use ritual_common as common;
 use ritual_common::cpp_build_config::{CppBuildConfig, CppBuildPaths, CppLibraryType};
-use ritual_common::cpp_lib_builder::{BuildType, CMakeConfigData, CppLibBuilder};
-use ritual_common::errors::{bail, err_msg, FancyUnwrap, Result, ResultExt};
+use ritual_common::errors::{err_msg, FancyUnwrap, Result, ResultExt};
 use ritual_common::file_utils::{create_file, file_to_string, load_json, path_to_str};
 use ritual_common::target::{current_target, LibraryTarget, OS};
 use ritual_common::{env_var_names, BuildScriptData};
@@ -138,18 +137,16 @@ impl Config {
             .eval(&current_target.target)?;
 
         let out_dir = out_dir()?;
-        //let c_lib_install_dir = out_dir.join("c_lib_install");
         let manifest_dir = manifest_dir()?;
-        let profile = env::var("PROFILE").with_context(|_| "PROFILE env var is missing")?;
         info!("Building C++ wrapper library");
-
-        let library_type = cpp_build_config_data
+        // TODO: reimplement shared cpp lib support
+        let _library_type = cpp_build_config_data
             .library_type()
             .ok_or_else(|| err_msg("library type (shared or static) is not set"))?;
 
         let mut build = cc::Build::new();
         build
-            .file(manifest_dir.join("c_lib").join("file1.cpp"))
+            .file(manifest_dir.join("cpp").join("file1.cpp"))
             .includes(self.cpp_build_paths.include_paths());
         for flag in cpp_build_config_data.compiler_flags() {
             build.flag(flag);
@@ -159,46 +156,22 @@ impl Config {
             build.flag("-F");
             build.flag(str);
         }
-        build.compile(&self.build_script_data.cpp_wrapper_lib_name);
+        let crate_name =
+            env::var("CARGO_PKG_NAME").with_context(|_| "CARGO_PKG_NAME env var is missing")?;
+        let cpp_wrapper_lib_name = format!("ritual_cpp_{}", crate_name);
 
-        // let cmake_config = CMakeConfigData {
-        //     cpp_build_config_data: &cpp_build_config_data,
-        //     cpp_build_paths: &self.cpp_build_paths,
-        //     library_type: Some(library_type),
-        //     cpp_library_version: self.current_cpp_library_version.clone(),
-        // };
+        build.compile(&cpp_wrapper_lib_name);
 
-        // let cmake_vars = cmake_config.cmake_vars()?.into_iter().collect();
-        // CppLibBuilder {
-        //     cmake_source_dir: manifest_dir.join("c_lib"),
-        //     build_dir: out_dir.join("c_lib_build"),
-        //     install_dir: Some(c_lib_install_dir.clone()),
-        //     num_jobs: env::var("NUM_JOBS").ok().and_then(|x| x.parse().ok()),
-        //     cmake_vars,
-        //     build_type: match profile.as_str() {
-        //         "debug" => BuildType::Debug,
-        //         "release" => BuildType::Release,
-        //         _ => bail!("unknown value of PROFILE env var: {}", profile),
-        //     },
-        //     capture_output: false,
-        //     skip_cmake: false,
-        //     skip_cmake_after_first_run: false,
-        // }
-        // .run()?;
         {
             info!("Generating ffi.rs file");
             let mut ffi_file = create_file(out_dir.join("ffi.rs"))?;
             if cpp_build_config_data.library_type() == Some(CppLibraryType::Shared) {
-                writeln!(
-                    ffi_file,
-                    "#[link(name = \"{}\")]",
-                    &self.build_script_data.cpp_wrapper_lib_name
-                )?;
+                writeln!(ffi_file, "#[link(name = \"{}\")]", &cpp_wrapper_lib_name)?;
             } else {
                 writeln!(
                     ffi_file,
                     "#[link(name = \"{}\", kind = \"static\")]",
-                    &self.build_script_data.cpp_wrapper_lib_name
+                    &cpp_wrapper_lib_name
                 )?;
             }
             write!(
@@ -228,10 +201,6 @@ impl Config {
         for path in self.cpp_build_paths.framework_paths() {
             println!("cargo:rustc-link-search=framework={}", path_to_str(path)?);
         }
-        // println!(
-        //     "cargo:rustc-link-search=native={}",
-        //     path_to_str(&c_lib_install_dir)?
-        // );
 
         if let Some(version) = self.current_cpp_library_version {
             println!("cargo:rustc-cfg=cpp_lib_version={:?}", version);

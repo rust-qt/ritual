@@ -307,7 +307,7 @@ impl LocalCppChecker {
         let extra_path = src_path.join("extra");
         create_dir_all(&extra_path)?;
         if let Some(crate_template_path) = &self.crate_template_path {
-            let extra_template = crate_template_path.join("c_lib/extra");
+            let extra_template = crate_template_path.join("cpp/extra");
             if extra_template.exists() {
                 copy_recursively(&extra_template, &extra_path)?;
             }
@@ -324,7 +324,7 @@ impl LocalCppChecker {
         writeln!(
             global_file,
             "{}",
-            include_str!("../templates/c_lib/global.h"),
+            include_str!("../templates/cpp/file1.cpp"),
         )?;
         write_include_directives(&mut global_file, &self.all_include_directives)?;
 
@@ -695,10 +695,7 @@ pub fn check_cpp_parser_hook(
     hook: &impl Fn(&CppPath) -> Result<bool>,
 ) -> Result<bool> {
     let all_types = cpp_item.all_involved_types();
-    let paths = all_types
-        .iter()
-        .flat_map(type_paths)
-        .chain(cpp_item.path());
+    let paths = all_types.iter().flat_map(type_paths).chain(cpp_item.path());
     for path in paths {
         if !recursive_hook(path.clone(), hook)? {
             return Ok(false);

@@ -27,8 +27,6 @@ pub use toml;
 pub struct BuildScriptData {
     /// Information required to build the C++ wrapper library
     pub cpp_build_config: cpp_build_config::CppBuildConfig,
-    /// Name of C++ wrapper library
-    pub cpp_wrapper_lib_name: String,
     /// Environments the generator was used in
     pub known_targets: Vec<LibraryTarget>,
 }

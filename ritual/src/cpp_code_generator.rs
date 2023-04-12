@@ -63,7 +63,7 @@ impl Generator<'_> {
             )
             .join(", ");
         Ok(format!(
-            include_str!("../templates/c_lib/qt_slot_wrapper.h"),
+            include_str!("../templates/cpp/qt_slot_wrapper.h"),
             class_name = wrapper.class_path.to_cpp_code()?,
             callback_arg = func_type.to_cpp_code(Some("callback"))?,
             callback_type = func_type.to_cpp_code(Some(""))?,
@@ -85,7 +85,7 @@ impl Generator<'_> {
             })?
             .join(", ");
         Ok(format!(
-            include_str!("../templates/c_lib/qt_signal_wrapper.h"),
+            include_str!("../templates/cpp/qt_signal_wrapper.h"),
             class_name = wrapper.class_path.to_cpp_code()?,
             method_args = method_args,
             signal_impl = if self.0.crate_name().starts_with("moqt_") {
@@ -529,7 +529,7 @@ pub fn all_include_directives(config: &Config) -> Result<Vec<PathBuf>> {
     let mut all_include_directives = config.include_directives().to_vec();
 
     if let Some(crate_template_path) = config.crate_template_path() {
-        let extra_template = crate_template_path.join("c_lib/extra");
+        let extra_template = crate_template_path.join("cpp/extra");
         if extra_template.exists() {
             for item in read_dir(&extra_template)? {
                 all_include_directives.push(PathBuf::from(format!(

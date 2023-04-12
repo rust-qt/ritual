@@ -94,10 +94,10 @@ fn build_moqt() -> Result<TempTestDir> {
             write!(file, "{}", new_content)?;
         }
 
-        if repo_template_dir.join(&real_lib).join("c_lib").exists() {
+        if repo_template_dir.join(&real_lib).join("cpp").exists() {
             copy_recursively(
-                &repo_template_dir.join(&real_lib).join("c_lib"),
-                &template_dir.join(lib).join("c_lib"),
+                &repo_template_dir.join(&real_lib).join("cpp"),
+                &template_dir.join(lib).join("cpp"),
             )?;
         }
     }

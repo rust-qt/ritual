@@ -37,6 +37,7 @@ mod rust_code_generator;
 mod rust_generator;
 pub mod rust_info;
 pub mod rust_type;
+pub mod rustifier;
 pub mod search_db;
 mod type_allocation_places;
 pub mod workspace;
